@@ -1,38 +1,19 @@
 import SwiftUI
 
 struct PopoverView: View {
+    static let preferredWidth: CGFloat = 280
+
     let monitor: PowerMonitor
+    var openDetails: (() -> Void)? = nil
     @Environment(\.openWindow) private var openWindow
-    @State private var cachedPopoverWindow: NSWindow?
 
     private var data: PowerData { monitor.currentData }
 
-    private var layoutSignature: String {
-        [
-            String(describing: data.connectionPhase),
-            data.effectiveIsOnAC ? "ac" : "bat",
-            data.isConnectingAC ? "conn" : "stable",
-            data.isBatteryCharging ? "chg" : data.isSupplementalDischarge ? "sup" : "plain",
-            data.notChargingReasonDescription != nil ? "reason" : "noreason",
-            data.batteryHealthPercent != nil ? "health" : "nohealth",
-            data.effectiveIsOnAC && data.acAdapterWattage > 0 ? "spec" : "nospec",
-            data.estimatedTimeRemainingText != nil ? "time" : "notime",
-            monitor.isDataAvailable ? "available" : "unavailable",
-            monitor.launchAtLoginError == nil ? "loginok" : "loginerror",
-        ].joined(separator: "-")
-    }
-
     var body: some View {
         contentSections
-            .frame(width: Self.popoverWidth, alignment: .topLeading)
+            .frame(width: Self.preferredWidth, alignment: .topLeading)
             .fixedSize(horizontal: false, vertical: true)
-            .onChange(of: layoutSignature) { _, _ in
-                scheduleWindowFit(after: 0)
-                scheduleWindowFit(after: 0.05)
-            }
             .onAppear {
-                scheduleWindowFit(after: 0)
-                scheduleWindowFit(after: 0.05)
                 DispatchQueue.main.async {
                     NSApp.keyWindow?.makeFirstResponder(nil)
                 }
@@ -64,8 +45,6 @@ struct PopoverView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-
-    private static let popoverWidth: CGFloat = 280
 
     private var unavailableBanner: some View {
         HStack(spacing: 6) {
@@ -442,107 +421,21 @@ struct PopoverView: View {
         }
     }
 
-    private func scheduleWindowFit(after delay: TimeInterval) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            fitPopoverWindow(to: intrinsicContentHeight())
-        }
-    }
-
-    private func intrinsicContentHeight() -> CGFloat {
-        let hostingView = NSHostingView(
-            rootView: contentSections
-                .frame(width: Self.popoverWidth, alignment: .topLeading)
-                .fixedSize(horizontal: false, vertical: true)
-        )
-        hostingView.sizingOptions = [.intrinsicContentSize]
-        hostingView.setFrameSize(NSSize(width: Self.popoverWidth, height: 1))
-        hostingView.layoutSubtreeIfNeeded()
-        return hostingView.fittingSize.height
-    }
-
-    private func popoverWindow() -> NSWindow? {
-        if let cached = cachedPopoverWindow, cached.isVisible {
-            return cached
-        }
-        let candidates = NSApp.windows.filter { window in
-            let contentRect = window.contentRect(forFrameRect: window.frame)
-            return window.isVisible &&
-                abs(contentRect.width - Self.popoverWidth) < 12 &&
-                contentRect.height > 60 && contentRect.height < 800 &&
-                window.title != detailWindowTitle
-        }
-        let found = candidates.first
-        if let f = found {
-            cachedPopoverWindow = f   // @State assignment is allowed
-        }
-        return found
-    }
-
-    private func fitPopoverWindow(to contentHeight: CGFloat) {
-        DispatchQueue.main.async {
-            guard contentHeight > 1 else { return }
-            guard let window = self.popoverWindow() else { return }
-
-            let currentFrame = window.frame
-            let targetContentRect = NSRect(
-                origin: .zero,
-                size: NSSize(width: Self.popoverWidth, height: contentHeight)
-            )
-            var targetFrame = window.frameRect(forContentRect: targetContentRect)
-            targetFrame.origin.x = currentFrame.midX - targetFrame.width / 2
-            targetFrame.origin.y = currentFrame.maxY - targetFrame.height
-
-            let heightDiff = abs(currentFrame.height - targetFrame.height)
-            let widthDiff = abs(currentFrame.width - targetFrame.width)
-            if heightDiff < 0.5 && widthDiff < 0.5 {
-                return
-            }
-
-            window.setFrame(targetFrame, display: true, animate: false)
-
-            DispatchQueue.main.async {
-                window.contentView?.layoutSubtreeIfNeeded()
-            }
-        }
-    }
-
-    private var detailWindowTitle: String {
-        String(localized: "PowerTop Details")
-    }
-
-    private func detailWindow() -> NSWindow? {
-        NSApp.windows.first { $0.title == detailWindowTitle }
-    }
-
     private func openDetailWindow() {
-        popoverWindow()?.orderOut(nil)
-
-        if let window = detailWindow() {
-            DispatchQueue.main.async {
-                presentDetailWindow(window)
-            }
+        if let openDetails {
+            openDetails()
             return
         }
-
-        openWindow(id: "detail")
-        scheduleDetailWindowPresentation(attemptsRemaining: 6, after: 0)
-    }
-
-    private func scheduleDetailWindowPresentation(attemptsRemaining: Int, after delay: TimeInterval) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            if let window = detailWindow() {
-                presentDetailWindow(window)
-            } else if attemptsRemaining > 0 {
-                scheduleDetailWindowPresentation(attemptsRemaining: attemptsRemaining - 1, after: 0.05)
-            } else {
+        let detailTitle = String(localized: "PowerTop Details")
+        for window in NSApp.windows {
+            if window.title == detailTitle {
+                window.makeKeyAndOrderFront(nil)
                 NSApp.activate(ignoringOtherApps: true)
+                return
             }
         }
-    }
-
-    private func presentDetailWindow(_ window: NSWindow) {
+        openWindow(id: "detail")
         NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
     }
 }
 

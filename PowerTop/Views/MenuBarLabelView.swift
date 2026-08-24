@@ -36,4 +36,9 @@ struct MenuBarLabelView: View {
             .font(.system(size: 12, weight: .medium, design: .rounded))
         }
     }
+
+    static func preferredWidth(for monitor: PowerMonitor) -> CGFloat {
+        let host = NSHostingView(rootView: MenuBarLabelView(monitor: monitor))
+        return ceil(host.fittingSize.width)
+    }
 }
