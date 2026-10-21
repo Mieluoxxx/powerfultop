@@ -14,6 +14,7 @@ struct RegressionTests {
         testGapAloneIsNotSupplementalDischarge()
         testEstimatorIgnoresRepeatedSnapshots()
         testTelemetryEnergyUnits()
+        testMenuBarLabelStyles()
 
         guard failures == 0 else {
             fputs("\(failures) regression test(s) failed\n", stderr)
@@ -267,6 +268,31 @@ struct RegressionTests {
         expect(abs(telemetryEnergyToWatts(3321) - 11.956) < 0.01, "idle wall power includes adapter loss")
         expect(abs(telemetryEnergyToWatts(13390) - 48.207) < 0.01, "charging SystemEnergyConsumed matches SystemPowerIn")
         expect(abs(telemetryEnergyToWatts(14741) - 53.068) < 0.01, "charging wall power includes adapter loss")
+    }
+
+    private static func testMenuBarLabelStyles() {
+        let battery = makeData(systemPowerW: 7.4, batteryPowerW: 7.4, acInputW: 0, isOnAC: false, connectionPhase: .onBattery)
+
+        let percent = MenuBarLabel(style: .batteryPercent, isDataAvailable: true, data: battery)
+        expectEqual(percent.title, "50%", "percent style hides power")
+        expectEqual(percent.symbolName, "battery.50", "percent style shows battery level icon")
+
+        let full = MenuBarLabel(style: .batteryPercentPower, isDataAvailable: true, data: battery)
+        expectEqual(full.title, "50% 7W", "percent + power style")
+        expectEqual(full.widthTemplate, "50% 88W", "reserve two-digit power width")
+
+        let powerOnly = MenuBarLabel(style: .powerOnly, isDataAvailable: true, data: battery)
+        expectEqual(powerOnly.title, "7W", "power-only style shows wattage")
+        expectNil(powerOnly.symbolName, "power-only style has no icon next to the system battery")
+        expectEqual(powerOnly.widthTemplate, "88W", "power-only reserves two-digit width")
+
+        let busy = makeData(systemPowerW: 23.6, batteryPowerW: 23.6, acInputW: 0, isOnAC: false, connectionPhase: .onBattery)
+        let busyLabel = MenuBarLabel(style: .powerOnly, isDataAvailable: true, data: busy)
+        expectEqual(busyLabel.title, "24W", "round wattage")
+        expectEqual(busyLabel.widthTemplate, "24W", "two-digit power needs no padding")
+
+        let unavailable = MenuBarLabel(style: .powerOnly, isDataAvailable: false, data: battery)
+        expectEqual(unavailable.symbolName, "exclamationmark.triangle", "warn when data is unavailable")
     }
 
     private static func packed(_ storedDigits: String) -> Int {

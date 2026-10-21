@@ -41,7 +41,10 @@
 // Footer
 "Details" = "Details";
 "Launch at Login" = "Launch at Login";
-"Show Power in Menu Bar" = "Show Power in Menu Bar";
+"Menu Bar Display" = "Menu Bar Display";
+"Battery + Percent" = "Battery + Percent";
+"Battery + Percent + Power" = "Battery + Percent + Power";
+"Power Only" = "Power Only (next to system battery)";
 "Quit" = "Quit";
 
 // Detail Window

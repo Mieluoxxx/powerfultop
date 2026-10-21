@@ -8,7 +8,8 @@ import ServiceManagement
 @MainActor
 @Observable
 final class PowerMonitor {
-    private static let showPowerInMenuBarKey = "showPowerInMenuBar"
+    private static let menuBarDisplayStyleKey = "menuBarDisplayStyle"
+    private static let legacyShowPowerInMenuBarKey = "showPowerInMenuBar"
 
     var currentData: PowerData = .empty
     /// Bumped on each publish so MenuBarExtra label can refresh (SwiftUI may not redraw otherwise).
@@ -30,9 +31,9 @@ final class PowerMonitor {
             }
         }
     }
-    var showPowerInMenuBar: Bool {
+    var menuBarDisplayStyle: MenuBarDisplayStyle {
         didSet {
-            UserDefaults.standard.set(showPowerInMenuBar, forKey: Self.showPowerInMenuBarKey)
+            UserDefaults.standard.set(menuBarDisplayStyle.rawValue, forKey: Self.menuBarDisplayStyleKey)
         }
     }
 
@@ -57,7 +58,17 @@ final class PowerMonitor {
 
     init() {
         launchAtLogin = (SMAppService.mainApp.status == .enabled)
-        showPowerInMenuBar = UserDefaults.standard.bool(forKey: Self.showPowerInMenuBarKey)
+        menuBarDisplayStyle = Self.loadMenuBarDisplayStyle()
+    }
+
+    private static func loadMenuBarDisplayStyle() -> MenuBarDisplayStyle {
+        let defaults = UserDefaults.standard
+        if let raw = defaults.string(forKey: menuBarDisplayStyleKey),
+           let style = MenuBarDisplayStyle(rawValue: raw) {
+            return style
+        }
+        // Users who enabled the old "Show Power in Menu Bar" toggle keep wattage visible.
+        return defaults.bool(forKey: legacyShowPowerInMenuBarKey) ? .batteryPercentPower : .batteryPercent
     }
 
     func refreshNow() {

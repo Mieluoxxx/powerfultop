@@ -258,10 +258,15 @@ struct PopoverView: View {
                 get: { monitor.launchAtLogin },
                 set: { monitor.launchAtLogin = $0 }
             ))
-            Toggle(String(localized: "Show Power in Menu Bar"), isOn: Binding(
-                get: { monitor.showPowerInMenuBar },
-                set: { monitor.showPowerInMenuBar = $0 }
-            ))
+            Picker(String(localized: "Menu Bar Display"), selection: Binding(
+                get: { monitor.menuBarDisplayStyle },
+                set: { monitor.menuBarDisplayStyle = $0 }
+            )) {
+                ForEach(MenuBarDisplayStyle.allCases) { style in
+                    Text(style.title).tag(style)
+                }
+            }
+            .pickerStyle(.inline)
             Divider()
             Text(AppInfo.versionLabel)
             Button(String(localized: "Quit")) {

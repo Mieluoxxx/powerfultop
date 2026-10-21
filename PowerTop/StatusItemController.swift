@@ -68,7 +68,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     private func observeMonitor() {
         withObservationTracking {
             _ = monitor.uiRefreshToken
-            _ = monitor.showPowerInMenuBar
+            _ = monitor.menuBarDisplayStyle
             _ = monitor.isDataAvailable
             _ = monitor.currentData.menuBarPowerText
             _ = monitor.currentData.effectiveIsOnAC
@@ -82,16 +82,33 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     }
 
     private func updateStatusItem() {
-        let label = MenuBarLabel(monitor: monitor)
+        let label = MenuBarLabel(
+            style: monitor.menuBarDisplayStyle,
+            isDataAvailable: monitor.isDataAvailable,
+            data: monitor.currentData
+        )
         guard label != renderedLabel else { return }
         renderedLabel = label
 
         guard let button = statusItem.button else { return }
-        let image = NSImage(systemSymbolName: label.symbolName, accessibilityDescription: nil)
+        let image = label.symbolName.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
         image?.isTemplate = true
         button.image = image
+        if image == nil {
+            button.imagePosition = .noImage
+        } else {
+            button.imagePosition = label.title.isEmpty ? .imageOnly : .imageLeading
+        }
+
+        if label.title.isEmpty {
+            button.title = ""
+            statusItem.length = NSStatusItem.variableLength
+            return
+        }
+        button.title = label.widthTemplate
+        let reservedWidth = ceil(button.fittingSize.width)
         button.title = label.title
-        button.imagePosition = label.title.isEmpty ? .imageOnly : .imageLeading
+        statusItem.length = max(reservedWidth, ceil(button.fittingSize.width))
     }
 
     @objc private func statusItemClicked() {

@@ -29,6 +29,7 @@ mkdir -p "$BUILD_DIR"
     "$PROJECT_DIR/PowerTop/Utilities/BatteryChargeLimit.swift" \
     "$PROJECT_DIR/PowerTop/Models/PowerConnectionPhase.swift" \
     "$PROJECT_DIR/PowerTop/Models/PowerData.swift" \
+    "$PROJECT_DIR/PowerTop/Views/MenuBarLabelView.swift" \
     "$PROJECT_DIR/Tests/RegressionTests.swift"
 
 "$BUILD_DIR/PowerTopRegressionTests"
