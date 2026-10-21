@@ -24,24 +24,8 @@ mkdir -p "$BUILD_DIR"
 
 # Compile Swift sources
 echo "Compiling..."
-SWIFT_FILES=(
-    "$PROJECT_DIR/PowerTop/Utilities/AppInfo.swift"
-    "$PROJECT_DIR/PowerTop/Utilities/IOKitHelpers.swift"
-    "$PROJECT_DIR/PowerTop/Utilities/BatteryTimeEstimator.swift"
-    "$PROJECT_DIR/PowerTop/Utilities/PowerFlow.swift"
-    "$PROJECT_DIR/PowerTop/Utilities/BatteryChargeLimit.swift"
-    "$PROJECT_DIR/PowerTop/Utilities/TemperatureUnits.swift"
-    "$PROJECT_DIR/PowerTop/Models/PowerConnectionPhase.swift"
-    "$PROJECT_DIR/PowerTop/Models/PowerData.swift"
-    "$PROJECT_DIR/PowerTop/Services/PowerMonitor.swift"
-    "$PROJECT_DIR/PowerTop/Views/MenuBarLabelView.swift"
-    "$PROJECT_DIR/PowerTop/Views/LevelBar.swift"
-    "$PROJECT_DIR/PowerTop/Views/PowerPresentation.swift"
-    "$PROJECT_DIR/PowerTop/Views/PopoverView.swift"
-    "$PROJECT_DIR/PowerTop/Views/DetailWindowView.swift"
-    "$PROJECT_DIR/PowerTop/StatusItemController.swift"
-    "$PROJECT_DIR/PowerTop/PowerTopApp.swift"
-)
+# Glob instead of listing files so new sources can't be forgotten.
+SWIFT_FILES=("$PROJECT_DIR"/PowerTop/*.swift "$PROJECT_DIR"/PowerTop/*/*.swift)
 
 "$SWIFTC" \
     -target arm64-apple-macosx14.0 \

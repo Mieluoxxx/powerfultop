@@ -19,9 +19,7 @@
 "Charger" = "充电器";
 "Battery" = "电池";
 "AC Adapter" = "AC 适配器";
-"Battery Charging" = "电池充电";
 "System" = "系统";
-"Battery Supplement" = "电池补充功率";
 
 // Metrics
 "System Power" = "系统功耗";
@@ -51,7 +49,6 @@
 "PowerTop Details" = "PowerTop 详细参数";
 
 // Detail - Power Section
-"Power" = "电源";
 "Charger Load Rate" = "充电器负载率";
 "Charging Status" = "充电状态";
 "Not Charging" = "未在充电";
@@ -60,7 +57,6 @@
 "Charger Output Voltage" = "充电器输出电压";
 "Charger Output Current" = "充电器输出电流";
 "Estimation Mode — telemetry unavailable" = "估算模式 — 遥测数据不可用";
-"Remaining Capacity" = "剩余容量";
 "Est. Time to Empty" = "预计剩余时间";
 "Est. Time to Full" = "预计充满时间";
 "Est. Time to %d%%" = "预计充至 %d%%";
@@ -76,15 +72,11 @@
 
 // Detail - Battery Health
 "Battery Health" = "电池健康";
-"Capacity Details" = "容量详情";
-"Electrical Readings" = "电气读数";
 "—" = "—";
 "Design Capacity" = "设计容量";
 "Current Full Charge" = "当前满充电量";
 "Calibrated Full Charge" = "系统标定满电量";
 "Remaining Charge" = "剩余电量";
-"Full Charge Capacity" = "当前满充容量";
-"Nominal Full Charge Capacity" = "标称满充容量";
 "Discharging" = "放电";
 "Charging" = "充电";
 "Idle" = "空闲";
@@ -107,15 +99,12 @@
 "Series Group %d" = "串联组 %d";
 "Series Group %d · Cell %d" = "串联组 %d · 并联节 %d";
 "Instantaneous current per parallel cell; unequal split within a group is normal." = "各并联节的瞬时电流；同组内两节电流不均是正常现象。";
-"Cell Balance" = "电芯均衡";
 "Series Voltage Balance" = "串联组电压均衡";
 "Parallel Current Balance" = "并联节电流均衡";
 "%d mA max within-group spread — %@" = "组内最大电流差 %d mA — %@";
 "%d mV spread — %@" = "压差 %d mV — %@";
 "Fair" = "一般";
 "Worth Checking" = "建议关注";
-"Cell %d Voltage" = "电芯 %d 电压";
-"Cell %d Full Charge Capacity" = "电芯 %d 满充容量";
 "Optimized Charging Range" = "优化充电保持范围";
 
 // Detail - Charging
@@ -123,13 +112,11 @@
 "Cell Charging Voltage" = "电芯充电电压";
 "Charging Current" = "充电电流";
 "Max Charging Voltage Limit" = "最大充电电压限制";
-"None" = "无";
 
 // Detail - Lifetime
 "Lifetime Statistics" = "生命周期统计";
 "Total Operating Time" = "总运行时间";
 "hours" = "小时";
-"minutes" = "分钟";
 "Battery Max Temperature" = "电池历史最高温度";
 "Battery Min Temperature" = "电池历史最低温度";
 "Battery Avg Temperature" = "电池历史平均温度";

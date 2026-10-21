@@ -23,13 +23,10 @@ mkdir -p "$BUILD_DIR"
     -parse-as-library \
     -Onone \
     -o "$BUILD_DIR/PowerTopRegressionTests" \
-    "$PROJECT_DIR/PowerTop/Utilities/IOKitHelpers.swift" \
-    "$PROJECT_DIR/PowerTop/Utilities/BatteryTimeEstimator.swift" \
-    "$PROJECT_DIR/PowerTop/Utilities/PowerFlow.swift" \
-    "$PROJECT_DIR/PowerTop/Utilities/BatteryChargeLimit.swift" \
-    "$PROJECT_DIR/PowerTop/Models/PowerConnectionPhase.swift" \
-    "$PROJECT_DIR/PowerTop/Models/PowerData.swift" \
-    "$PROJECT_DIR/PowerTop/Views/MenuBarLabelView.swift" \
-    "$PROJECT_DIR/Tests/RegressionTests.swift"
+    "$PROJECT_DIR"/PowerTop/Models/*.swift \
+    "$PROJECT_DIR"/PowerTop/Utilities/*.swift \
+    "$PROJECT_DIR"/Tests/*.swift
 
 "$BUILD_DIR/PowerTopRegressionTests"
+
+python3 -I "$PROJECT_DIR/scripts/check-localization.py" "$PROJECT_DIR"
