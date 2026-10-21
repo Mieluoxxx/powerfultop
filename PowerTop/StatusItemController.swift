@@ -9,7 +9,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     private let popover = NSPopover()
     private var detailWindow: NSWindow?
     /// Skip redundant status-item layout; rewriting length/title every 2s shifts the item.
-    private var renderedSignature: String = ""
+    private var renderedLabel: MenuBarLabel?
     /// Accessory apps often don't resign key, so `.transient` misses outside clicks on macOS 15/26.
     private var localClickMonitor: Any?
     private var globalClickMonitor: Any?
@@ -72,6 +72,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
             _ = monitor.isDataAvailable
             _ = monitor.currentData.menuBarPowerText
             _ = monitor.currentData.effectiveIsOnAC
+            _ = monitor.currentData.batteryPercent
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.updateStatusItem()
@@ -80,46 +81,17 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
         }
     }
 
-    private func statusSignature() -> String {
-        if !monitor.isDataAvailable { return "nodata" }
-        if monitor.showPowerInMenuBar {
-            return "power:\(monitor.currentData.menuBarPowerText)"
-        }
-        return monitor.currentData.effectiveIsOnAC ? "icon:ac" : "icon:battery"
-    }
-
     private func updateStatusItem() {
-        let signature = statusSignature()
-        guard signature != renderedSignature else { return }
-        renderedSignature = signature
+        let label = MenuBarLabel(monitor: monitor)
+        guard label != renderedLabel else { return }
+        renderedLabel = label
 
         guard let button = statusItem.button else { return }
-
-        if !monitor.isDataAvailable {
-            applySymbol(named: "exclamationmark.triangle", on: button)
-            button.title = ""
-            return
-        }
-
-        if monitor.showPowerInMenuBar {
-            button.image = nil
-            button.imagePosition = .noImage
-            button.title = monitor.currentData.menuBarPowerText
-            return
-        }
-
-        button.title = ""
-        applySymbol(
-            named: monitor.currentData.effectiveIsOnAC ? "bolt.fill" : "battery.50",
-            on: button
-        )
-    }
-
-    private func applySymbol(named name: String, on button: NSStatusBarButton) {
-        let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)
+        let image = NSImage(systemSymbolName: label.symbolName, accessibilityDescription: nil)
         image?.isTemplate = true
         button.image = image
-        button.imagePosition = .imageOnly
+        button.title = label.title
+        button.imagePosition = label.title.isEmpty ? .imageOnly : .imageLeading
     }
 
     @objc private func statusItemClicked() {
