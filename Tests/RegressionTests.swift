@@ -12,6 +12,7 @@ struct RegressionTests {
         testManufactureDateDecoding()
         testPowerFlowUsesIOKitDischargeSign()
         testGapAloneIsNotSupplementalDischarge()
+        testEstimatorIgnoresRepeatedSnapshots()
         testTelemetryEnergyUnits()
 
         guard failures == 0 else {
@@ -238,6 +239,28 @@ struct RegressionTests {
         expectEqual(data.menuBarPowerShowsWarning, false, "no supplement warning without measured discharge")
     }
 
+    private static func testEstimatorIgnoresRepeatedSnapshots() {
+        var estimator = BatteryTimeEstimator()
+        func sample(_ watts: Double, at seconds: TimeInterval) -> Double? {
+            let data = makeData(
+                systemPowerW: watts,
+                batteryPowerW: watts,
+                acInputW: 0,
+                isOnAC: false,
+                connectionPhase: .onBattery,
+                timestamp: Date(timeIntervalSince1970: seconds)
+            )
+            return estimator.smoothedPower(for: data).dischargeW
+        }
+
+        expectApproximately(sample(10, at: 0), 10, "seed EMA with first snapshot")
+        for _ in 0..<30 {
+            _ = sample(20, at: 0)
+        }
+        expectApproximately(sample(20, at: 0), 10, "repeated polls of one snapshot do not move EMA")
+        expectApproximately(sample(20, at: 60), 10 + 10 * (1 - exp(-60.0 / 180.0)), "weight by snapshot age")
+    }
+
     private static func testTelemetryEnergyUnits() {
         // Live samples: idle on AC (SystemPowerIn 11501 mW) and charging (SystemPowerIn 48207 mW).
         expect(abs(telemetryEnergyToWatts(3194) - 11.501) < 0.01, "idle SystemEnergyConsumed matches SystemPowerIn")
@@ -259,7 +282,8 @@ struct RegressionTests {
         isOnAC: Bool,
         isCharging: Bool = false,
         fullyCharged: Bool = false,
-        connectionPhase: PowerConnectionPhase
+        connectionPhase: PowerConnectionPhase,
+        timestamp: Date = Date(timeIntervalSince1970: 0)
     ) -> PowerData {
         PowerData(
             systemPowerW: systemPowerW,
@@ -280,7 +304,7 @@ struct RegressionTests {
             cycleCount: nil,
             adapterDescription: nil,
             dataSource: .telemetry,
-            timestamp: Date(timeIntervalSince1970: 0),
+            timestamp: timestamp,
             connectionPhase: connectionPhase,
             batteryHealthPercent: nil,
             designCapacityMAH: nil,

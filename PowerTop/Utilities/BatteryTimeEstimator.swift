@@ -5,6 +5,7 @@ struct BatteryTimeEstimator {
     private var dischargeEMA: Double?
     private var chargeEMA: Double?
     private var lastMode: Mode?
+    private var lastSampleAt: Date?
 
     private enum Mode: Equatable {
         case batteryDischarging
@@ -12,13 +13,15 @@ struct BatteryTimeEstimator {
         case charging
     }
 
-    /// ~60 s effective window at 2 s sampling.
-    private let emaAlpha = 0.065
+    /// AppleSmartBattery refreshes telemetry about once a minute while the UI polls every 2 s,
+    /// so weight by elapsed sample time instead of per poll.
+    private let timeConstant: TimeInterval = 180
 
     mutating func reset() {
         dischargeEMA = nil
         chargeEMA = nil
         lastMode = nil
+        lastSampleAt = nil
     }
 
     /// Returns smoothed discharge/charge power (watts) for the current display snapshot.
@@ -43,17 +46,18 @@ struct BatteryTimeEstimator {
     private mutating func updateDischargeEMA(for data: PowerData) -> Double? {
         switchMode(data.isSupplementalDischarge ? .supplementalDischarging : .batteryDischarging)
         let instant = instantDischargePowerW(for: data)
-        guard instant >= 0.2 else { return dischargeEMA }
-        dischargeEMA = ema(previous: dischargeEMA, sample: instant)
+        guard instant >= 0.2, let elapsed = consumeSample(at: data.timestamp) else { return dischargeEMA }
+        dischargeEMA = ema(previous: dischargeEMA, sample: instant, elapsed: elapsed)
         return dischargeEMA
     }
 
     private mutating func updateChargeEMA(for data: PowerData) -> Double? {
         switchMode(.charging)
         let instant = data.batteryChargeRateW
-        guard instant >= 0.2 else { return chargeEMA }
-        let smoothed = ema(previous: chargeEMA, sample: instant)
-        chargeEMA = smoothed
+        if instant >= 0.2, let elapsed = consumeSample(at: data.timestamp) {
+            chargeEMA = ema(previous: chargeEMA, sample: instant, elapsed: elapsed)
+        }
+        guard let smoothed = chargeEMA else { return nil }
         return applyChargeTaper(
             rateW: smoothed,
             stateOfCharge: data.stateOfCharge ?? data.batteryPercent,
@@ -66,7 +70,20 @@ struct BatteryTimeEstimator {
             dischargeEMA = nil
             chargeEMA = nil
             lastMode = mode
+            lastSampleAt = nil
         }
+    }
+
+    /// Returns elapsed time since the previous sample, or nil when the snapshot was already consumed.
+    private mutating func consumeSample(at sampleAt: Date) -> TimeInterval? {
+        guard let last = lastSampleAt else {
+            lastSampleAt = sampleAt
+            return 0
+        }
+        let elapsed = sampleAt.timeIntervalSince(last)
+        guard elapsed > 0 else { return nil }
+        lastSampleAt = sampleAt
+        return elapsed
     }
 
     private func instantDischargePowerW(for data: PowerData) -> Double {
@@ -76,9 +93,10 @@ struct BatteryTimeEstimator {
         return data.systemPowerW
     }
 
-    private func ema(previous: Double?, sample: Double) -> Double {
+    private func ema(previous: Double?, sample: Double, elapsed: TimeInterval) -> Double {
         guard let previous else { return sample }
-        return previous + emaAlpha * (sample - previous)
+        let alpha = 1 - exp(-elapsed / timeConstant)
+        return previous + alpha * (sample - previous)
     }
 
     /// Reduce effective charge rate near the charge target to approximate constant-voltage taper.

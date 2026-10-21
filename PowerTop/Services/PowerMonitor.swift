@@ -289,6 +289,11 @@ final class PowerMonitor {
         let voltage = extractInt(from: props, key: "Voltage")
         let amperage = extractInt(from: props, key: "Amperage")
         let cycleCount = extractInt(from: props, key: "CycleCount")
+        // Telemetry is a snapshot taken at UpdateTime, not at poll time.
+        let sampleDate: Date = {
+            guard let updateTime = extractInt(from: props, key: "UpdateTime"), updateTime > 0 else { return Date() }
+            return Date(timeIntervalSince1970: TimeInterval(updateTime))
+        }()
 
         // Device info
         let batterySerial = extractString(from: props, key: "Serial")
@@ -374,7 +379,7 @@ final class PowerMonitor {
                 batteryVoltageMV: voltage, batteryAmperageMA: amperage,
                 batteryTemperatureC: temperature.map { TemperatureUnits.instantCelsius(fromCentidegrees: $0) },
                 cycleCount: cycleCount, adapterDescription: adapterDescription,
-                dataSource: ds, timestamp: Date(),
+                dataSource: ds, timestamp: sampleDate,
                 connectionPhase: .onBattery,
                 batteryHealthPercent: batteryHealthPercent,
                 designCapacityMAH: designCapacity, rawMaxCapacityMAH: rawMaxCapacity,
