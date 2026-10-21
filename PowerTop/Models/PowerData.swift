@@ -44,7 +44,7 @@ struct PowerData {
     let adapterDescription: String?
     let dataSource: PowerDataSource
     let timestamp: Date
-    let connectionPhase: PowerConnectionPhase
+    private(set) var connectionPhase: PowerConnectionPhase
 
     // Battery health
     let batteryHealthPercent: Int?
@@ -97,40 +97,40 @@ struct PowerData {
     let averageSystemPowerW: Double?
     let batteryManufactureDate: String?
     /// EMA-smoothed discharge/charge power for time estimates (set by PowerMonitor).
-    let smoothedDischargePowerW: Double?
-    let smoothedChargePowerW: Double?
+    private(set) var smoothedDischargePowerW: Double?
+    private(set) var smoothedChargePowerW: Double?
 
     // Full memberwise init (package-internal; centralizes all assignments to avoid drift across call sites)
     init(
         systemPowerW: Double, batteryPowerW: Double, acInputW: Double,
-        acAdapterWattage: Int,
+        acAdapterWattage: Int = 0,
         adapterRatedVoltageMV: Int? = nil, adapterRatedCurrentMA: Int? = nil,
         batteryPercent: Int,
-        isOnAC: Bool, isCharging: Bool, fullyCharged: Bool,
-        wallPowerW: Double?, adapterEfficiencyLossW: Double?,
-        systemVoltageMV: Int?, systemCurrentMA: Int?,
-        batteryVoltageMV: Int?, batteryAmperageMA: Int?,
-        batteryTemperatureC: Double?, cycleCount: Int?,
-        adapterDescription: String?, dataSource: PowerDataSource, timestamp: Date,
-        connectionPhase: PowerConnectionPhase,
-        batteryHealthPercent: Int?, designCapacityMAH: Int?, rawMaxCapacityMAH: Int?,
-        nominalChargeCapacityMAH: Int?, designCycleCount: Int?,
-        chargingVoltageMV: Int?, chargingCurrentMA: Int?, notChargingReason: Int?, vacVoltageLimit: Int?,
-        cellVoltagesMV: [Int]?, stateOfCharge: Int?, qmaxMAH: [Int]?,
-        batteryCellLayout: BatteryCellTelemetryLayout?, batteryParallelCellCurrents: [BatteryParallelCellCurrent]?,
-        dailyMinSoc: Int?, dailyMaxSoc: Int?,
-        chargeLimitPercent: Int, chargeLimitSource: BatteryChargeLimitSource,
-        totalOperatingTimeMin: Int?,
-        lifetimeMaxTempC: Int?, lifetimeMinTempC: Int?, lifetimeAvgTempC: Int?,
-        lifetimeMaxPackVoltageMV: Int?, lifetimeMinPackVoltageMV: Int?,
-        lifetimeMaxChargeCurrentMA: Int?, lifetimeMaxDischargeCurrentMA: Int?,
-        batterySerial: String?, deviceName: String?,
-        instantAmperageMA: Int?, atCriticalLevel: Bool?,
-        permanentFailureStatus: Int?, batteryCellDisconnectCount: Int?,
-        avgTimeToEmptyMinutes: Int?, avgTimeToFullMinutes: Int?,
-        remainingCapacityMAH: Int?, fullChargeCapacityMAH: Int?,
-        averageSystemPowerW: Double?, batteryManufactureDate: String?,
-        smoothedDischargePowerW: Double?, smoothedChargePowerW: Double?
+        isOnAC: Bool, isCharging: Bool = false, fullyCharged: Bool = false,
+        wallPowerW: Double? = nil, adapterEfficiencyLossW: Double? = nil,
+        systemVoltageMV: Int? = nil, systemCurrentMA: Int? = nil,
+        batteryVoltageMV: Int? = nil, batteryAmperageMA: Int? = nil,
+        batteryTemperatureC: Double? = nil, cycleCount: Int? = nil,
+        adapterDescription: String? = nil, dataSource: PowerDataSource = .telemetry, timestamp: Date = Date(),
+        connectionPhase: PowerConnectionPhase = .onBattery,
+        batteryHealthPercent: Int? = nil, designCapacityMAH: Int? = nil, rawMaxCapacityMAH: Int? = nil,
+        nominalChargeCapacityMAH: Int? = nil, designCycleCount: Int? = nil,
+        chargingVoltageMV: Int? = nil, chargingCurrentMA: Int? = nil, notChargingReason: Int? = nil, vacVoltageLimit: Int? = nil,
+        cellVoltagesMV: [Int]? = nil, stateOfCharge: Int? = nil, qmaxMAH: [Int]? = nil,
+        batteryCellLayout: BatteryCellTelemetryLayout? = nil, batteryParallelCellCurrents: [BatteryParallelCellCurrent]? = nil,
+        dailyMinSoc: Int? = nil, dailyMaxSoc: Int? = nil,
+        chargeLimitPercent: Int = 100, chargeLimitSource: BatteryChargeLimitSource = .none,
+        totalOperatingTimeMin: Int? = nil,
+        lifetimeMaxTempC: Int? = nil, lifetimeMinTempC: Int? = nil, lifetimeAvgTempC: Int? = nil,
+        lifetimeMaxPackVoltageMV: Int? = nil, lifetimeMinPackVoltageMV: Int? = nil,
+        lifetimeMaxChargeCurrentMA: Int? = nil, lifetimeMaxDischargeCurrentMA: Int? = nil,
+        batterySerial: String? = nil, deviceName: String? = nil,
+        instantAmperageMA: Int? = nil, atCriticalLevel: Bool? = nil,
+        permanentFailureStatus: Int? = nil, batteryCellDisconnectCount: Int? = nil,
+        avgTimeToEmptyMinutes: Int? = nil, avgTimeToFullMinutes: Int? = nil,
+        remainingCapacityMAH: Int? = nil, fullChargeCapacityMAH: Int? = nil,
+        averageSystemPowerW: Double? = nil, batteryManufactureDate: String? = nil,
+        smoothedDischargePowerW: Double? = nil, smoothedChargePowerW: Double? = nil
     ) {
         self.systemPowerW = systemPowerW
         self.batteryPowerW = batteryPowerW
@@ -495,86 +495,18 @@ struct PowerData {
         return String(format: String(localized: "Reason Code %1$@ (0x%2$@)"), "\(reason)", String(format: "%X", reason))
     }
 
-    static let empty = PowerData(
-        systemPowerW: 0, batteryPowerW: 0, acInputW: 0,
-        acAdapterWattage: 0, batteryPercent: 0,
-        isOnAC: false, isCharging: false, fullyCharged: false,
-        wallPowerW: nil, adapterEfficiencyLossW: nil,
-        systemVoltageMV: nil, systemCurrentMA: nil,
-        batteryVoltageMV: nil, batteryAmperageMA: nil,
-        batteryTemperatureC: nil, cycleCount: nil,
-        adapterDescription: nil, dataSource: .telemetry, timestamp: Date(),
-        connectionPhase: .onBattery,
-        batteryHealthPercent: nil, designCapacityMAH: nil, rawMaxCapacityMAH: nil,
-        nominalChargeCapacityMAH: nil, designCycleCount: nil,
-        chargingVoltageMV: nil, chargingCurrentMA: nil,
-        notChargingReason: nil, vacVoltageLimit: nil,
-        cellVoltagesMV: nil, stateOfCharge: nil, qmaxMAH: nil,
-        batteryCellLayout: nil, batteryParallelCellCurrents: nil,
-        dailyMinSoc: nil, dailyMaxSoc: nil,
-        chargeLimitPercent: 100, chargeLimitSource: .none,
-        totalOperatingTimeMin: nil,
-        lifetimeMaxTempC: nil, lifetimeMinTempC: nil, lifetimeAvgTempC: nil,
-        lifetimeMaxPackVoltageMV: nil, lifetimeMinPackVoltageMV: nil,
-        lifetimeMaxChargeCurrentMA: nil, lifetimeMaxDischargeCurrentMA: nil,
-        batterySerial: nil, deviceName: nil,
-        instantAmperageMA: nil, atCriticalLevel: nil,
-        permanentFailureStatus: nil, batteryCellDisconnectCount: nil,
-        avgTimeToEmptyMinutes: nil, avgTimeToFullMinutes: nil,
-        remainingCapacityMAH: nil, fullChargeCapacityMAH: nil,
-        averageSystemPowerW: nil, batteryManufactureDate: nil,
-        smoothedDischargePowerW: nil, smoothedChargePowerW: nil
-    ) // delegates to private init below (centralized)
+    static let empty = PowerData(systemPowerW: 0, batteryPowerW: 0, acInputW: 0, batteryPercent: 0, isOnAC: false)
 
     func withConnectionPhase(_ phase: PowerConnectionPhase) -> PowerData {
-        withConnectionPhase(phase, smoothedDischargePowerW: smoothedDischargePowerW, smoothedChargePowerW: smoothedChargePowerW)
+        var copy = self
+        copy.connectionPhase = phase
+        return copy
     }
 
     func withSmoothedPower(dischargeW: Double?, chargeW: Double?) -> PowerData {
-        withConnectionPhase(connectionPhase, smoothedDischargePowerW: dischargeW, smoothedChargePowerW: chargeW)
-    }
-
-    private func withConnectionPhase(
-        _ phase: PowerConnectionPhase,
-        smoothedDischargePowerW: Double?,
-        smoothedChargePowerW: Double?
-    ) -> PowerData {
-        PowerData(
-            systemPowerW: systemPowerW, batteryPowerW: batteryPowerW, acInputW: acInputW,
-            acAdapterWattage: acAdapterWattage,
-            adapterRatedVoltageMV: adapterRatedVoltageMV, adapterRatedCurrentMA: adapterRatedCurrentMA,
-            batteryPercent: batteryPercent,
-            isOnAC: isOnAC, isCharging: isCharging, fullyCharged: fullyCharged,
-            wallPowerW: wallPowerW, adapterEfficiencyLossW: adapterEfficiencyLossW,
-            systemVoltageMV: systemVoltageMV, systemCurrentMA: systemCurrentMA,
-            batteryVoltageMV: batteryVoltageMV, batteryAmperageMA: batteryAmperageMA,
-            batteryTemperatureC: batteryTemperatureC, cycleCount: cycleCount,
-            adapterDescription: adapterDescription, dataSource: dataSource, timestamp: timestamp,
-            connectionPhase: phase,
-            batteryHealthPercent: batteryHealthPercent, designCapacityMAH: designCapacityMAH,
-            rawMaxCapacityMAH: rawMaxCapacityMAH, nominalChargeCapacityMAH: nominalChargeCapacityMAH,
-            designCycleCount: designCycleCount, chargingVoltageMV: chargingVoltageMV,
-            chargingCurrentMA: chargingCurrentMA, notChargingReason: notChargingReason,
-            vacVoltageLimit: vacVoltageLimit, cellVoltagesMV: cellVoltagesMV,
-            stateOfCharge: stateOfCharge, qmaxMAH: qmaxMAH,
-            batteryCellLayout: batteryCellLayout, batteryParallelCellCurrents: batteryParallelCellCurrents,
-            dailyMinSoc: dailyMinSoc,
-            dailyMaxSoc: dailyMaxSoc,
-            chargeLimitPercent: chargeLimitPercent, chargeLimitSource: chargeLimitSource,
-            totalOperatingTimeMin: totalOperatingTimeMin,
-            lifetimeMaxTempC: lifetimeMaxTempC, lifetimeMinTempC: lifetimeMinTempC,
-            lifetimeAvgTempC: lifetimeAvgTempC, lifetimeMaxPackVoltageMV: lifetimeMaxPackVoltageMV,
-            lifetimeMinPackVoltageMV: lifetimeMinPackVoltageMV,
-            lifetimeMaxChargeCurrentMA: lifetimeMaxChargeCurrentMA,
-            lifetimeMaxDischargeCurrentMA: lifetimeMaxDischargeCurrentMA,
-            batterySerial: batterySerial, deviceName: deviceName,
-            instantAmperageMA: instantAmperageMA, atCriticalLevel: atCriticalLevel,
-            permanentFailureStatus: permanentFailureStatus,
-            batteryCellDisconnectCount: batteryCellDisconnectCount,
-            avgTimeToEmptyMinutes: avgTimeToEmptyMinutes, avgTimeToFullMinutes: avgTimeToFullMinutes,
-            remainingCapacityMAH: remainingCapacityMAH, fullChargeCapacityMAH: fullChargeCapacityMAH,
-            averageSystemPowerW: averageSystemPowerW, batteryManufactureDate: batteryManufactureDate,
-            smoothedDischargePowerW: smoothedDischargePowerW, smoothedChargePowerW: smoothedChargePowerW
-        )
+        var copy = self
+        copy.smoothedDischargePowerW = dischargeW
+        copy.smoothedChargePowerW = chargeW
+        return copy
     }
 }
