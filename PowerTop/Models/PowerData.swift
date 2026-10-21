@@ -281,18 +281,16 @@ struct PowerData {
         return String(localized: "AC Powered")
     }
 
-    /// Battery is supplementing AC (AC can't provide enough power alone)
+    /// Battery is supplementing AC (AC can't provide enough power alone).
+    /// Requires measured discharge: a load/input gap alone can be a phase mismatch (issue #8).
     var isSupplementalDischarge: Bool {
         guard !isConnectingAC, effectiveIsOnAC, effectiveACInputW > 0, !isBatteryCharging else { return false }
-        if isBatteryDischarging { return true }
-        return effectiveACInputW + 0.5 < systemPowerW
+        return isBatteryDischarging
     }
 
     /// How much power the battery contributes during supplemental discharge.
     var batterySupplementalW: Double {
-        guard isSupplementalDischarge else { return 0 }
-        if batteryPowerW > 0.3 { return batteryPowerW }
-        return max(0, systemPowerW - effectiveACInputW)
+        isSupplementalDischarge ? batteryPowerW : 0
     }
 
     /// Primary wattage shown in the popover header.

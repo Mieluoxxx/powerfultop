@@ -11,6 +11,7 @@ struct RegressionTests {
         testMenuBarAlwaysUsesSystemPower()
         testManufactureDateDecoding()
         testPowerFlowUsesIOKitDischargeSign()
+        testGapAloneIsNotSupplementalDischarge()
         testTelemetryEnergyUnits()
 
         guard failures == 0 else {
@@ -223,6 +224,18 @@ struct RegressionTests {
             ioBatteryPowerW: nil, ioAmperagePowerW: -8, systemInputW: nil
         )
         expectEqual(legacyDischarge, PowerFlowReading(systemPowerW: 8, batteryPowerW: 8), "legacy amperage discharge")
+    }
+
+    private static func testGapAloneIsNotSupplementalDischarge() {
+        let data = makeData(
+            systemPowerW: 25,
+            batteryPowerW: 0,
+            acInputW: 20,
+            isOnAC: true,
+            connectionPhase: .onAC
+        )
+        expect(!data.isSupplementalDischarge, "do not infer supplement from a load/input gap")
+        expectEqual(data.menuBarPowerShowsWarning, false, "no supplement warning without measured discharge")
     }
 
     private static func testTelemetryEnergyUnits() {
