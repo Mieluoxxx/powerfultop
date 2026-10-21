@@ -99,16 +99,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
         } else {
             button.imagePosition = label.title.isEmpty ? .imageOnly : .imageLeading
         }
-
-        if label.title.isEmpty {
-            button.title = ""
-            statusItem.length = NSStatusItem.variableLength
-            return
-        }
-        button.title = label.widthTemplate
-        let reservedWidth = ceil(button.fittingSize.width)
         button.title = label.title
-        statusItem.length = max(reservedWidth, ceil(button.fittingSize.width))
     }
 
     @objc private func statusItemClicked() {

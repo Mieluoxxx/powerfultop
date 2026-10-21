@@ -278,18 +278,15 @@ struct RegressionTests {
         expectEqual(percent.symbolName, "battery.50", "percent style shows battery level icon")
 
         let full = MenuBarLabel(style: .batteryPercentPower, isDataAvailable: true, data: battery)
-        expectEqual(full.title, "50% 7W", "percent + power style")
-        expectEqual(full.widthTemplate, "50% 88W", "reserve two-digit power width")
+        expectEqual(full.title, "50% \u{2007}7W", "pad single-digit power with a figure space")
 
         let powerOnly = MenuBarLabel(style: .powerOnly, isDataAvailable: true, data: battery)
-        expectEqual(powerOnly.title, "7W", "power-only style shows wattage")
+        expectEqual(powerOnly.title, "\u{2007}7W", "power-only style shows padded wattage")
         expectNil(powerOnly.symbolName, "power-only style has no icon next to the system battery")
-        expectEqual(powerOnly.widthTemplate, "88W", "power-only reserves two-digit width")
 
         let busy = makeData(systemPowerW: 23.6, batteryPowerW: 23.6, acInputW: 0, isOnAC: false, connectionPhase: .onBattery)
         let busyLabel = MenuBarLabel(style: .powerOnly, isDataAvailable: true, data: busy)
-        expectEqual(busyLabel.title, "24W", "round wattage")
-        expectEqual(busyLabel.widthTemplate, "24W", "two-digit power needs no padding")
+        expectEqual(busyLabel.title, "24W", "two-digit power needs no padding")
 
         let unavailable = MenuBarLabel(style: .powerOnly, isDataAvailable: false, data: battery)
         expectEqual(unavailable.symbolName, "exclamationmark.triangle", "warn when data is unavailable")

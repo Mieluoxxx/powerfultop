@@ -21,38 +21,35 @@ enum MenuBarDisplayStyle: String, CaseIterable, Identifiable {
 struct MenuBarLabel: Equatable {
     let symbolName: String?
     let title: String
-    /// Same label with the wattage padded to two digits, so the item keeps its width
-    /// when power crosses 10 W instead of shifting neighbouring menu bar items.
-    let widthTemplate: String
 
     init(style: MenuBarDisplayStyle, isDataAvailable: Bool, data: PowerData) {
         guard isDataAvailable else {
             symbolName = "exclamationmark.triangle"
             title = ""
-            widthTemplate = ""
             return
         }
         let batteryPercent = min(100, max(0, data.batteryPercent))
         let percentage = "\(batteryPercent)%"
-        let power = data.menuBarPowerText
-        let paddedPower = data.menuBarPowerRoundedW < 10
-            ? power.replacingOccurrences(of: "\(data.menuBarPowerRoundedW)W", with: "88W")
-            : power
+        // A figure space is exactly one digit wide in the monospaced-digit status font, so
+        // single-digit wattage keeps the item width and neighbouring menu bar items don't shift.
+        let power = data.menuBarPowerRoundedW < 10
+            ? data.menuBarPowerText.replacingOccurrences(
+                of: "\(data.menuBarPowerRoundedW)W",
+                with: "\u{2007}\(data.menuBarPowerRoundedW)W"
+            )
+            : data.menuBarPowerText
         let batterySymbol = data.effectiveIsOnAC ? "bolt.fill" : Self.batteryIconName(for: batteryPercent)
 
         switch style {
         case .batteryPercent:
             symbolName = batterySymbol
             title = percentage
-            widthTemplate = percentage
         case .batteryPercentPower:
             symbolName = batterySymbol
             title = "\(percentage) \(power)"
-            widthTemplate = "\(percentage) \(paddedPower)"
         case .powerOnly:
             symbolName = nil
             title = power
-            widthTemplate = paddedPower
         }
     }
 
