@@ -263,23 +263,6 @@ struct PowerData {
         return 0
     }
 
-    /// How much power the AC adapter provides
-    var acProvidesW: Double {
-        effectiveACOutputW
-    }
-
-    /// How much power the battery provides to the system (discharge only)
-    var batteryProvidesW: Double {
-        if !effectiveIsOnAC { return systemPowerW }
-        if isSupplementalDischarge { return batterySupplementalW }
-        return 0
-    }
-
-    /// How much power the battery is receiving (charging)
-    var batteryChargingW: Double {
-        batteryChargeRateW
-    }
-
     var powerSourceDescription: String {
         if isConnectingAC { return String(localized: "AC Connecting") }
         if isBatteryCharging { return String(localized: "AC Charging") }
@@ -298,12 +281,6 @@ struct PowerData {
     /// How much power the battery contributes during supplemental discharge.
     var batterySupplementalW: Double {
         isSupplementalDischarge ? batteryPowerW : 0
-    }
-
-    /// Primary wattage shown in the popover header.
-    var headerPowerW: Double {
-        if isConnectingAC || !effectiveIsOnAC || isSupplementalDischarge { return systemPowerW }
-        return effectiveACOutputW
     }
 
     /// Raw system load shown in the menu bar across all power states.

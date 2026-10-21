@@ -12,8 +12,6 @@ final class PowerMonitor {
     private static let legacyShowPowerInMenuBarKey = "showPowerInMenuBar"
 
     var currentData: PowerData = .empty
-    /// Bumped on each publish so MenuBarExtra label can refresh (SwiftUI may not redraw otherwise).
-    var uiRefreshToken: Int = 0
     var isDataAvailable: Bool = true
     var launchAtLoginError: String?
     var launchAtLogin: Bool {
@@ -225,7 +223,6 @@ final class PowerMonitor {
         let phased = raw.withConnectionPhase(displayConnectionPhase())
         let smoothed = timeEstimator.smoothedPower(for: phased)
         currentData = phased.withSmoothedPower(dischargeW: smoothed.dischargeW, chargeW: smoothed.chargeW)
-        uiRefreshToken &+= 1
     }
 
     private func advanceMachinePhase(with raw: PowerData) {

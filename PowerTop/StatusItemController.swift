@@ -67,7 +67,6 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
 
     private func observeMonitor() {
         withObservationTracking {
-            _ = monitor.uiRefreshToken
             _ = monitor.menuBarDisplayStyle
             _ = monitor.isDataAvailable
             _ = monitor.currentData.menuBarPowerText

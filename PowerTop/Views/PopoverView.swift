@@ -4,8 +4,7 @@ struct PopoverView: View {
     static let preferredWidth: CGFloat = 280
 
     let monitor: PowerMonitor
-    var openDetails: (() -> Void)? = nil
-    @Environment(\.openWindow) private var openWindow
+    let openDetails: () -> Void
 
     private var data: PowerData { monitor.currentData }
 
@@ -210,7 +209,7 @@ struct PopoverView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 2) {
                 Button {
-                    openDetailWindow()
+                    openDetails()
                 } label: {
                     HStack(spacing: 4) {
                         Text(String(localized: "Details"))
@@ -281,22 +280,6 @@ struct PopoverView: View {
         .padding(.horizontal, 4)
     }
 
-    private func openDetailWindow() {
-        if let openDetails {
-            openDetails()
-            return
-        }
-        let detailTitle = String(localized: "PowerTop Details")
-        for window in NSApp.windows {
-            if window.title == detailTitle {
-                window.makeKeyAndOrderFront(nil)
-                NSApp.activate(ignoringOtherApps: true)
-                return
-            }
-        }
-        openWindow(id: "detail")
-        NSApp.activate(ignoringOtherApps: true)
-    }
 }
 
 // MARK: - Components
