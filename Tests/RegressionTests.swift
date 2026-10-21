@@ -17,6 +17,7 @@ struct RegressionTests {
         testMenuBarLabelStyles()
         testPowerStateClassification()
         testCellTelemetryParsing()
+        testDetailDerivations()
 
         guard failures == 0 else {
             fputs("\(failures) regression test(s) failed\n", stderr)
@@ -270,6 +271,39 @@ struct RegressionTests {
         expect(abs(telemetryEnergyToWatts(3321) - 11.956) < 0.01, "idle wall power includes adapter loss")
         expect(abs(telemetryEnergyToWatts(13390) - 48.207) < 0.01, "charging SystemEnergyConsumed matches SystemPowerIn")
         expect(abs(telemetryEnergyToWatts(14741) - 53.068) < 0.01, "charging wall power includes adapter loss")
+    }
+
+    private static func testDetailDerivations() {
+        expectEqual(PowerData.batteryCurrentText(2_896), "2.90 A (Charging)", "positive IOKit amperage is charging")
+        expectEqual(PowerData.batteryCurrentText(-791), "0.79 A (Discharging)", "negative IOKit amperage is discharging")
+        expectEqual(PowerData.batteryCurrentText(0), "0.00 A (Idle)", "zero amperage is idle")
+
+        let data = PowerData(
+            systemPowerW: 10, batteryPowerW: 0, acInputW: 10, batteryPercent: 85, isOnAC: true,
+            designCapacityMAH: 5_600,
+            cellVoltagesMV: [4_190, 4_189, 4_250],
+            qmaxMAH: [6_066, 6_085, 6_112],
+            batteryCellLayout: .seriesParallel(seriesCount: 3, parallelCount: 1, parallelCountKnown: true),
+            batteryParallelCellCurrents: [
+                BatteryParallelCellCurrent(bankID: 0, cellID: 0, currentMA: 1_000),
+                BatteryParallelCellCurrent(bankID: 0, cellID: 1, currentMA: 1_200),
+            ],
+            chargeLimitPercent: 85,
+            chargeLimitSource: .macOSSetting
+        )
+        expectApproximately(data.capacityFractionOfDesign(5_560), 5_560.0 / 5_600.0, "capacity relative to design")
+        expectNil(data.capacityFractionOfDesign(nil), "no fraction without a value")
+        expectEqual(data.seriesVoltageBalanceSummary([4_190, 4_189, 4_191]), "2 mV spread — Normal", "tight series balance")
+        expectEqual(data.seriesVoltageBalanceSummary([4_190, 4_189, 4_250]), "61 mV spread — Fair", "61 mV spread is fair")
+        expectEqual(
+            data.parallelCurrentBalanceSummary(data.batteryParallelCellCurrents ?? []),
+            "200 mA max within-group spread — Worth Checking",
+            "large within-group current spread"
+        )
+        expectEqual(data.chargeLimitText, "85% (macOS setting)", "charge limit names its source")
+        expectEqual(data.cellTopologyDescription, "Battery topology: 3 series groups", "1P layout reads as series groups")
+        expect(data.hasCellData, "cell data present")
+        expect(!data.hasLifetimeData, "no lifetime data")
     }
 
     private static func testCellTelemetryParsing() {

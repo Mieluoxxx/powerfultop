@@ -52,11 +52,11 @@ struct DetailWindowView: View {
             cards.append(MasonryItem(id: "adapter", weight: 8, view: AnyView(adapterCard)))
             cards.append(MasonryItem(id: "charging", weight: 5, view: AnyView(chargingCard)))
         }
-        if hasCellData {
-            let rows = cellDisplayEntries.count * 2 + (data.batteryParallelCellCurrents?.count ?? 0) + 3
+        if data.hasCellData {
+            let rows = data.cellDisplayEntries.count * 2 + (data.batteryParallelCellCurrents?.count ?? 0) + 3
             cards.append(MasonryItem(id: "cells", weight: Double(rows), view: AnyView(cellsCard)))
         }
-        if hasLifetimeData {
+        if data.hasLifetimeData {
             cards.append(MasonryItem(id: "lifetime", weight: 9, view: AnyView(lifetimeCard)))
         }
         cards.append(MasonryItem(id: "device", weight: 5, view: AnyView(deviceCard)))
@@ -111,7 +111,7 @@ struct DetailWindowView: View {
                 CardRow(label: data.estimatedTimeRemainingLabel, value: time, emphasized: true)
             }
             if data.chargeLimitPercent < 100 {
-                CardRow(label: String(localized: "Charge Limit"), value: chargeLimitText)
+                CardRow(label: String(localized: "Charge Limit"), value: data.chargeLimitText)
             }
             if let footnote = data.estimatedTimeFootnote {
                 CardNote(footnote)
@@ -126,7 +126,7 @@ struct DetailWindowView: View {
         DashCard(title: String(localized: "Battery"), icon: "bolt.fill", tint: .yellow) {
             CardHero(value: data.signedBatteryPowerText, caption: String(localized: "Battery Power"))
             if let amp = data.batteryAmperageMA {
-                CardRow(label: String(localized: "Battery Current"), value: currentText(amp))
+                CardRow(label: String(localized: "Battery Current"), value: PowerData.batteryCurrentText(amp))
             }
             if let voltage = data.batteryVoltageMV {
                 CardRow(label: String(localized: "Battery Voltage"), value: String(format: "%.2f V", Double(voltage) / 1000.0))
@@ -139,7 +139,7 @@ struct DetailWindowView: View {
                 CardRow(label: String(localized: "Remaining Charge"), value: "\(remaining) mAh")
             }
             if let instant = data.instantAmperageMA {
-                CardRow(label: String(localized: "Battery Instant Current"), value: currentText(instant))
+                CardRow(label: String(localized: "Battery Instant Current"), value: PowerData.batteryCurrentText(instant))
             }
         }
     }
@@ -232,7 +232,7 @@ struct DetailWindowView: View {
                 CardRow(label: String(localized: "Not Charging Reason"), value: reason)
             }
             if data.chargeLimitPercent < 100 {
-                CardRow(label: String(localized: "Charge Limit"), value: chargeLimitText)
+                CardRow(label: String(localized: "Charge Limit"), value: data.chargeLimitText)
             }
             if let minSoc = data.dailyMinSoc, let maxSoc = data.dailyMaxSoc {
                 CardRow(label: String(localized: "Optimized Charging Range"), value: "\(minSoc)% – \(maxSoc)%")
@@ -251,28 +251,28 @@ struct DetailWindowView: View {
 
     private var cellsCard: some View {
         DashCard(title: String(localized: "Cell Data"), icon: "square.stack.3d.up", tint: .cyan) {
-            if let topology = cellTopologyDescription {
+            if let topology = data.cellTopologyDescription {
                 CardNote(topology)
             }
-            if let cells = data.cellVoltagesMV, let balance = seriesVoltageBalanceSummary(cells) {
+            if let cells = data.cellVoltagesMV, let balance = data.seriesVoltageBalanceSummary(cells) {
                 CardRow(label: String(localized: "Series Voltage Balance"), value: balance)
             }
-            ForEach(Array(cellDisplayEntries.enumerated()), id: \.offset) { idx, entry in
+            ForEach(Array(data.cellDisplayEntries.enumerated()), id: \.offset) { idx, entry in
                 CardBarRow(
-                    label: usesSeriesParallelLayout
+                    label: data.usesSeriesParallelLayout
                         ? String(format: String(localized: "Series Group %d"), idx + 1)
                         : String(format: String(localized: "Cell %d"), idx + 1),
-                    value: cellSummary(voltageMV: entry.voltageMV, qmaxMAH: entry.qmaxMAH),
-                    fraction: entry.voltageMV.map(cellVoltageFraction),
+                    value: data.cellSummary(voltageMV: entry.voltageMV, qmaxMAH: entry.qmaxMAH),
+                    fraction: entry.voltageMV.map(data.cellVoltageFraction),
                     tint: .cyan
                 )
             }
-            if usesSeriesParallelLayout, let currents = data.batteryParallelCellCurrents, !currents.isEmpty {
-                if let balance = parallelCurrentBalanceSummary(currents) {
+            if data.usesSeriesParallelLayout, let currents = data.batteryParallelCellCurrents, !currents.isEmpty {
+                if let balance = data.parallelCurrentBalanceSummary(currents) {
                     CardRow(label: String(localized: "Parallel Current Balance"), value: balance)
                 }
                 ForEach(Array(currents.enumerated()), id: \.offset) { _, cell in
-                    CardRow(label: parallelCellLabel(bankID: cell.bankID, cellID: cell.cellID), value: "\(cell.currentMA) mA")
+                    CardRow(label: data.parallelCellLabel(bankID: cell.bankID, cellID: cell.cellID), value: "\(cell.currentMA) mA")
                 }
                 CardNote(String(localized: "Instantaneous current per parallel cell; unequal split within a group is normal."))
             }
@@ -309,7 +309,7 @@ struct DetailWindowView: View {
                 CardRow(label: String(localized: "Max Discharging Current"), value: "\(maxDischarge) mA")
             }
             if let discCount = data.batteryCellDisconnectCount {
-                CardRow(label: String(localized: "Protection Trigger Count"), value: protectionTriggerLabel(count: discCount))
+                CardRow(label: String(localized: "Protection Trigger Count"), value: data.protectionTriggerLabel(count: discCount))
             }
         }
     }
@@ -386,7 +386,7 @@ struct DetailWindowView: View {
     @ViewBuilder
     private func capacityRow(_ label: String, _ value: Int?, tint: Color) -> some View {
         if let value {
-            let fraction = capacityFraction(value)
+            let fraction = data.capacityFractionOfDesign(value)
             CardBarRow(
                 label: label,
                 value: fraction.map { String(format: "%d mAh · %.0f%%", value, $0 * 100) } ?? "\(value) mAh",
@@ -396,102 +396,8 @@ struct DetailWindowView: View {
         }
     }
 
-    private func capacityFraction(_ value: Int?) -> Double? {
-        guard let value, let design = data.designCapacityMAH, design > 0 else { return nil }
-        return Double(value) / Double(design)
-    }
-
-    /// Raw IOKit amperage: positive = charging, negative = discharging.
-    private func currentText(_ milliamps: Int) -> String {
-        let direction = milliamps > 0
-            ? String(localized: "Charging")
-            : (milliamps < 0 ? String(localized: "Discharging") : String(localized: "Idle"))
-        return String(format: "%.2f A (%@)", Double(abs(milliamps)) / 1000.0, direction)
-    }
-
-    /// Li-ion working window; only used to draw a comparable bar per cell.
-    private func cellVoltageFraction(_ millivolts: Int) -> Double {
-        (Double(millivolts) - 3000) / (4400 - 3000)
-    }
-
-    private var hasCellData: Bool {
-        !cellDisplayEntries.isEmpty || !(data.batteryParallelCellCurrents?.isEmpty ?? true)
-    }
-
-    private var usesSeriesParallelLayout: Bool {
-        if case .seriesParallel = data.batteryCellLayout { return true }
-        return false
-    }
-
-    private var cellTopologyDescription: String? {
-        switch data.batteryCellLayout {
-        case .seriesParallel(let seriesCount, let parallelCount, let parallelCountKnown):
-            if parallelCountKnown, parallelCount > 1 {
-                return String(
-                    format: String(localized: "Battery topology: %dS%dP (%d cells)"),
-                    seriesCount, parallelCount, seriesCount * parallelCount
-                )
-            }
-            return String(format: String(localized: "Battery topology: %d series groups"), seriesCount)
-        case .perCellArrays:
-            if let count = data.cellVoltagesMV?.count, count > 0 {
-                return String(format: String(localized: "Battery topology: %d cells"), count)
-            }
-            return nil
-        case nil:
-            return nil
-        }
-    }
-
-    private var cellDisplayEntries: [(voltageMV: Int?, qmaxMAH: Int?)] {
-        let voltages = data.cellVoltagesMV ?? []
-        let capacities = data.qmaxMAH ?? []
-        let count = max(voltages.count, capacities.count)
-        guard count > 0 else { return [] }
-        return (0..<count).map { index in
-            (
-                voltageMV: index < voltages.count ? voltages[index] : nil,
-                qmaxMAH: index < capacities.count ? capacities[index] : nil
-            )
-        }
-    }
-
-    private func cellSummary(voltageMV: Int?, qmaxMAH: Int?) -> String {
-        var parts: [String] = []
-        if let voltageMV {
-            parts.append(String(format: "%.3f V", Double(voltageMV) / 1000.0))
-        }
-        if let qmaxMAH {
-            parts.append("\(qmaxMAH) mAh")
-        }
-        return parts.isEmpty ? unavailableValue : parts.joined(separator: " · ")
-    }
-
-    private func parallelCellLabel(bankID: Int, cellID: Int) -> String {
-        String(format: String(localized: "Series Group %d · Cell %d"), bankID + 1, cellID + 1)
-    }
-
-    private var hasLifetimeData: Bool {
-        data.totalOperatingTimeMin != nil
-            || data.lifetimeMaxTempC != nil
-            || data.lifetimeMinTempC != nil
-            || data.lifetimeAvgTempC != nil
-            || data.lifetimeMaxPackVoltageMV != nil
-            || data.lifetimeMinPackVoltageMV != nil
-            || data.lifetimeMaxChargeCurrentMA != nil
-            || data.lifetimeMaxDischargeCurrentMA != nil
-            || data.batteryCellDisconnectCount != nil
-    }
-
     private var unavailableValue: String {
         String(localized: "—")
-    }
-
-    private var chargeLimitText: String {
-        if let source = chargeLimitSourceLabel(data.chargeLimitSource) {
-            return "\(data.chargeLimitPercent)% (\(source))"
-        }
-        return "\(data.chargeLimitPercent)%"
     }
 
     private var healthColor: Color {
@@ -501,43 +407,6 @@ struct DetailWindowView: View {
         return .red
     }
 
-    private func seriesVoltageBalanceSummary(_ voltagesMV: [Int]) -> String? {
-        guard voltagesMV.count >= 2, let minMV = voltagesMV.min(), let maxMV = voltagesMV.max() else { return nil }
-        let delta = maxMV - minMV
-        return String(format: String(localized: "%d mV spread — %@"), delta, balanceStatus(forMillivoltSpread: delta))
-    }
-
-    private func parallelCurrentBalanceSummary(_ currents: [BatteryParallelCellCurrent]) -> String? {
-        let grouped = Dictionary(grouping: currents, by: \.bankID)
-        let spreads = grouped.values.compactMap { cells -> Int? in
-            guard cells.count >= 2 else { return nil }
-            let values = cells.map(\.currentMA)
-            guard let minMA = values.min(), let maxMA = values.max() else { return nil }
-            return maxMA - minMA
-        }
-        guard let worstSpread = spreads.max() else { return nil }
-        return String(
-            format: String(localized: "%d mA max within-group spread — %@"),
-            worstSpread,
-            balanceStatus(forMilliampSpread: worstSpread)
-        )
-    }
-
-    private func balanceStatus(forMillivoltSpread delta: Int) -> String {
-        if delta <= 50 { return String(localized: "Normal") }
-        if delta <= 100 { return String(localized: "Fair") }
-        return String(localized: "Worth Checking")
-    }
-
-    private func balanceStatus(forMilliampSpread delta: Int) -> String {
-        if delta <= 80 { return String(localized: "Normal") }
-        if delta <= 150 { return String(localized: "Fair") }
-        return String(localized: "Worth Checking")
-    }
-
-    private func protectionTriggerLabel(count: Int) -> String {
-        count == 0 ? String(localized: "0 (normal)") : "\(count)"
-    }
 }
 
 // MARK: - Components
