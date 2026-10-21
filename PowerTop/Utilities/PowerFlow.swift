@@ -1,5 +1,10 @@
 import Foundation
 
+enum PowerThresholds {
+    /// Battery flow below this is measurement noise rather than charge or discharge.
+    static let batteryFlowW = 0.3
+}
+
 /// System and battery power resolved from one AppleSmartBattery snapshot.
 struct PowerFlowReading: Equatable {
     let systemPowerW: Double
@@ -19,7 +24,7 @@ func resolvePowerFlow(
     ioAmperagePowerW: Double?,
     systemInputW: Double?
 ) -> PowerFlowReading {
-    let threshold = 0.3
+    let threshold = PowerThresholds.batteryFlowW
     let ioBattery: Double = {
         if let telemetry = ioBatteryPowerW, abs(telemetry) > threshold { return telemetry }
         if let amperage = ioAmperagePowerW, abs(amperage) > threshold { return amperage }

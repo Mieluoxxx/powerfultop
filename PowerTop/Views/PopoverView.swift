@@ -63,26 +63,23 @@ struct PopoverView: View {
 
     // MARK: - Header
 
-    private var batteryPercent: Int { min(100, max(0, data.batteryPercent)) }
-
-    private var levelTint: Color {
-        if data.isBatteryCharging { return .green }
-        if batteryPercent <= 20 { return .red }
-        return batteryPercent <= 50 ? .orange : .green
-    }
-
     private var statusSymbol: String {
-        if data.isConnectingAC { return "powerplug" }
-        if data.isBatteryCharging { return "bolt.fill" }
-        if data.isSupplementalDischarge { return "exclamationmark.triangle.fill" }
-        return data.effectiveIsOnAC ? "powerplug.fill" : MenuBarLabel.batteryIconName(for: batteryPercent)
+        switch data.powerState {
+        case .onBattery: return data.batteryLevelSymbol
+        case .connectingAC: return "powerplug"
+        case .acIdle: return "powerplug.fill"
+        case .charging: return "bolt.fill"
+        case .supplementing: return "exclamationmark.triangle.fill"
+        }
     }
 
     private var statusTint: Color {
-        if data.isConnectingAC { return .secondary }
-        if data.isSupplementalDischarge { return .orange }
-        if data.effectiveIsOnAC { return .green }
-        return batteryPercent <= 20 ? .red : .secondary
+        switch data.powerState {
+        case .onBattery: return data.displayBatteryPercent <= 20 ? .red : .secondary
+        case .connectingAC: return .secondary
+        case .acIdle, .charging: return .green
+        case .supplementing: return .orange
+        }
     }
 
     private var statusLine: String {
@@ -92,11 +89,11 @@ struct PopoverView: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("\(batteryPercent)%")
+            Text("\(data.displayBatteryPercent)%")
                 .font(.system(size: 30, weight: .bold, design: .rounded))
                 .monospacedDigit()
 
-            LevelBar(fraction: Double(batteryPercent) / 100, tint: levelTint)
+            LevelBar(fraction: Double(data.displayBatteryPercent) / 100, tint: data.batteryLevelTint)
 
             HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Image(systemName: statusSymbol)
@@ -108,7 +105,7 @@ struct PopoverView: View {
             .font(.system(size: 12))
 
             if let reason = data.notChargingReasonDescription,
-               data.effectiveIsOnAC, !data.isConnectingAC, !data.isBatteryCharging {
+               data.powerState == .acIdle || data.isSupplementalDischarge {
                 Text(reason)
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
@@ -123,47 +120,44 @@ struct PopoverView: View {
         String(format: "%.1f W", value)
     }
 
-    private var sourceNodes: [FlowNode] {
-        if data.isConnectingAC {
-            return [FlowNode(icon: "powerplug", title: String(localized: "AC Connecting"), value: nil, tint: .secondary)]
-        }
-        var nodes: [FlowNode] = []
-        if data.effectiveIsOnAC {
-            nodes.append(FlowNode(
-                icon: "powerplug.fill",
-                title: String(localized: "Charger"),
-                value: watts(data.effectiveACOutputW),
-                capacity: data.acAdapterWattage > 0 ? "\(data.acAdapterWattage) W" : nil,
-                tint: .green
-            ))
-        }
-        if data.isSupplementalDischarge {
-            nodes.append(FlowNode(icon: "battery.50", title: String(localized: "Battery"), value: watts(data.batterySupplementalW), tint: .orange))
-        } else if !data.effectiveIsOnAC {
-            nodes.append(FlowNode(icon: MenuBarLabel.batteryIconName(for: batteryPercent), title: String(localized: "Battery"), value: nil, tint: .orange))
-        }
-        return nodes
+    private var chargerNode: FlowNode {
+        FlowNode(
+            icon: "powerplug.fill",
+            title: String(localized: "Charger"),
+            value: watts(data.effectiveACOutputW),
+            capacity: data.acAdapterWattage > 0 ? "\(data.acAdapterWattage) W" : nil,
+            tint: .green
+        )
     }
 
-    private var destinationNodes: [FlowNode] {
-        var nodes = [FlowNode(icon: "laptopcomputer", title: String(localized: "System"), value: watts(data.systemPowerW), tint: .primary)]
-        if data.isBatteryCharging {
-            nodes.append(FlowNode(icon: "battery.100.bolt", title: String(localized: "Battery"), value: watts(data.batteryChargeRateW), tint: .blue))
+    private var flowNodes: (sources: [FlowNode], destinations: [FlowNode]) {
+        let system = FlowNode(icon: "laptopcomputer", title: String(localized: "System"), value: watts(data.systemPowerW), tint: .primary)
+        let battery = String(localized: "Battery")
+        switch data.powerState {
+        case .onBattery:
+            return ([FlowNode(icon: data.batteryLevelSymbol, title: battery, value: nil, tint: .orange)], [system])
+        case .connectingAC:
+            return ([FlowNode(icon: "powerplug", title: String(localized: "AC Connecting"), value: nil, tint: .secondary)], [system])
+        case .acIdle:
+            return ([chargerNode], [system])
+        case .charging(let rate):
+            return ([chargerNode], [system, FlowNode(icon: "battery.100.bolt", title: battery, value: watts(rate), tint: .blue)])
+        case .supplementing(let rate):
+            return ([chargerNode, FlowNode(icon: "battery.50", title: battery, value: watts(rate), tint: .orange)], [system])
         }
-        return nodes
     }
 
     private var powerFlowSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 VStack(spacing: 6) {
-                    ForEach(sourceNodes) { FlowNodeView(node: $0) }
+                    ForEach(flowNodes.sources) { FlowNodeView(node: $0) }
                 }
                 Image(systemName: "arrow.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.tertiary)
                 VStack(spacing: 6) {
-                    ForEach(destinationNodes) { FlowNodeView(node: $0) }
+                    ForEach(flowNodes.destinations) { FlowNodeView(node: $0) }
                 }
             }
 

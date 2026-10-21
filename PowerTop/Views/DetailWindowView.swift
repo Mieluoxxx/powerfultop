@@ -48,7 +48,7 @@ struct DetailWindowView: View {
             MasonryItem(id: "battery", weight: 7, view: AnyView(batteryCard)),
             MasonryItem(id: "health", weight: 8, view: AnyView(healthCard)),
         ]
-        if data.effectiveIsOnAC && !data.isConnectingAC {
+        if data.hasSettledAC {
             cards.append(MasonryItem(id: "adapter", weight: 8, view: AnyView(adapterCard)))
             cards.append(MasonryItem(id: "charging", weight: 5, view: AnyView(chargingCard)))
         }
@@ -67,13 +67,13 @@ struct DetailWindowView: View {
 
     private var powerStrip: some View {
         HStack(spacing: 0) {
-            if data.effectiveIsOnAC && !data.isConnectingAC {
+            if data.hasSettledAC {
                 StripItem(icon: "powerplug.fill", tint: .green, label: String(localized: "Charger"), value: watts(data.effectiveACOutputW))
                 StripDivider()
             }
             StripItem(icon: "laptopcomputer", tint: .primary, label: String(localized: "System"), value: watts(data.systemPowerW))
             StripDivider()
-            StripItem(icon: batteryStripIcon, tint: batteryStripTint, label: String(localized: "Battery"), value: batteryStripValue)
+            StripItem(icon: batteryStripIcon, tint: batteryStripTint, label: String(localized: "Battery"), value: data.signedBatteryPowerText)
             if let time = data.estimatedTimeRemainingText {
                 StripDivider()
                 StripItem(icon: "clock", tint: .secondary, label: data.estimatedTimeRemainingLabel, value: time)
@@ -87,29 +87,23 @@ struct DetailWindowView: View {
     }
 
     private var batteryStripIcon: String {
-        if data.isBatteryCharging { return "battery.100.bolt" }
-        return MenuBarLabel.batteryIconName(for: batteryLevelPercent)
+        data.isBatteryCharging ? "battery.100.bolt" : data.batteryLevelSymbol
     }
 
     private var batteryStripTint: Color {
-        if data.isBatteryCharging { return .blue }
-        if data.isSupplementalDischarge || !data.effectiveIsOnAC { return .orange }
-        return .secondary
-    }
-
-    private var batteryStripValue: String {
-        if data.isBatteryCharging { return "+" + watts(data.batteryChargeRateW) }
-        if data.isSupplementalDischarge { return "−" + watts(data.batterySupplementalW) }
-        if !data.effectiveIsOnAC { return "−" + watts(data.systemPowerW) }
-        return watts(0)
+        switch data.powerState {
+        case .charging: return .blue
+        case .onBattery, .supplementing: return .orange
+        case .connectingAC, .acIdle: return .secondary
+        }
     }
 
     // MARK: - Cards
 
     private var levelCard: some View {
-        DashCard(title: String(localized: "Battery Level"), icon: MenuBarLabel.batteryIconName(for: batteryLevelPercent), tint: batteryLevelTint) {
-            CardHero(value: "\(batteryLevelPercent)%", size: 38)
-            LevelBar(fraction: Double(batteryLevelPercent) / 100, tint: batteryLevelTint)
+        DashCard(title: String(localized: "Battery Level"), icon: data.batteryLevelSymbol, tint: data.batteryLevelTint) {
+            CardHero(value: "\(data.displayBatteryPercent)%", size: 38)
+            LevelBar(fraction: Double(data.displayBatteryPercent) / 100, tint: data.batteryLevelTint)
             Text(data.powerSourceDescription)
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
@@ -130,7 +124,7 @@ struct DetailWindowView: View {
 
     private var batteryCard: some View {
         DashCard(title: String(localized: "Battery"), icon: "bolt.fill", tint: .yellow) {
-            CardHero(value: batteryStripValue, caption: String(localized: "Battery Power"))
+            CardHero(value: data.signedBatteryPowerText, caption: String(localized: "Battery Power"))
             if let amp = data.batteryAmperageMA {
                 CardRow(label: String(localized: "Battery Current"), value: currentText(amp))
             }
@@ -498,18 +492,6 @@ struct DetailWindowView: View {
             return "\(data.chargeLimitPercent)% (\(source))"
         }
         return "\(data.chargeLimitPercent)%"
-    }
-
-    private var batteryLevelPercent: Int {
-        data.stateOfCharge ?? data.batteryPercent
-    }
-
-    private var batteryLevelTint: Color {
-        if data.isBatteryCharging { return .green }
-        let level = batteryLevelPercent
-        if level <= 20 { return .red }
-        if level <= 50 { return .orange }
-        return .green
     }
 
     private var healthColor: Color {

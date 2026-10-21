@@ -15,6 +15,7 @@ struct RegressionTests {
         testEstimatorIgnoresRepeatedSnapshots()
         testTelemetryEnergyUnits()
         testMenuBarLabelStyles()
+        testPowerStateClassification()
 
         guard failures == 0 else {
             fputs("\(failures) regression test(s) failed\n", stderr)
@@ -268,6 +269,37 @@ struct RegressionTests {
         expect(abs(telemetryEnergyToWatts(3321) - 11.956) < 0.01, "idle wall power includes adapter loss")
         expect(abs(telemetryEnergyToWatts(13390) - 48.207) < 0.01, "charging SystemEnergyConsumed matches SystemPowerIn")
         expect(abs(telemetryEnergyToWatts(14741) - 53.068) < 0.01, "charging wall power includes adapter loss")
+    }
+
+    private static func testPowerStateClassification() {
+        func state(
+            system: Double, battery: Double, input: Double, onAC: Bool,
+            charging: Bool = false, phase: PowerConnectionPhase
+        ) -> PowerState {
+            makeData(systemPowerW: system, batteryPowerW: battery, acInputW: input,
+                     isOnAC: onAC, isCharging: charging, connectionPhase: phase).powerState
+        }
+
+        expectEqual(state(system: 9.751, battery: 9.751, input: 0, onAC: false, phase: .onBattery),
+                    .onBattery, "battery discharge")
+        expectEqual(state(system: 11.501, battery: 0, input: 11.501, onAC: true, phase: .onAC),
+                    .acIdle, "AC idle at charge limit")
+        expectEqual(state(system: 11.066, battery: -37.141, input: 48.207, onAC: true, charging: true, phase: .onAC),
+                    .charging(rateW: 37.141), "live charging sample")
+        expectEqual(state(system: 25, battery: 5, input: 20, onAC: true, phase: .onAC),
+                    .supplementing(rateW: 5), "battery supplements AC")
+        expectEqual(state(system: 5.818, battery: 5.818, input: 0, onAC: true, phase: .connectingAC),
+                    .connectingAC, "stale discharge snapshot while connecting")
+        expectEqual(state(system: 5.818, battery: 5.818, input: 0, onAC: true, phase: .onAC),
+                    .acIdle, "discharge without measured AC input is not a supplement")
+        expectEqual(state(system: 12, battery: -0.1, input: 12.1, onAC: true, charging: true, phase: .onAC),
+                    .charging(rateW: 0.1), "trickle charge reported by IsCharging")
+        expectEqual(state(system: 12, battery: 0, input: 12, onAC: false, phase: .onAC),
+                    .onBattery, "ExternalConnected=false overrides a lagging phase")
+
+        let charging = makeData(systemPowerW: 30, batteryPowerW: -10, acInputW: 0,
+                                isOnAC: true, isCharging: true, connectionPhase: .onAC)
+        expectEqual(charging.effectiveACOutputW, 40, "estimate charger output without SystemPowerIn")
     }
 
     private static func testMenuBarLabelStyles() {

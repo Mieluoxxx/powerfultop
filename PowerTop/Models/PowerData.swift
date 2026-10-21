@@ -196,91 +196,94 @@ struct PowerData {
         self.smoothedChargePowerW = smoothedChargePowerW
     }
 
-    // MARK: - Computed properties
+    /// Percent as macOS shows it in the menu bar, clamped for display.
+    var displayBatteryPercent: Int {
+        min(100, max(0, batteryPercent))
+    }
+
+    // MARK: - Power state
+
+    /// The one classification every view and estimate derives from.
+    var powerState: PowerState {
+        // ExternalConnected flips before telemetry refreshes; trust the phase machine first.
+        if connectionPhase == .onBattery || !isOnAC { return .onBattery }
+        if connectionPhase == .connectingAC { return .connectingAC }
+        if batteryPowerW > PowerThresholds.batteryFlowW {
+            // Battery outflow without measured AC input is a stale snapshot, not a supplement.
+            return acInputW > 0 ? .supplementing(rateW: batteryPowerW) : .acIdle
+        }
+        if batteryPowerW < -PowerThresholds.batteryFlowW { return .charging(rateW: -batteryPowerW) }
+        // Trickle charging near the charge limit reports IsCharging with negligible flow.
+        if isCharging { return .charging(rateW: max(0, -batteryPowerW)) }
+        return .acIdle
+    }
 
     var isConnectingAC: Bool {
-        connectionPhase == .connectingAC
+        powerState == .connectingAC
     }
 
-    /// State machine or ExternalConnected=false — stale telemetry is ignored.
-    private var clearlyOnBattery: Bool {
-        connectionPhase == .onBattery || !isOnAC
-    }
-
-    /// AC input used for state logic — zero when unplugged or still connecting.
-    var effectiveACInputW: Double {
-        if clearlyOnBattery || isConnectingAC { return 0 }
-        return isOnAC ? acInputW : 0
-    }
-
-    /// Effective AC status — driven by connection phase, then telemetry.
     var effectiveIsOnAC: Bool {
-        if clearlyOnBattery { return false }
-        if isConnectingAC { return true }
-        if effectiveACInputW > 0 { return true }
-        if isCharging { return true }
-        return connectionPhase == .onAC
+        powerState != .onBattery
     }
 
-    /// Effective AC output in watts.
-    /// Uses SystemPowerIn when available; estimates when SystemPowerIn is 0 or outdated.
-    var effectiveACOutputW: Double {
-        if !effectiveIsOnAC || isConnectingAC { return 0 }
-        if effectiveACInputW > 0 { return effectiveACInputW }
-        if isBatteryCharging {
-            return systemPowerW + batteryChargeRateW
+    /// Plugged in and past the connecting window, so adapter readings are current.
+    var hasSettledAC: Bool {
+        switch powerState {
+        case .acIdle, .charging, .supplementing: return true
+        case .onBattery, .connectingAC: return false
         }
-        return systemPowerW
     }
 
-    private var isBatteryDischarging: Bool {
-        batteryPowerW > 0.3
-    }
-
-    /// Whether the battery is actively charging.
-    /// AC input exceeding system load means surplus is charging the battery.
     var isBatteryCharging: Bool {
-        if clearlyOnBattery || isConnectingAC { return false }
-        if isBatteryDischarging { return false }
-        if batteryPowerW < -0.3 { return true }
+        if case .charging = powerState { return true }
+        return false
+    }
 
-        let hasSurplusAC = effectiveACInputW > systemPowerW + 0.5
-        if hasSurplusAC {
-            if fullyCharged { return false }
-            if let reason = notChargingReason, reason != 0 { return false }
-            return true
-        }
-
-        if isCharging { return true }
+    var isSupplementalDischarge: Bool {
+        if case .supplementing = powerState { return true }
         return false
     }
 
     /// Battery charge rate in watts (positive value).
     var batteryChargeRateW: Double {
-        if !isBatteryCharging { return 0 }
-        if batteryPowerW < 0 { return abs(batteryPowerW) }
-        if effectiveACInputW > systemPowerW { return effectiveACInputW - systemPowerW }
+        if case .charging(let rate) = powerState { return rate }
         return 0
-    }
-
-    var powerSourceDescription: String {
-        if isConnectingAC { return String(localized: "AC Connecting") }
-        if isBatteryCharging { return String(localized: "AC Charging") }
-        if isSupplementalDischarge { return String(localized: "AC + Battery Supplement") }
-        if !effectiveIsOnAC { return String(localized: "Battery Discharging") }
-        return String(localized: "AC Powered")
-    }
-
-    /// Battery is supplementing AC (AC can't provide enough power alone).
-    /// Requires measured discharge: a load/input gap alone can be a phase mismatch (issue #8).
-    var isSupplementalDischarge: Bool {
-        guard !isConnectingAC, effectiveIsOnAC, effectiveACInputW > 0, !isBatteryCharging else { return false }
-        return isBatteryDischarging
     }
 
     /// How much power the battery contributes during supplemental discharge.
     var batterySupplementalW: Double {
-        isSupplementalDischarge ? batteryPowerW : 0
+        if case .supplementing(let rate) = powerState { return rate }
+        return 0
+    }
+
+    /// AC input once the connection has settled; zero while unplugged or connecting.
+    var effectiveACInputW: Double {
+        switch powerState {
+        case .onBattery, .connectingAC: return 0
+        case .acIdle, .charging, .supplementing: return acInputW
+        }
+    }
+
+    /// Charger output, falling back to load + charge when SystemPowerIn is unavailable.
+    var effectiveACOutputW: Double {
+        switch powerState {
+        case .onBattery, .connectingAC:
+            return 0
+        case .acIdle, .supplementing:
+            return acInputW > 0 ? acInputW : systemPowerW
+        case .charging(let rate):
+            return acInputW > 0 ? acInputW : systemPowerW + rate
+        }
+    }
+
+    var powerSourceDescription: String {
+        switch powerState {
+        case .onBattery: return String(localized: "Battery Discharging")
+        case .connectingAC: return String(localized: "AC Connecting")
+        case .acIdle: return String(localized: "AC Powered")
+        case .charging: return String(localized: "AC Charging")
+        case .supplementing: return String(localized: "AC + Battery Supplement")
+        }
     }
 
     /// Raw system load shown in the menu bar across all power states.

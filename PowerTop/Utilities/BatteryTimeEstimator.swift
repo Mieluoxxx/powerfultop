@@ -26,34 +26,28 @@ struct BatteryTimeEstimator {
 
     /// Returns smoothed discharge/charge power (watts) for the current display snapshot.
     mutating func smoothedPower(for data: PowerData) -> (dischargeW: Double?, chargeW: Double?) {
-        guard !data.isConnectingAC else {
+        switch data.powerState {
+        case .charging(let rate) where !data.fullyCharged:
+            return (nil, updateChargeEMA(sample: rate, for: data))
+        case .onBattery:
+            return (updateDischargeEMA(.batteryDischarging, sample: data.systemPowerW, at: data.timestamp), nil)
+        case .supplementing(let rate):
+            return (updateDischargeEMA(.supplementalDischarging, sample: rate, at: data.timestamp), nil)
+        case .charging, .connectingAC, .acIdle:
             reset()
             return (nil, nil)
         }
-
-        if data.isBatteryCharging, !data.fullyCharged {
-            return (nil, updateChargeEMA(for: data))
-        }
-
-        if !data.effectiveIsOnAC || data.isSupplementalDischarge {
-            return (updateDischargeEMA(for: data), nil)
-        }
-
-        reset()
-        return (nil, nil)
     }
 
-    private mutating func updateDischargeEMA(for data: PowerData) -> Double? {
-        switchMode(data.isSupplementalDischarge ? .supplementalDischarging : .batteryDischarging)
-        let instant = instantDischargePowerW(for: data)
-        guard instant >= 0.2, let elapsed = consumeSample(at: data.timestamp) else { return dischargeEMA }
+    private mutating func updateDischargeEMA(_ mode: Mode, sample instant: Double, at sampleAt: Date) -> Double? {
+        switchMode(mode)
+        guard instant >= 0.2, let elapsed = consumeSample(at: sampleAt) else { return dischargeEMA }
         dischargeEMA = ema(previous: dischargeEMA, sample: instant, elapsed: elapsed)
         return dischargeEMA
     }
 
-    private mutating func updateChargeEMA(for data: PowerData) -> Double? {
+    private mutating func updateChargeEMA(sample instant: Double, for data: PowerData) -> Double? {
         switchMode(.charging)
-        let instant = data.batteryChargeRateW
         if instant >= 0.2, let elapsed = consumeSample(at: data.timestamp) {
             chargeEMA = ema(previous: chargeEMA, sample: instant, elapsed: elapsed)
         }
@@ -84,13 +78,6 @@ struct BatteryTimeEstimator {
         guard elapsed > 0 else { return nil }
         lastSampleAt = sampleAt
         return elapsed
-    }
-
-    private func instantDischargePowerW(for data: PowerData) -> Double {
-        if data.isSupplementalDischarge {
-            return data.batterySupplementalW
-        }
-        return data.systemPowerW
     }
 
     private func ema(previous: Double?, sample: Double, elapsed: TimeInterval) -> Double {
