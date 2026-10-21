@@ -10,6 +10,7 @@ struct RegressionTests {
         testDischargeEstimatorResetsAcrossPowerSources()
         testMenuBarAlwaysUsesSystemPower()
         testManufactureDateDecoding()
+        testPowerFlowUsesIOKitDischargeSign()
 
         guard failures == 0 else {
             fputs("\(failures) regression test(s) failed\n", stderr)
@@ -175,6 +176,52 @@ struct RegressionTests {
             ),
             "never infer a date from ManufacturerData"
         )
+    }
+
+    private static func testPowerFlowUsesIOKitDischargeSign() {
+        // Live samples: on battery IOKit reports discharge as negative Amperage/BatteryPower.
+        let battery = resolvePowerFlow(
+            isOnAC: false, acInputW: 0, systemLoadW: 9.751,
+            ioBatteryPowerW: -9.751, ioAmperagePowerW: -9.751, systemInputW: nil
+        )
+        expectEqual(battery, PowerFlowReading(systemPowerW: 9.751, batteryPowerW: 9.751), "battery discharge")
+
+        let acIdle = resolvePowerFlow(
+            isOnAC: true, acInputW: 11.501, systemLoadW: 11.501,
+            ioBatteryPowerW: 0, ioAmperagePowerW: nil, systemInputW: 11.498
+        )
+        expectEqual(acIdle, PowerFlowReading(systemPowerW: 11.501, batteryPowerW: 0), "AC idle")
+
+        let supplement = resolvePowerFlow(
+            isOnAC: true, acInputW: 20, systemLoadW: 25,
+            ioBatteryPowerW: -5, ioAmperagePowerW: -5, systemInputW: 20
+        )
+        expectEqual(supplement, PowerFlowReading(systemPowerW: 25, batteryPowerW: 5), "AC + battery supplement")
+
+        let charging = resolvePowerFlow(
+            isOnAC: true, acInputW: 40, systemLoadW: 30,
+            ioBatteryPowerW: 10, ioAmperagePowerW: 10, systemInputW: 40
+        )
+        expectEqual(charging, PowerFlowReading(systemPowerW: 30, batteryPowerW: -10), "AC charging")
+
+        let liveCharging = resolvePowerFlow(
+            isOnAC: true, acInputW: 48.207, systemLoadW: 11.066,
+            ioBatteryPowerW: 37.141, ioAmperagePowerW: 37.141, systemInputW: 48.207
+        )
+        expectEqual(liveCharging, PowerFlowReading(systemPowerW: 11.066, batteryPowerW: -37.141), "live charging sample")
+
+        // Just plugged in: ExternalConnected flips before telemetry refreshes.
+        let staleAfterPlug = resolvePowerFlow(
+            isOnAC: true, acInputW: 0, systemLoadW: 5.818,
+            ioBatteryPowerW: -5.818, ioAmperagePowerW: -5.152, systemInputW: nil
+        )
+        expectEqual(staleAfterPlug, PowerFlowReading(systemPowerW: 5.818, batteryPowerW: 5.818), "stale snapshot after plug-in")
+
+        let legacyDischarge = resolvePowerFlow(
+            isOnAC: false, acInputW: 0, systemLoadW: nil,
+            ioBatteryPowerW: nil, ioAmperagePowerW: -8, systemInputW: nil
+        )
+        expectEqual(legacyDischarge, PowerFlowReading(systemPowerW: 8, batteryPowerW: 8), "legacy amperage discharge")
     }
 
     private static func packed(_ storedDigits: String) -> Int {
