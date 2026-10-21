@@ -7,6 +7,7 @@ struct DetailWindowView: View {
     static let minimumWidth: CGFloat = 620
 
     let monitor: PowerMonitor
+    let thermal: ThermalMonitor
 
     private var data: PowerData { monitor.currentData }
 
@@ -42,24 +43,24 @@ struct DetailWindowView: View {
     }
 
     /// Weights approximate card heights in rows so the masonry columns stay balanced.
+    /// Only depth the popover lacks earns a card; anything it already shows lives in the strip.
     private var dashboardCards: [MasonryItem] {
-        var cards = [
-            MasonryItem(id: "level", weight: 5, view: AnyView(levelCard)),
-            MasonryItem(id: "battery", weight: 7, view: AnyView(batteryCard)),
-            MasonryItem(id: "health", weight: 8, view: AnyView(healthCard)),
-        ]
-        if data.hasSettledAC {
-            cards.append(MasonryItem(id: "adapter", weight: 8, view: AnyView(adapterCard)))
-            cards.append(MasonryItem(id: "charging", weight: 5, view: AnyView(chargingCard)))
+        var cards: [MasonryItem] = []
+        if thermal.snapshot.hasFans || !thermal.snapshot.temperatures.isEmpty {
+            let weight = 6.0 + Double(thermal.snapshot.fans.count) + (thermal.mode.isAutomatic ? 0 : 4)
+            cards.append(MasonryItem(id: "cooling", weight: weight, view: AnyView(CoolingCard(thermal: thermal))))
         }
-        if data.hasCellData {
-            let rows = data.cellDisplayEntries.count * 2 + (data.batteryParallelCellCurrents?.count ?? 0) + 3
+        cards.append(MasonryItem(id: "health", weight: 10, view: AnyView(healthCard)))
+        if data.hasSettledAC {
+            cards.append(MasonryItem(id: "charger", weight: 11, view: AnyView(chargerCard)))
+        }
+        if data.hasCellData || data.batteryVoltageMV != nil {
+            let rows = data.cellDisplayEntries.count * 2 + (data.batteryParallelCellCurrents?.count ?? 0) + 6
             cards.append(MasonryItem(id: "cells", weight: Double(rows), view: AnyView(cellsCard)))
         }
         if data.hasLifetimeData {
             cards.append(MasonryItem(id: "lifetime", weight: 9, view: AnyView(lifetimeCard)))
         }
-        cards.append(MasonryItem(id: "device", weight: 5, view: AnyView(deviceCard)))
         return cards
     }
 
@@ -67,16 +68,32 @@ struct DetailWindowView: View {
 
     private var powerStrip: some View {
         HStack(spacing: 0) {
+            StripItem(
+                icon: data.batteryLevelSymbol,
+                tint: data.batteryLevelTint,
+                label: "\(data.displayBatteryPercent)%",
+                value: data.powerSourceDescription
+            )
+            StripDivider()
             if data.hasSettledAC {
                 StripItem(icon: "powerplug.fill", tint: .green, label: String(localized: "Charger"), value: watts(data.effectiveACOutputW))
                 StripDivider()
             }
             StripItem(icon: "laptopcomputer", tint: .primary, label: String(localized: "System"), value: watts(data.systemPowerW))
+                .help(data.averageSystemPowerW.map {
+                    String(format: String(localized: "Average System Power: %@"), watts($0))
+                } ?? "")
             StripDivider()
             StripItem(icon: batteryStripIcon, tint: batteryStripTint, label: String(localized: "Battery"), value: data.signedBatteryPowerText)
             if let time = data.estimatedTimeRemainingText {
                 StripDivider()
                 StripItem(icon: "clock", tint: .secondary, label: data.estimatedTimeRemainingLabel, value: time)
+                    .help(data.estimatedTimeFootnote ?? "")
+            }
+            if data.dataSource == .legacy {
+                StripDivider()
+                StripItem(icon: "exclamationmark.triangle.fill", tint: .yellow, label: String(localized: "Estimation Mode"), value: "")
+                    .help(String(localized: "Estimation Mode — telemetry unavailable"))
             }
             Spacer(minLength: 0)
         }
@@ -100,50 +117,6 @@ struct DetailWindowView: View {
 
     // MARK: - Cards
 
-    private var levelCard: some View {
-        DashCard(title: String(localized: "Battery Level"), icon: data.batteryLevelSymbol, tint: data.batteryLevelTint) {
-            CardHero(value: "\(data.displayBatteryPercent)%", size: 38)
-            LevelBar(fraction: Double(data.displayBatteryPercent) / 100, tint: data.batteryLevelTint)
-            Text(data.powerSourceDescription)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-            if let time = data.estimatedTimeRemainingText {
-                CardRow(label: data.estimatedTimeRemainingLabel, value: time, emphasized: true)
-            }
-            if data.chargeLimitPercent < 100 {
-                CardRow(label: String(localized: "Charge Limit"), value: data.chargeLimitText)
-            }
-            if let footnote = data.estimatedTimeFootnote {
-                CardNote(footnote)
-            }
-            if data.dataSource == .legacy {
-                CardNote(String(localized: "Estimation Mode — telemetry unavailable"))
-            }
-        }
-    }
-
-    private var batteryCard: some View {
-        DashCard(title: String(localized: "Battery"), icon: "bolt.fill", tint: .yellow) {
-            CardHero(value: data.signedBatteryPowerText, caption: String(localized: "Battery Power"))
-            if let amp = data.batteryAmperageMA {
-                CardRow(label: String(localized: "Battery Current"), value: PowerData.batteryCurrentText(amp))
-            }
-            if let voltage = data.batteryVoltageMV {
-                CardRow(label: String(localized: "Battery Voltage"), value: String(format: "%.2f V", Double(voltage) / 1000.0))
-            }
-            CardRow(label: String(localized: "System Power"), value: watts(data.systemPowerW), emphasized: true)
-            if let avg = data.averageSystemPowerW, avg > 0.5 {
-                CardRow(label: String(localized: "Average System Power"), value: watts(avg))
-            }
-            if let remaining = data.remainingCapacityMAH {
-                CardRow(label: String(localized: "Remaining Charge"), value: "\(remaining) mAh")
-            }
-            if let instant = data.instantAmperageMA {
-                CardRow(label: String(localized: "Battery Instant Current"), value: PowerData.batteryCurrentText(instant))
-            }
-        }
-    }
-
     private var healthCard: some View {
         DashCard(title: String(localized: "Battery Health"), icon: "heart.fill", tint: healthColor) {
             if let health = data.batteryHealthPercent {
@@ -152,6 +125,20 @@ struct DetailWindowView: View {
             capacityRow(String(localized: "Design Capacity"), data.designCapacityMAH, tint: .secondary)
             capacityRow(String(localized: "Current Full Charge"), data.fullChargeCapacityMAH ?? data.rawMaxCapacityMAH, tint: healthColor)
             capacityRow(String(localized: "Calibrated Full Charge"), data.nominalChargeCapacityMAH, tint: healthColor)
+            capacityRow(String(localized: "Remaining Charge"), data.remainingCapacityMAH, tint: data.batteryLevelTint)
+            HStack(spacing: 6) {
+                CardRow(label: String(localized: "Charge Limit"), value: data.chargeLimitText)
+                Button {
+                    NSWorkspace.shared.open(macOSChargeLimitSettingsURL)
+                } label: {
+                    Image(systemName: "arrow.up.forward.app")
+                }
+                .buttonStyle(.borderless)
+                .help(String(localized: "Adjust the charge limit (80–100%) in System Settings"))
+            }
+            if let minSoc = data.dailyMinSoc, let maxSoc = data.dailyMaxSoc {
+                CardRow(label: String(localized: "Optimized Charging Range"), value: "\(minSoc)% – \(maxSoc)%")
+            }
             if let cycles = data.cycleCount {
                 CardRow(
                     label: String(localized: "Cycle Count"),
@@ -176,8 +163,8 @@ struct DetailWindowView: View {
         }
     }
 
-    private var adapterCard: some View {
-        DashCard(title: String(localized: "AC Adapter"), icon: "powerplug.fill", tint: .green) {
+    private var chargerCard: some View {
+        DashCard(title: String(localized: "Charger & Charging"), icon: "powerplug.fill", tint: .green) {
             CardHero(
                 value: watts(data.effectiveACOutputW),
                 rated: data.acAdapterWattage > 0 ? "\(data.acAdapterWattage) W" : nil,
@@ -212,14 +199,7 @@ struct DetailWindowView: View {
             if let loss = data.adapterEfficiencyLossW {
                 CardRow(label: String(localized: "Adapter Loss"), value: watts(loss))
             }
-            if let description = data.adapterDescription {
-                CardNote(description)
-            }
-        }
-    }
-
-    private var chargingCard: some View {
-        DashCard(title: String(localized: "Charging Status"), icon: "battery.100.bolt", tint: .blue) {
+            Divider().padding(.vertical, 2)
             CardRow(
                 label: String(localized: "Status"),
                 value: data.isBatteryCharging ? String(localized: "Charging") : String(localized: "Not Charging"),
@@ -231,12 +211,6 @@ struct DetailWindowView: View {
             if let reason = data.notChargingReasonDescription {
                 CardRow(label: String(localized: "Not Charging Reason"), value: reason)
             }
-            if data.chargeLimitPercent < 100 {
-                CardRow(label: String(localized: "Charge Limit"), value: data.chargeLimitText)
-            }
-            if let minSoc = data.dailyMinSoc, let maxSoc = data.dailyMaxSoc {
-                CardRow(label: String(localized: "Optimized Charging Range"), value: "\(minSoc)% – \(maxSoc)%")
-            }
             if let cv = data.chargingVoltageMV {
                 CardRow(label: String(localized: "Cell Charging Voltage"), value: String(format: "%.3f V", Double(cv) / 1000.0))
             }
@@ -246,11 +220,23 @@ struct DetailWindowView: View {
             if let vac = data.vacVoltageLimit {
                 CardRow(label: String(localized: "Max Charging Voltage Limit"), value: String(format: "%.3f V", Double(vac) / 1000.0))
             }
+            if let description = data.adapterDescription {
+                CardNote(description)
+            }
         }
     }
 
     private var cellsCard: some View {
-        DashCard(title: String(localized: "Cell Data"), icon: "square.stack.3d.up", tint: .cyan) {
+        DashCard(title: String(localized: "Cells & Live Readings"), icon: "square.stack.3d.up", tint: .cyan) {
+            if let voltage = data.batteryVoltageMV {
+                CardRow(label: String(localized: "Battery Voltage"), value: String(format: "%.2f V", Double(voltage) / 1000.0))
+            }
+            if let amp = data.batteryAmperageMA {
+                CardRow(label: String(localized: "Battery Current"), value: PowerData.batteryCurrentText(amp))
+            }
+            if let instant = data.instantAmperageMA {
+                CardRow(label: String(localized: "Battery Instant Current"), value: PowerData.batteryCurrentText(instant))
+            }
             if let topology = data.cellTopologyDescription {
                 CardNote(topology)
             }
@@ -314,53 +300,36 @@ struct DetailWindowView: View {
         }
     }
 
-    private var deviceCard: some View {
-        DashCard(title: String(localized: "Device Information"), icon: "info.circle", tint: .secondary) {
-            if let serial = data.batterySerial {
-                HStack(spacing: 6) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(String(localized: "Battery Serial Number"))
-                            .foregroundStyle(.secondary)
-                        Text(serial)
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
-                            .textSelection(.enabled)
-                    }
-                    .font(.system(size: 12))
-                    Spacer(minLength: 0)
-                    Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(serial, forType: .string)
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                    }
-                    .buttonStyle(.borderless)
-                    .help(String(localized: "Copy"))
-                }
-            }
-            if let name = data.deviceName {
-                CardRow(label: String(localized: "Battery Management Chip"), value: name)
-            }
-            if let mfg = data.batteryManufactureDate {
-                CardRow(label: String(localized: "Manufacture Date"), value: mfg)
-            }
-            CardRow(
-                label: String(localized: "Data Source"),
-                value: data.dataSource == .telemetry
-                    ? String(localized: "Power Telemetry")
-                    : String(localized: "Estimation Mode")
-            )
-            CardNote(String(localized: "Device info is shown locally only and is not uploaded."))
-        }
+    private func celsius(_ value: Double) -> String {
+        String(format: "%.1f°C", value)
     }
 
+    /// Device facts are rarely needed, so they share the footer line instead of a card.
     private var footerTimestamp: some View {
-        HStack {
+        HStack(spacing: 6) {
+            Text([data.deviceName, data.batteryManufactureDate.map { String(format: String(localized: "Manufactured %@"), $0) }]
+                .compactMap { $0 }
+                .joined(separator: " · "))
+            if let serial = data.batterySerial {
+                Text("·")
+                Text(serial)
+                    .font(.system(size: 10, design: .monospaced))
+                    .textSelection(.enabled)
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(serial, forType: .string)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                }
+                .buttonStyle(.borderless)
+                .help(String(localized: "Copy serial number. Device info is shown locally only and is not uploaded."))
+            }
             Spacer()
             Text(String(format: String(localized: "Updated at %@"), data.timestamp.formatted(date: .omitted, time: .standard)))
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
                 .monospacedDigit()
         }
+        .font(.system(size: 10))
+        .foregroundStyle(.tertiary)
     }
 
     private var unavailableState: some View {
@@ -407,6 +376,183 @@ struct DetailWindowView: View {
         return .red
     }
 
+}
+
+// MARK: - Fan control
+
+/// Mirrors Macs Fan Control: Auto hands fans to macOS; Custom is a constant RPM or a temperature ramp.
+private struct CoolingCard: View {
+    let thermal: ThermalMonitor
+    @State private var draftRPM: Double?
+
+    private enum Preset: Hashable { case automatic, fullBlast, custom }
+
+    private var snapshot: ThermalSnapshot { thermal.snapshot }
+    private var minRPM: Double { snapshot.fans.map(\.minRPM).max() ?? 0 }
+    private var maxRPM: Double { snapshot.fans.map(\.maxRPM).min() ?? 0 }
+
+    private var preset: Preset {
+        switch thermal.mode {
+        case .automatic: return .automatic
+        case .fullBlast: return .fullBlast
+        case .constant, .sensor: return .custom
+        }
+    }
+
+    var body: some View {
+        DashCard(title: String(localized: "Cooling"), icon: "fan.fill", tint: .teal) {
+            if let cpu = snapshot.temperatures[.cpu] {
+                CardHero(value: String(format: "%.1f°C", cpu.averageC), caption: String(localized: "CPU Average"))
+            }
+            ForEach(SensorGroup.allCases) { group in
+                if let summary = snapshot.temperatures[group] {
+                    CardBarRow(
+                        label: group.title,
+                        value: String(
+                            format: String(localized: "%@ avg · %@ max"),
+                            String(format: "%.1f°C", summary.averageC),
+                            String(format: "%.1f°C", summary.maximumC)
+                        ),
+                        fraction: summary.maximumC / FanHelperConstants.failsafeCelsius,
+                        tint: summary.maximumC >= 90 ? .red : (summary.maximumC >= 75 ? .orange : .green)
+                    )
+                }
+            }
+            if snapshot.hasFans {
+                fanSection
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var fanSection: some View {
+            Divider().padding(.vertical, 2)
+            CardRow(
+                label: thermal.isControlling ? String(localized: "Controlled by PowerTop") : String(localized: "Controlled by macOS"),
+                value: String(format: "%.0f RPM", snapshot.fans.map(\.actualRPM).max() ?? 0),
+                emphasized: true
+            )
+            ForEach(snapshot.fans) { fan in
+                CardBarRow(
+                    label: String(format: String(localized: "Fan %d"), fan.index + 1),
+                    value: String(format: "%.0f / %.0f RPM", fan.actualRPM, fan.maxRPM),
+                    fraction: fan.maxRPM > 0 ? fan.actualRPM / fan.maxRPM : nil,
+                    tint: .teal
+                )
+            }
+
+            Picker("", selection: Binding(get: { preset }, set: select)) {
+                Text(String(localized: "Auto")).tag(Preset.automatic)
+                Text(String(localized: "Full Blast")).tag(Preset.fullBlast)
+                Text(String(localized: "Custom")).tag(Preset.custom)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.top, 4)
+
+            if preset == .custom {
+                customControls
+            }
+            statusNotes
+    }
+
+    private func select(_ newPreset: Preset) {
+        switch newPreset {
+        case .automatic: thermal.setMode(.automatic)
+        case .fullBlast: thermal.setMode(.fullBlast)
+        case .custom: thermal.setMode(thermal.lastCustomMode)
+        }
+    }
+
+    @ViewBuilder
+    private var customControls: some View {
+        let isSensor: Bool = { if case .sensor = thermal.mode { return true }; return false }()
+        Picker("", selection: Binding(
+            get: { isSensor },
+            set: { thermal.setMode($0 ? sensorMode : constantMode) }
+        )) {
+            Text(String(localized: "Constant RPM")).tag(false)
+            Text(String(localized: "Follow Temperature")).tag(true)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+
+        switch thermal.mode {
+        case .constant(let rpm):
+            let shown = draftRPM ?? rpm
+            CardRow(label: String(localized: "Target Speed"), value: String(format: "%.0f RPM", shown), emphasized: true)
+            Slider(
+                value: Binding(get: { draftRPM ?? rpm }, set: { draftRPM = $0 }),
+                in: minRPM...max(maxRPM, minRPM + 100),
+                step: 100
+            ) { editing in
+                if !editing, let draftRPM {
+                    thermal.setMode(.constant(rpm: draftRPM))
+                    self.draftRPM = nil
+                }
+            }
+        case .sensor(let group, let lowerC, let upperC):
+            Picker(String(localized: "Sensor"), selection: Binding(
+                get: { group },
+                set: { thermal.setMode(.sensor(group: $0, lowerC: lowerC, upperC: upperC)) }
+            )) {
+                ForEach([SensorGroup.cpu, .gpu]) { Text($0.title).tag($0) }
+            }
+            .font(.system(size: 12))
+            Stepper(
+                String(format: String(localized: "Start ramping at %.0f°C"), lowerC),
+                value: Binding(get: { lowerC }, set: { thermal.setMode(.sensor(group: group, lowerC: $0, upperC: max(upperC, $0 + 5))) }),
+                in: 30...90,
+                step: 5
+            )
+            .font(.system(size: 12))
+            Stepper(
+                String(format: String(localized: "Full speed at %.0f°C"), upperC),
+                value: Binding(get: { upperC }, set: { thermal.setMode(.sensor(group: group, lowerC: min(lowerC, $0 - 5), upperC: $0)) }),
+                in: 40...100,
+                step: 5
+            )
+            .font(.system(size: 12))
+        default:
+            EmptyView()
+        }
+    }
+
+    private var constantMode: FanControlMode {
+        if case .constant = thermal.lastCustomMode { return thermal.lastCustomMode }
+        return .defaultConstant
+    }
+
+    private var sensorMode: FanControlMode {
+        if case .sensor = thermal.lastCustomMode { return thermal.lastCustomMode }
+        return .defaultSensor
+    }
+
+    @ViewBuilder
+    private var statusNotes: some View {
+        if thermal.conflictDetected && !thermal.isControlling {
+            CardNote(String(localized: "Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerTop take over; until then PowerTop only monitors."))
+        } else if !thermal.mode.isAutomatic && thermal.helperStatus != .ready {
+            CardNote(thermal.helperStatus == .needsUpdate
+                ? String(localized: "PowerTop was updated, so the fan helper must be authorized again.")
+                : String(localized: "Controlling fans needs a small helper that runs as root. macOS asks for an administrator password once."))
+            Button(thermal.helperStatus == .needsUpdate ? String(localized: "Update Fan Helper") : String(localized: "Install Fan Helper")) {
+                thermal.installHelper()
+            }
+            .controlSize(.small)
+        } else if thermal.mode.isAutomatic && snapshot.fans.allSatisfy({ $0.actualRPM == 0 }) {
+            CardNote(String(localized: "macOS stops the fans while temperatures are low; they spin up on their own when cooling is needed."))
+        }
+        if let error = thermal.lastError {
+            Text(error)
+                .font(.system(size: 10))
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        if !thermal.mode.isAutomatic {
+            CardNote(String(format: String(localized: "Fans return to macOS control when PowerTop quits, the Mac sleeps, or the CPU or GPU reaches %.0f°C."), FanHelperConstants.failsafeCelsius))
+        }
+    }
 }
 
 // MARK: - Components

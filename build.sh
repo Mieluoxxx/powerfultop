@@ -48,6 +48,19 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 # Move executable into bundle
 mv "$BUILD_DIR/$APP_NAME" "$EXECUTABLE"
 
+# Root fan helper: shares only the SMC client and fan model with the app.
+echo "Compiling fan helper..."
+"$SWIFTC" \
+    -target arm64-apple-macosx14.0 \
+    -sdk "$SDK" \
+    -framework IOKit \
+    -framework Foundation \
+    -O \
+    -o "$APP_BUNDLE/Contents/MacOS/PowerTopFanHelper" \
+    "$PROJECT_DIR"/Helper/*.swift \
+    "$PROJECT_DIR/PowerTop/Utilities/SMC.swift" \
+    "$PROJECT_DIR/PowerTop/Models/Thermal.swift"
+
 # Copy Info.plist
 cp "$PROJECT_DIR/PowerTop/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 

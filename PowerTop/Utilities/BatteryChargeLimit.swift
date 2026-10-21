@@ -57,19 +57,53 @@ private func isOptimizedChargingHoldActive(notChargingReason: Int?) -> Bool {
     return reason & optimizedChargingPauseReason != 0
 }
 
+/// System Settings › Battery › Charging, where macOS 26.4+ exposes the native 80–100% limit.
+let macOSChargeLimitSettingsURL = URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension")!
+
+/// powerd enforces the native limit; `prior.limit` in the batteryui domain lingers after the limit
+/// is switched off, so it cannot tell whether a limit is active.
 private func readMacOSChargeLimitPercent() -> Int? {
-    let domain = "com.apple.batteryui.charging.mac"
-    let keys = [
-        "com.apple.batteryui.charging.mac.limit",
-        "com.apple.batteryui.charging.mac.prior.limit",
-        "limit",
-    ]
-    for key in keys {
-        if let limit = normalizedChargeLimitPercent(readPreferenceNumber(domain: domain, key: key)) {
-            return limit
-        }
+    PowerdChargeLimitCache.shared.limit()
+}
+
+/// `pmset -g battlimit` lists the SOC limits powerd is enforcing; the strictest one applies.
+func parsePowerdChargeLimit(_ output: String) -> Int? {
+    let pattern = try! Regex(#"chargeSocLimitSoc\s*=\s*(\d+);"#)
+    let limits = output.matches(of: pattern).compactMap { match in
+        match.output[1].substring.flatMap { Int($0) }
     }
-    return nil
+    return limits.compactMap(normalizedChargeLimitPercent).min()
+}
+
+/// Spawning pmset on every 2 s refresh is wasteful; the limit only changes when the user edits it.
+private final class PowerdChargeLimitCache: @unchecked Sendable {
+    static let shared = PowerdChargeLimitCache()
+    private let lock = NSLock()
+    private var cached: Int?
+    private var readAt = Date.distantPast
+    private let lifetime: TimeInterval = 30
+
+    func limit() -> Int? {
+        lock.lock()
+        defer { lock.unlock() }
+        if Date().timeIntervalSince(readAt) < lifetime { return cached }
+        cached = Self.readPmset()
+        readAt = Date()
+        return cached
+    }
+
+    private static func readPmset() -> Int? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
+        process.arguments = ["-g", "battlimit"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return nil }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return parsePowerdChargeLimit(String(decoding: data, as: UTF8.self))
+    }
 }
 
 private func readAlDenteChargeLimitPercent() -> Int? {

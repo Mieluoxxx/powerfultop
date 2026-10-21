@@ -4,6 +4,7 @@ struct PopoverView: View {
     static let preferredWidth: CGFloat = 280
 
     let monitor: PowerMonitor
+    let thermal: ThermalMonitor
     let openDetails: () -> Void
 
     private var data: PowerData { monitor.currentData }
@@ -172,7 +173,12 @@ struct PopoverView: View {
     // MARK: - Battery Stats
 
     private var hasBatteryStats: Bool {
-        data.batteryHealthPercent != nil || data.batteryTemperatureC != nil || data.cycleCount != nil
+        data.batteryHealthPercent != nil || batteryTemperatureC != nil || data.cycleCount != nil || thermal.snapshot.hasFans
+    }
+
+    /// Some machines drop `Temperature` from AppleSmartBattery; the SMC pack thermistors still report it.
+    private var batteryTemperatureC: Double? {
+        data.batteryTemperatureC ?? thermal.snapshot.temperatures[.battery]?.averageC
     }
 
     private var batteryStatsSection: some View {
@@ -184,7 +190,7 @@ struct PopoverView: View {
                     tint: health >= 80 ? .primary : (health >= 60 ? .orange : .red)
                 )
             }
-            if let temp = data.batteryTemperatureC {
+            if let temp = batteryTemperatureC {
                 StatCell(
                     value: String(format: "%.1f°", temp),
                     label: String(localized: "Battery Temp"),
@@ -193,6 +199,13 @@ struct PopoverView: View {
             }
             if let cycles = data.cycleCount {
                 StatCell(value: "\(cycles)", label: String(localized: "Cycle Count"), tint: .primary)
+            }
+            if thermal.snapshot.hasFans {
+                StatCell(
+                    value: String(format: "%.0f", thermal.snapshot.fans.map(\.actualRPM).max() ?? 0),
+                    label: String(localized: "Fan RPM"),
+                    tint: thermal.isControlling ? .teal : .primary
+                )
             }
         }
     }
@@ -247,6 +260,28 @@ struct PopoverView: View {
 
     private var settingsMenu: some View {
         Menu {
+            if thermal.snapshot.hasFans {
+                Picker(String(localized: "Fans"), selection: Binding(
+                    get: { thermal.mode.isAutomatic ? 0 : (thermal.mode == .fullBlast ? 1 : 2) },
+                    set: { choice in
+                        switch choice {
+                        case 0: thermal.setMode(.automatic)
+                        case 1: thermal.setMode(.fullBlast)
+                        default: thermal.setMode(thermal.lastCustomMode)
+                        }
+                    }
+                )) {
+                    Text(String(localized: "Auto")).tag(0)
+                    Text(String(localized: "Full Blast")).tag(1)
+                    Text(String(localized: "Custom")).tag(2)
+                }
+                .pickerStyle(.menu)
+                Divider()
+            }
+            Button(String(format: String(localized: "Charge Limit: %@…"), data.chargeLimitText)) {
+                NSWorkspace.shared.open(macOSChargeLimitSettingsURL)
+            }
+            Divider()
             Toggle(String(localized: "Launch at Login"), isOn: Binding(
                 get: { monitor.launchAtLogin },
                 set: { monitor.launchAtLogin = $0 }

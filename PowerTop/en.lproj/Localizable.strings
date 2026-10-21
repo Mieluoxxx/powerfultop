@@ -18,18 +18,13 @@
 // Power Flow Diagram
 "Charger" = "Charger";
 "Battery" = "Battery";
-"AC Adapter" = "AC Adapter";
 "System" = "System";
 
 // Metrics
-"System Power" = "System Power";
-"Battery Power" = "Battery Power";
 "AC Adapter Output" = "AC Adapter Output";
-"Data Source" = "Data Source";
 "Estimation Mode" = "Estimation Mode";
 
 // Battery Section
-"Battery Level" = "Battery Level";
 "Health" = "Health";
 "Battery Temp" = "Battery Temp";
 "Cycle Count" = "Cycle Count";
@@ -50,7 +45,6 @@
 
 // Detail - Power Section
 "Charger Load Rate" = "Charger Load Rate";
-"Charging Status" = "Charging Status";
 "Not Charging" = "Not Charging";
 "Wall Outlet Power" = "Power from Outlet (est.)";
 "Adapter Loss" = "Charger Conversion Loss";
@@ -67,8 +61,6 @@
 "macOS setting" = "macOS setting";
 "Optimized Charging" = "Optimized Charging";
 "Estimated from remaining energy and smoothed power (macOS no longer provides this)." = "Estimated from remaining energy and smoothed power (macOS no longer provides this).";
-"Average System Power" = "Average System Power";
-"Manufacture Date" = "Manufacture Date";
 
 // Detail - Battery Health
 "Battery Health" = "Battery Health";
@@ -90,7 +82,6 @@
 "Abnormal (%d)" = "Abnormal (%d)";
 
 // Detail - Cell Data
-"Cell Data" = "Cell Data";
 "Cell %d" = "Cell %d";
 "—" = "—";
 "Battery topology: %dS%dP (%d cells)" = "Battery topology: %dS%dP (%d cells)";
@@ -128,10 +119,6 @@
 "0 (normal)" = "0 (normal)";
 
 // Detail - Device Info
-"Device Information" = "Device Information";
-"Battery Serial Number" = "Battery Serial Number";
-"Battery Management Chip" = "Battery Management Chip";
-"Device info is shown locally only and is not uploaded." = "Device info is shown locally only and is not uploaded.";
 
 // Detail - Footer
 "Updated at %@" = "Updated at %@";
@@ -141,5 +128,47 @@
 
 // Detail - Tabs
 "Status" = "Status";
-"Copy" = "Copy";
-"Power Telemetry" = "Power Telemetry";
+
+// Fans & Temperatures
+"%@ avg · %@ max" = "%@ avg · %@ max";
+"Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerTop take over; until then PowerTop only monitors." = "Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerTop take over; until then PowerTop only monitors.";
+"Authorization was cancelled." = "Authorization was cancelled.";
+"Auto" = "Auto";
+"CPU" = "CPU";
+"CPU Average" = "CPU Average";
+"Constant RPM" = "Constant RPM";
+"Controlled by PowerTop" = "Controlled by PowerTop";
+"Controlled by macOS" = "Controlled by macOS";
+"Controlling fans needs a small helper that runs as root. macOS asks for an administrator password once." = "Controlling fans needs a small helper that runs as root. macOS asks for an administrator password once.";
+"Could not connect to the fan helper." = "Could not connect to the fan helper.";
+"Custom" = "Custom";
+"Fan %d" = "Fan %d";
+"Fan RPM" = "Fan RPM";
+"Fans" = "Fans";
+"Fans return to macOS control when PowerTop quits, the Mac sleeps, or the CPU or GPU reaches %.0f°C." = "Fans return to macOS control when PowerTop quits, the Mac sleeps, or the CPU or GPU reaches %.0f°C.";
+"Follow Temperature" = "Follow Temperature";
+"Full Blast" = "Full Blast";
+"Full speed at %.0f°C" = "Full speed at %.0f°C";
+"GPU" = "GPU";
+"Install Fan Helper" = "Install Fan Helper";
+"PowerTop must be code-signed to control fans." = "PowerTop must be code-signed to control fans.";
+"PowerTop was updated, so the fan helper must be authorized again." = "PowerTop was updated, so the fan helper must be authorized again.";
+"Sensor" = "Sensor";
+"Start ramping at %.0f°C" = "Start ramping at %.0f°C";
+"Target Speed" = "Target Speed";
+"The fan helper is missing from the app bundle." = "The fan helper is missing from the app bundle.";
+"Update Fan Helper" = "Update Fan Helper";
+"macOS stops the fans while temperatures are low; they spin up on their own when cooling is needed." = "macOS stops the fans while temperatures are low; they spin up on their own when cooling is needed.";
+
+// Dashboard
+"Average System Power: %@" = "Average System Power: %@";
+"Cells & Live Readings" = "Cells & Live Readings";
+"Charger & Charging" = "Charger & Charging";
+"Cooling" = "Cooling";
+"Copy serial number. Device info is shown locally only and is not uploaded." = "Copy serial number. Device info is shown locally only and is not uploaded.";
+"Manufactured %@" = "Manufactured %@";
+
+// Charge limit
+"Off" = "Off";
+"Adjust the charge limit (80–100%) in System Settings" = "Adjust the charge limit (80–100%) in System Settings";
+"Charge Limit: %@…" = "Charge Limit: %@…";

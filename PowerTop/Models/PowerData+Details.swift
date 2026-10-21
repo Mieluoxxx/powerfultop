@@ -89,7 +89,9 @@ extension PowerData {
             || batteryCellDisconnectCount != nil
     }
 
+    /// "85% (macOS setting)", or "Off" when nothing caps charging.
     var chargeLimitText: String {
+        guard chargeLimitPercent < 100 else { return String(localized: "Off") }
         if let source = chargeLimitSourceLabel(chargeLimitSource) {
             return "\(chargeLimitPercent)% (\(source))"
         }

@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate {
     private let monitor: PowerMonitor
+    private let thermal: ThermalMonitor
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
     private var detailWindow: NSWindow?
@@ -14,8 +15,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     private var localClickMonitor: Any?
     private var globalClickMonitor: Any?
 
-    init(monitor: PowerMonitor) {
+    init(monitor: PowerMonitor, thermal: ThermalMonitor) {
         self.monitor = monitor
+        self.thermal = thermal
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
         configureStatusItem()
@@ -50,6 +52,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
         popover.delegate = self
         let root = StatusPopoverContent(
             monitor: monitor,
+            thermal: thermal,
             openDetails: { [weak self] in self?.openDetails() },
             onMeasuredSize: { [weak self] size in
                 self?.applyPopoverSize(size)
@@ -181,7 +184,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
         popover.performClose(nil)
         NSApp.activate(ignoringOtherApps: true)
         if detailWindow == nil {
-            let hosting = NSHostingController(rootView: DetailWindowView(monitor: monitor))
+            let hosting = NSHostingController(rootView: DetailWindowView(monitor: monitor, thermal: thermal))
             let window = NSWindow(contentViewController: hosting)
             window.title = String(localized: "PowerTop Details")
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
@@ -215,11 +218,12 @@ private struct PopoverMeasuredSizeKey: PreferenceKey {
 
 private struct StatusPopoverContent: View {
     let monitor: PowerMonitor
+    let thermal: ThermalMonitor
     let openDetails: () -> Void
     let onMeasuredSize: (CGSize) -> Void
 
     var body: some View {
-        PopoverView(monitor: monitor, openDetails: openDetails)
+        PopoverView(monitor: monitor, thermal: thermal, openDetails: openDetails)
             .background {
                 GeometryReader { proxy in
                     Color.clear.preference(key: PopoverMeasuredSizeKey.self, value: proxy.size)

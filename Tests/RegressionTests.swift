@@ -18,6 +18,11 @@ struct RegressionTests {
         testPowerStateClassification()
         testCellTelemetryParsing()
         testDetailDerivations()
+        testSMCParamLayout()
+        testFanTargets()
+        testSensorGrouping()
+        testTemperatureSmoothing()
+        testPowerdChargeLimitParsing()
 
         guard failures == 0 else {
             fputs("\(failures) regression test(s) failed\n", stderr)
@@ -273,6 +278,95 @@ struct RegressionTests {
         expect(abs(telemetryEnergyToWatts(14741) - 53.068) < 0.01, "charging wall power includes adapter loss")
     }
 
+    private static func testSMCParamLayout() {
+        // AppleSMC rejects every call unless the struct matches the kernel's 80-byte SMCKeyData_t.
+        expectEqual(MemoryLayout<SMCParam>.size, 80, "SMCParam size")
+        expectEqual(MemoryLayout<SMCParam>.offset(of: \SMCParam.keyInfo), 28, "keyInfo offset")
+        expectEqual(MemoryLayout<SMCParam>.offset(of: \SMCParam.result), 40, "result offset")
+        expectEqual(MemoryLayout<SMCParam>.offset(of: \SMCParam.command), 42, "command offset")
+        expectEqual(MemoryLayout<SMCParam>.offset(of: \SMCParam.data32), 44, "data32 offset")
+        expectEqual(MemoryLayout<SMCParam>.offset(of: \SMCParam.bytes), 48, "bytes offset")
+        expectEqual(SMCParam.fourCC("F0Ac"), 0x4630_4163, "fourCC packs big-endian")
+        expectEqual(SMCParam.string(0x4630_4163), "F0Ac", "fourCC round trip")
+
+        let rpm = SMCValue(type: "flt ", bytes: SMCValue.floatBytes(2317))
+        expectEqual(rpm.doubleValue, 2317, "flt round trip")
+        expectEqual(SMCValue(type: "ui8 ", bytes: [3]).doubleValue, 3, "ui8 mode")
+    }
+
+    private static func testFanTargets() {
+        let fan = FanReading(index: 0, actualRPM: 0, minRPM: 2317, maxRPM: 7826, targetRPM: 0, mode: 3)
+        let hot = [SensorGroup.cpu: TemperatureSummary([60, 70])!]
+
+        expectNil(fanTargetRPM(mode: .automatic, fan: fan, temperatures: hot), "automatic leaves fans to macOS")
+        expectEqual(fanTargetRPM(mode: .fullBlast, fan: fan, temperatures: hot), 7826, "full blast uses the fan maximum")
+        expectEqual(fanTargetRPM(mode: .constant(rpm: 1000), fan: fan, temperatures: hot), 2317, "clamp below minimum")
+        expectEqual(fanTargetRPM(mode: .constant(rpm: 9000), fan: fan, temperatures: hot), 7826, "clamp above maximum")
+
+        let ramp = FanControlMode.sensor(group: .cpu, lowerC: 50, upperC: 90)
+        expectApproximately(fanTargetRPM(mode: ramp, fan: fan, temperatures: hot), 2317 + (7826 - 2317) * 0.5,
+                            "70 °C is halfway between 50 and 90 °C")
+        expectEqual(fanTargetRPM(mode: ramp, fan: fan, temperatures: [.cpu: TemperatureSummary([40])!]), 2317,
+                    "below the ramp stays at minimum")
+        expectEqual(fanTargetRPM(mode: ramp, fan: fan, temperatures: [:]), 7826,
+                    "missing sensor fails towards cooling")
+
+        let encoded = try? JSONEncoder().encode(ramp)
+        expectEqual(encoded.flatMap { try? JSONDecoder().decode(FanControlMode.self, from: $0) }, ramp, "mode persists")
+    }
+
+    private static func testPowerdChargeLimitParsing() {
+        // Live `pmset -g battlimit` output with the native 85% limit on.
+        let active = """
+        Battery level limits:
+        (
+                {
+                Terminated = 0;
+                chargeSocLimitDrain = 1;
+                chargeSocLimitOwner = 473;
+                chargeSocLimitReason = manualChargeLimit;
+                chargeSocLimitSoc = 85;
+            },
+                {
+                chargeSocLimitReason = manualChargeLimit;
+                chargeSocLimitSoc = 90;
+            }
+        )
+        """
+        expectEqual(parsePowerdChargeLimit(active), 85, "strictest powerd limit applies")
+        expectNil(parsePowerdChargeLimit("No battery level limits set"), "no limit when powerd reports none")
+        expectNil(parsePowerdChargeLimit("chargeSocLimitSoc = 100;"), "100% means no limit")
+    }
+
+    private static func testTemperatureSmoothing() {
+        let calm = [SensorGroup.cpu: TemperatureSummary(averageC: 42, maximumC: 54, sensorCount: 112)]
+        let spike = [SensorGroup.cpu: TemperatureSummary(averageC: 44, maximumC: 79, sensorCount: 112)]
+
+        let first = smoothTemperatures(previous: [:], current: spike, elapsed: 0)
+        expectEqual(first[.cpu]?.maximumC, 79, "first sample seeds the average")
+
+        // Live trace: max jumped 54 -> 79 °C within one 2 s refresh while the average moved 2 °C.
+        let damped = smoothTemperatures(previous: calm, current: spike, elapsed: 2)
+        let alpha = 1 - exp(-2.0 / 10.0)
+        expectApproximately(damped[.cpu]?.maximumC, 54 + 25 * alpha, "a one-sample spike moves the max by ~4.5 °C")
+        expect((damped[.cpu]?.maximumC ?? 99) < 60, "spike stays damped")
+
+        var sustained = calm
+        for _ in 0..<30 {
+            sustained = smoothTemperatures(previous: sustained, current: spike, elapsed: 2)
+        }
+        expect(abs((sustained[.cpu]?.maximumC ?? 0) - 79) < 0.1, "sustained heat converges within a minute")
+    }
+
+    private static func testSensorGrouping() {
+        let groups = groupSensorKeys(["Tp00", "Te04", "Tg0K", "TB0T", "TB1T", "Tf04", "TBXT0", "TPD0", "TC0P"])
+        expectEqual(groups[.cpu] ?? [], ["Tp00", "Te04"], "performance and efficiency cores")
+        expectEqual(groups[.gpu] ?? [], ["Tg0K"], "GPU sensors")
+        expectEqual(groups[.battery] ?? [], ["TB0T", "TB1T"], "pack thermistors only")
+        expect(!isPlausibleTemperature(0) && !isPlausibleTemperature(200) && isPlausibleTemperature(45),
+               "plausible temperature window")
+    }
+
     private static func testDetailDerivations() {
         expectEqual(PowerData.batteryCurrentText(2_896), "2.90 A (Charging)", "positive IOKit amperage is charging")
         expectEqual(PowerData.batteryCurrentText(-791), "0.79 A (Discharging)", "negative IOKit amperage is discharging")
@@ -301,6 +395,8 @@ struct RegressionTests {
             "large within-group current spread"
         )
         expectEqual(data.chargeLimitText, "85% (macOS setting)", "charge limit names its source")
+        let unlimited = PowerData(systemPowerW: 10, batteryPowerW: 0, acInputW: 10, batteryPercent: 85, isOnAC: true)
+        expectEqual(unlimited.chargeLimitText, "Off", "no limit reads as off")
         expectEqual(data.cellTopologyDescription, "Battery topology: 3 series groups", "1P layout reads as series groups")
         expect(data.hasCellData, "cell data present")
         expect(!data.hasLifetimeData, "no lifetime data")
