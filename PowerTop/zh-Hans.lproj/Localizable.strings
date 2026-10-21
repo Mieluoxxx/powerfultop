@@ -16,10 +16,11 @@
 "Reason Code %1$@ (0x%2$@)" = "原因代码 %1$@ (0x%2$@)";
 
 // Power Flow Diagram
+"Charger" = "充电器";
+"Battery" = "电池";
 "AC Adapter" = "AC 适配器";
 "Battery Charging" = "电池充电";
 "System" = "系统";
-"Battery Discharge" = "电池放电";
 "Battery Supplement" = "电池补充功率";
 
 // Metrics
@@ -65,6 +66,8 @@
 "Est. Time to Empty" = "预计剩余时间";
 "Est. Time to Full" = "预计充满时间";
 "Est. Time to %d%%" = "预计充至 %d%%";
+"Duration %dh %dm" = "%d 小时 %d 分钟";
+"Duration %dm" = "%d 分钟";
 "Estimated to %d%% charge limit (%@)." = "按 %d%% 充电上限估算（%@）。";
 "Charge Limit" = "充电上限";
 "macOS setting" = "系统设置";

@@ -16,10 +16,11 @@
 "Reason Code %1$@ (0x%2$@)" = "Reason Code %1$@ (0x%2$@)";
 
 // Power Flow Diagram
+"Charger" = "Charger";
+"Battery" = "Battery";
 "AC Adapter" = "AC Adapter";
 "Battery Charging" = "Battery Charging";
 "System" = "System";
-"Battery Discharge" = "Battery Discharge";
 "Battery Supplement" = "Battery Supplement";
 
 // Metrics
@@ -65,6 +66,8 @@
 "Est. Time to Empty" = "Est. Time to Empty";
 "Est. Time to Full" = "Est. Time to Full";
 "Est. Time to %d%%" = "Est. Time to %d%%";
+"Duration %dh %dm" = "%dh %dm";
+"Duration %dm" = "%dm";
 "Estimated to %d%% charge limit (%@)." = "Estimated to %d%% charge limit (%@).";
 "Charge Limit" = "Charge Limit";
 "macOS setting" = "macOS setting";

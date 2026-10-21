@@ -19,7 +19,7 @@ struct MenuBarLabel: Equatable {
         title = monitor.showPowerInMenuBar ? "\(percentage) \(data.menuBarPowerText)" : percentage
     }
 
-    private static func batteryIconName(for batteryPercent: Int) -> String {
+    static func batteryIconName(for batteryPercent: Int) -> String {
         switch batteryPercent {
         case ...10: return "battery.0"
         case ...35: return "battery.25"

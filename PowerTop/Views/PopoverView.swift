@@ -5,6 +5,7 @@ struct PopoverView: View {
 
     let monitor: PowerMonitor
     var openDetails: (() -> Void)? = nil
+    @Environment(\.openWindow) private var openWindow
 
     private var data: PowerData { monitor.currentData }
 
@@ -19,28 +20,29 @@ struct PopoverView: View {
             }
     }
 
-    // The actual stacked sections (no extra frame/fixed/background here).
     private var contentSections: some View {
         VStack(spacing: 0) {
             if !monitor.isDataAvailable {
                 unavailableBanner
             }
             headerSection
-            Divider().padding(.horizontal, 12)
-            powerFlowDiagram
-                .padding(.vertical, 8)
-            Divider().padding(.horizontal, 12)
-            metricsSection
                 .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.top, 14)
+                .padding(.bottom, 12)
             Divider().padding(.horizontal, 12)
-            batterySection
+            powerFlowSection
                 .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.vertical, 12)
+            if hasBatteryStats {
+                Divider().padding(.horizontal, 12)
+                batteryStatsSection
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+            }
             Divider().padding(.horizontal, 12)
             footerSection
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -60,294 +62,144 @@ struct PopoverView: View {
         .background(.orange.opacity(0.08))
     }
 
-    private var headerIconColor: Color {
-        if data.isConnectingAC { return .secondary }
-        return data.effectiveIsOnAC ? .green : .orange
-    }
-
     // MARK: - Header
 
+    private var batteryPercent: Int { min(100, max(0, data.batteryPercent)) }
+
+    private var levelTint: Color {
+        if data.isBatteryCharging { return .green }
+        if batteryPercent <= 20 { return .red }
+        return batteryPercent <= 50 ? .orange : .green
+    }
+
+    private var statusSymbol: String {
+        if data.isConnectingAC { return "powerplug" }
+        if data.isBatteryCharging { return "bolt.fill" }
+        if data.isSupplementalDischarge { return "exclamationmark.triangle.fill" }
+        return data.effectiveIsOnAC ? "powerplug.fill" : MenuBarLabel.batteryIconName(for: batteryPercent)
+    }
+
+    private var statusTint: Color {
+        if data.isConnectingAC { return .secondary }
+        if data.isSupplementalDischarge { return .orange }
+        if data.effectiveIsOnAC { return .green }
+        return batteryPercent <= 20 ? .red : .secondary
+    }
+
+    private var statusLine: String {
+        guard let time = data.estimatedTimeRemainingText else { return data.powerSourceDescription }
+        return "\(data.powerSourceDescription) · \(data.estimatedTimeRemainingLabel) \(time)"
+    }
+
     private var headerSection: some View {
-        HStack {
-            Image(systemName: data.effectiveIsOnAC ? "powerplug.fill" : "battery.50")
-                .foregroundStyle(headerIconColor)
-                .font(.title3)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(batteryPercent)%")
+                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .monospacedDigit()
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(data.powerSourceDescription)
-                    .font(.system(size: 13, weight: .semibold))
-                Text(String(format: "%.1f W", data.headerPowerW))
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+            LevelBar(fraction: Double(batteryPercent) / 100, tint: levelTint)
+
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Image(systemName: statusSymbol)
+                    .foregroundStyle(statusTint)
+                Text(statusLine)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .font(.system(size: 12))
 
-            Spacer()
-        }
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-    }
-
-    // MARK: - Power Flow Diagram
-
-    @ViewBuilder
-    private var powerFlowDiagram: some View {
-        Group {
-            if data.isConnectingAC {
-                connectingACDiagram
-            } else if data.isSupplementalDischarge {
-                supplementalDischargeDiagram
-            } else if data.effectiveIsOnAC {
-                acPoweredDiagram
-            } else {
-                batteryPoweredDiagram
+            if let reason = data.notChargingReasonDescription,
+               data.effectiveIsOnAC, !data.isConnectingAC, !data.isBatteryCharging {
+                Text(reason)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
             }
         }
-        .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var connectingACDiagram: some View {
-        VStack(spacing: 6) {
-            sourceBox(
-                title: String(localized: "AC Connecting"),
-                value: "—",
-                color: .secondary,
-                icon: "powerplug.fill"
-            )
-            Image(systemName: "arrowtriangle.down.fill")
-                .font(.system(size: 8))
-                .foregroundStyle(.secondary)
-            destBox(
-                title: String(localized: "System"),
-                value: String(format: "%.1f W", data.systemPowerW),
-                color: .primary,
-                icon: "desktopcomputer"
-            )
+    // MARK: - Power Flow
+
+    private func watts(_ value: Double) -> String {
+        String(format: "%.1f W", value)
+    }
+
+    private var sourceNodes: [FlowNode] {
+        if data.isConnectingAC {
+            return [FlowNode(icon: "powerplug", title: String(localized: "AC Connecting"), value: nil, tint: .secondary)]
         }
+        var nodes: [FlowNode] = []
+        if data.effectiveIsOnAC {
+            nodes.append(FlowNode(
+                icon: "powerplug.fill",
+                title: String(localized: "Charger"),
+                value: watts(data.effectiveACOutputW),
+                capacity: data.acAdapterWattage > 0 ? "\(data.acAdapterWattage) W" : nil,
+                tint: .green
+            ))
+        }
+        if data.isSupplementalDischarge {
+            nodes.append(FlowNode(icon: "battery.50", title: String(localized: "Battery"), value: watts(data.batterySupplementalW), tint: .orange))
+        } else if !data.effectiveIsOnAC {
+            nodes.append(FlowNode(icon: MenuBarLabel.batteryIconName(for: batteryPercent), title: String(localized: "Battery"), value: nil, tint: .orange))
+        }
+        return nodes
     }
 
-    private var acPoweredDiagram: some View {
-        VStack(spacing: 6) {
-            sourceBox(
-                title: String(localized: "AC Powered"),
-                value: String(format: "%.1f W", data.effectiveACOutputW),
-                color: .green,
-                icon: "powerplug.fill"
-            )
-            Image(systemName: "arrowtriangle.down.fill")
-                .font(.system(size: 8))
-                .foregroundStyle(.secondary)
+    private var destinationNodes: [FlowNode] {
+        var nodes = [FlowNode(icon: "laptopcomputer", title: String(localized: "System"), value: watts(data.systemPowerW), tint: .primary)]
+        if data.isBatteryCharging {
+            nodes.append(FlowNode(icon: "battery.100.bolt", title: String(localized: "Battery"), value: watts(data.batteryChargeRateW), tint: .blue))
+        }
+        return nodes
+    }
 
-            if data.isBatteryCharging {
-                HStack(spacing: 10) {
-                    destBox(
-                        title: String(localized: "Battery Charging"),
-                        value: String(format: "%.1f W", data.batteryChargeRateW),
-                        color: .blue,
-                        icon: "battery.100.bolt"
-                    )
-                    destBox(
-                        title: String(localized: "System"),
-                        value: String(format: "%.1f W", data.systemPowerW),
-                        color: .primary,
-                        icon: "desktopcomputer"
-                    )
+    private var powerFlowSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                VStack(spacing: 6) {
+                    ForEach(sourceNodes) { FlowNodeView(node: $0) }
                 }
-            } else {
-                destBox(
-                    title: String(localized: "System"),
-                    value: String(format: "%.1f W", data.systemPowerW),
-                    color: .primary,
-                    icon: "desktopcomputer"
-                )
-            }
-        }
-    }
-
-    private var supplementalDischargeDiagram: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 10) {
-                sourceBox(
-                    title: String(localized: "AC Powered"),
-                    value: String(format: "%.1f W", data.effectiveACOutputW),
-                    color: .green,
-                    icon: "powerplug.fill"
-                )
-                sourceBox(
-                    title: String(localized: "Battery Discharge"),
-                    value: String(format: "%.1f W", data.batterySupplementalW),
-                    color: .orange,
-                    icon: "battery.50"
-                )
-            }
-
-            Image(systemName: "arrowtriangle.down.fill")
-                .font(.system(size: 8))
-                .foregroundStyle(.secondary)
-
-            destBox(
-                title: String(localized: "System"),
-                value: String(format: "%.1f W", data.systemPowerW),
-                color: .primary,
-                icon: "desktopcomputer"
-            )
-        }
-    }
-
-    private var batteryPoweredDiagram: some View {
-        VStack(spacing: 6) {
-            sourceBox(
-                title: String(localized: "Battery Discharge"),
-                value: String(format: "%.1f W", data.systemPowerW),
-                color: .orange,
-                icon: "battery.50"
-            )
-            Image(systemName: "arrowtriangle.down.fill")
-                .font(.system(size: 8))
-                .foregroundStyle(.secondary)
-            destBox(
-                title: String(localized: "System"),
-                value: String(format: "%.1f W", data.systemPowerW),
-                color: .primary,
-                icon: "desktopcomputer"
-            )
-        }
-    }
-
-    private func sourceBox(title: String, value: String, color: Color, icon: String) -> some View {
-        VStack(spacing: 3) {
-            HStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 10))
-                Text(title).font(.system(size: 10))
-            }
-            .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(color)
-        }
-        .padding(.horizontal, 10).padding(.vertical, 5)
-        .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
-    }
-
-    private func destBox(title: String, value: String, color: Color, icon: String) -> some View {
-        VStack(spacing: 3) {
-            HStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 10))
-                Text(title).font(.system(size: 10))
-            }
-            .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(color)
-        }
-        .padding(.horizontal, 10).padding(.vertical, 5)
-        .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
-    }
-
-    // MARK: - Metrics
-
-    private var metricsSection: some View {
-        VStack(spacing: 6) {
-            PowerRowView(icon: "desktopcomputer", iconColor: .primary, label: String(localized: "System Power"), value: String(format: "%.1f W", data.systemPowerW))
-
-            if data.effectiveIsOnAC && !data.isConnectingAC {
-                PowerRowView(icon: "powerplug.fill", iconColor: .green, label: String(localized: "AC Adapter Output"), value: String(format: "%.1f W", data.effectiveACOutputW))
-            }
-
-            if data.isBatteryCharging {
-                PowerRowView(
-                    icon: "arrow.down.to.line",
-                    iconColor: .blue,
-                    label: String(localized: "Battery Charging"),
-                    value: String(format: "%.1f W", data.batteryChargeRateW)
-                )
-            } else if data.isSupplementalDischarge {
-                PowerRowView(
-                    icon: "arrow.up.right.and.arrow.down.left",
-                    iconColor: .orange,
-                    label: String(localized: "Battery Supplement"),
-                    value: String(format: "%.1f W", data.batterySupplementalW)
-                )
-            }
-
-            if data.effectiveIsOnAC && data.acAdapterWattage > 0 {
-                PowerRowView(
-                    icon: "bolt.fill",
-                    iconColor: .green,
-                    label: String(localized: "Charger Spec"),
-                    value: "\(data.acAdapterWattage) W" + (data.adapterDescription.map { " (\($0))" } ?? ""),
-                    wrapsValue: data.adapterDescription != nil
-                )
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                VStack(spacing: 6) {
+                    ForEach(destinationNodes) { FlowNodeView(node: $0) }
+                }
             }
 
             if data.dataSource == .legacy {
-                PowerRowView(
-                    icon: "exclamationmark.triangle.fill",
-                    iconColor: .yellow,
-                    label: String(localized: "Data Source"),
-                    value: String(localized: "Estimation Mode"),
-                    wrapsValue: true
-                )
+                Label(String(localized: "Estimation Mode"), systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.yellow)
             }
         }
     }
 
-    // MARK: - Battery
+    // MARK: - Battery Stats
 
-    private var batterySection: some View {
-        VStack(spacing: 6) {
-            let levelTint: Color = data.batteryPercent <= 20
-                ? .red
-                : (data.batteryPercent <= 50 ? .orange : .green)
-            PopoverMetricBarRow(
-                icon: "battery.100",
-                iconColor: levelTint,
-                label: String(localized: "Battery Level"),
-                progress: Double(data.batteryPercent),
-                valueText: "\(data.batteryPercent)%",
-                barTint: levelTint
-            )
+    private var hasBatteryStats: Bool {
+        data.batteryHealthPercent != nil || data.batteryTemperatureC != nil || data.cycleCount != nil
+    }
 
-            if let timeText = data.estimatedTimeRemainingText {
-                PowerRowView(
-                    icon: "clock",
-                    iconColor: data.isBatteryCharging ? .blue : .orange,
-                    label: data.estimatedTimeRemainingLabel,
-                    value: timeText
-                )
-            }
-
+    private var batteryStatsSection: some View {
+        HStack(spacing: 0) {
             if let health = data.batteryHealthPercent {
-                let healthTint: Color = health >= 80 ? .green : (health >= 60 ? .orange : .red)
-                PopoverMetricBarRow(
-                    icon: "heart.fill",
-                    iconColor: healthTint,
+                StatCell(
+                    value: "\(health)%",
                     label: String(localized: "Health"),
-                    progress: Double(health),
-                    valueText: "\(health)%",
-                    barTint: healthTint,
-                    valueColor: healthTint
+                    tint: health >= 80 ? .primary : (health >= 60 ? .orange : .red)
                 )
             }
-
             if let temp = data.batteryTemperatureC {
-                PowerRowView(icon: "thermometer.medium", iconColor: temp > 40 ? .red : .secondary, label: String(localized: "Battery Temp"), value: String(format: "%.1f °C", temp))
+                StatCell(
+                    value: String(format: "%.1f°", temp),
+                    label: String(localized: "Battery Temp"),
+                    tint: temp > 40 ? .red : .primary
+                )
             }
             if let cycles = data.cycleCount {
-                PowerRowView(icon: "arrow.triangle.2.circlepath", iconColor: .secondary, label: String(localized: "Cycle Count"), value: "\(cycles)" + (data.designCycleCount.map { "/\($0)" } ?? ""))
-            }
-            if let voltage = data.batteryVoltageMV {
-                PowerRowView(icon: "waveform.path", iconColor: .secondary, label: String(localized: "Battery Voltage"), value: String(format: "%.2f V", Double(voltage) / 1000.0))
-            }
-            if let reason = data.notChargingReasonDescription,
-               data.effectiveIsOnAC && !data.isConnectingAC && !data.isBatteryCharging {
-                PowerRowView(
-                    icon: "info.circle",
-                    iconColor: .blue,
-                    label: String(localized: "Not Charging Reason"),
-                    value: reason,
-                    wrapsValue: true
-                )
+                StatCell(value: "\(cycles)", label: String(localized: "Cycle Count"), tint: .primary)
             }
         }
     }
@@ -355,69 +207,73 @@ struct PopoverView: View {
     // MARK: - Footer
 
     private var footerSection: some View {
-        VStack(spacing: 6) {
-            Button {
-                openDetailWindow()
-            } label: {
-                HStack {
-                    Image(systemName: "chart.bar.doc.horizontal")
-                    Text(String(localized: "Details"))
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.tertiary)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 2) {
+                Button {
+                    openDetailWindow()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(String(localized: "Details"))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .contentShape(Rectangle())
                 }
-                .font(.system(size: 12))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-            }
-            .buttonStyle(.plain)
-            .focusEffectDisabled()
+                .buttonStyle(.plain)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Toggle(String(localized: "Launch at Login"), isOn: Binding(
-                    get: { monitor.launchAtLogin },
-                    set: { monitor.launchAtLogin = $0 }
-                ))
-                .toggleStyle(.checkbox)
-                .font(.system(size: 11))
-
-                if let error = monitor.launchAtLoginError {
-                    Text(error)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Toggle(String(localized: "Show Power in Menu Bar"), isOn: Binding(
-                    get: { monitor.showPowerInMenuBar },
-                    set: { monitor.showPowerInMenuBar = $0 }
-                ))
-                .toggleStyle(.checkbox)
-                .font(.system(size: 11))
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-
-            HStack {
                 Spacer()
 
-                Text(AppInfo.versionLabel)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
+                settingsMenu
 
-                Button(String(localized: "Quit")) {
+                Button {
                     NSApplication.shared.terminate(nil)
+                } label: {
+                    Image(systemName: "power")
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
-                .font(.system(size: 11))
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .help(String(localized: "Quit"))
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+            .focusEffectDisabled()
+
+            if let error = monitor.launchAtLoginError {
+                Text(error)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 6)
             }
         }
+    }
+
+    private var settingsMenu: some View {
+        Menu {
+            Toggle(String(localized: "Launch at Login"), isOn: Binding(
+                get: { monitor.launchAtLogin },
+                set: { monitor.launchAtLogin = $0 }
+            ))
+            Toggle(String(localized: "Show Power in Menu Bar"), isOn: Binding(
+                get: { monitor.showPowerInMenuBar },
+                set: { monitor.showPowerInMenuBar = $0 }
+            ))
+            Divider()
+            Text(AppInfo.versionLabel)
+            Button(String(localized: "Quit")) {
+                NSApplication.shared.terminate(nil)
+            }
+        } label: {
+            Image(systemName: "gearshape")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .padding(.horizontal, 4)
     }
 
     private func openDetailWindow() {
@@ -426,52 +282,103 @@ struct PopoverView: View {
             return
         }
         let detailTitle = String(localized: "PowerTop Details")
-        if let window = NSApp.windows.first(where: { $0.title == detailTitle }) {
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+        for window in NSApp.windows {
+            if window.title == detailTitle {
+                window.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                return
+            }
         }
+        openWindow(id: "detail")
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 
-// MARK: - Popover metric bar row
+// MARK: - Components
 
-/// Icon + fixed label + flexible bar + trailing value — bar starts align in EN/ZH.
-/// Font matches `PowerRowView` (12pt system, no scale-down, no rounded digits).
-private struct PopoverMetricBarRow: View {
-    /// Fits English "Battery Level" at full 12pt without shrinking the label.
-    static let labelWidth: CGFloat = 96
-    static let valueMinWidth: CGFloat = 40
-
-    let icon: String
-    let iconColor: Color
-    let label: String
-    let progress: Double
-    var total: Double = 100
-    let valueText: String
-    let barTint: Color
-    var valueColor: Color = .primary
+private struct LevelBar: View {
+    let fraction: Double
+    let tint: Color
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
-            Image(systemName: icon)
-                .foregroundStyle(iconColor)
-                .frame(width: PowerRowView.iconWidth)
-
-            Text(label)
-                .foregroundStyle(.secondary)
-                .frame(width: Self.labelWidth, alignment: .leading)
-                .lineLimit(1)
-
-            ProgressView(value: min(max(progress, 0), total), total: max(total, 1))
-                .progressViewStyle(.linear)
-                .tint(barTint)
-
-            Text(valueText)
-                .fontWeight(.medium)
-                .monospacedDigit()
-                .foregroundStyle(valueColor)
-                .frame(minWidth: Self.valueMinWidth, alignment: .trailing)
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(.quaternary)
+                Capsule()
+                    .fill(tint)
+                    .frame(width: max(6, proxy.size.width * min(max(fraction, 0), 1)))
+            }
         }
-        .font(.system(size: 12))
+        .frame(height: 6)
+    }
+}
+
+private struct FlowNode: Identifiable {
+    let icon: String
+    let title: String
+    let value: String?
+    var capacity: String? = nil
+    let tint: Color
+    var id: String { icon + title }
+}
+
+private struct FlowNodeView: View {
+    let node: FlowNode
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: node.icon)
+                .font(.system(size: 13))
+                .foregroundStyle(node.tint)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text(node.title)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    if let capacity = node.capacity {
+                        Spacer(minLength: 0)
+                        Text(capacity)
+                            .foregroundStyle(.tertiary)
+                            .monospacedDigit()
+                    }
+                }
+                .font(.system(size: 10))
+                if let value = node.value {
+                    Text(value)
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        // Value-less nodes (battery-only source) must line up with their valued counterpart.
+        .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
+        .background(node.tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct StatCell: View {
+    let value: String
+    let label: String
+    let tint: Color
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(tint)
+            Text(label)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
     }
 }

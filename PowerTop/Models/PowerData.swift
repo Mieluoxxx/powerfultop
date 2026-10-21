@@ -483,8 +483,8 @@ struct PowerData {
     private static func formatDuration(minutes: Int) -> String {
         let hours = minutes / 60
         let mins = minutes % 60
-        if hours > 0 { return "\(hours)h \(mins)m" }
-        return "\(mins)m"
+        if hours > 0 { return String(format: String(localized: "Duration %dh %dm"), hours, mins) }
+        return String(format: String(localized: "Duration %dm"), mins)
     }
 
     private static func minutesFromEnergy(energyWh: Double, powerW: Double) -> Int? {
