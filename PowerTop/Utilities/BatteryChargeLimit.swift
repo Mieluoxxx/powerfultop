@@ -91,43 +91,26 @@ private func readThirdPartyChargeLimitPercent(bundleID: String, key: String) -> 
     normalizedChargeLimitPercent(readPreferenceNumber(domain: bundleID, key: key))
 }
 
-private func readPreferenceNumber(domain: String, key: String) -> Int? {
+/// Third-party apps may write plists directly without cfprefsd seeing them, so fall back to the file.
+private func readPreferenceValue(domain: String, key: String) -> Any? {
     if let value = CFPreferencesCopyAppValue(key as CFString, domain as CFString) {
-        if let number = value as? NSNumber { return number.intValue }
-        if let intValue = value as? Int { return intValue }
-        if let doubleValue = value as? Double { return Int(doubleValue.rounded()) }
+        return value
     }
-
-    let plistName = domain.hasSuffix(".plist") ? domain : "\(domain).plist"
-    let paths = [
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Preferences/\(plistName)").path,
-        NSHomeDirectory() + "/Library/Preferences/" + plistName,
-    ]
-    for path in paths {
-        guard let dict = NSDictionary(contentsOfFile: path) as? [String: Any],
-              let value = dict[key] else { continue }
-        if let intValue = value as? Int { return intValue }
-        if let number = value as? NSNumber { return number.intValue }
-        if let doubleValue = value as? Double { return Int(doubleValue.rounded()) }
-    }
-    return nil
-}
-
-private func readPreferenceBool(domain: String, key: String) -> Bool? {
-    if let value = CFPreferencesCopyAppValue(key as CFString, domain as CFString) {
-        if let boolValue = value as? Bool { return boolValue }
-        if let number = value as? NSNumber { return number.boolValue }
-    }
-
     let plistName = domain.hasSuffix(".plist") ? domain : "\(domain).plist"
     let path = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Preferences/\(plistName)").path
-    guard let dict = NSDictionary(contentsOfFile: path) as? [String: Any],
-          let value = dict[key] else { return nil }
-    if let boolValue = value as? Bool { return boolValue }
-    if let number = value as? NSNumber { return number.boolValue }
-    return nil
+    return (NSDictionary(contentsOfFile: path) as? [String: Any])?[key]
+}
+
+private func readPreferenceNumber(domain: String, key: String) -> Int? {
+    switch readPreferenceValue(domain: domain, key: key) {
+    case let number as NSNumber: return Int(number.doubleValue.rounded())
+    default: return nil
+    }
+}
+
+private func readPreferenceBool(domain: String, key: String) -> Bool? {
+    (readPreferenceValue(domain: domain, key: key) as? NSNumber)?.boolValue
 }
 
 private func normalizedChargeLimitPercent(_ value: Int?) -> Int? {
