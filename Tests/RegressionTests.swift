@@ -11,6 +11,7 @@ struct RegressionTests {
         testMenuBarAlwaysUsesSystemPower()
         testManufactureDateDecoding()
         testPowerFlowUsesIOKitDischargeSign()
+        testTelemetryEnergyUnits()
 
         guard failures == 0 else {
             fputs("\(failures) regression test(s) failed\n", stderr)
@@ -222,6 +223,14 @@ struct RegressionTests {
             ioBatteryPowerW: nil, ioAmperagePowerW: -8, systemInputW: nil
         )
         expectEqual(legacyDischarge, PowerFlowReading(systemPowerW: 8, batteryPowerW: 8), "legacy amperage discharge")
+    }
+
+    private static func testTelemetryEnergyUnits() {
+        // Live samples: idle on AC (SystemPowerIn 11501 mW) and charging (SystemPowerIn 48207 mW).
+        expect(abs(telemetryEnergyToWatts(3194) - 11.501) < 0.01, "idle SystemEnergyConsumed matches SystemPowerIn")
+        expect(abs(telemetryEnergyToWatts(3321) - 11.956) < 0.01, "idle wall power includes adapter loss")
+        expect(abs(telemetryEnergyToWatts(13390) - 48.207) < 0.01, "charging SystemEnergyConsumed matches SystemPowerIn")
+        expect(abs(telemetryEnergyToWatts(14741) - 53.068) < 0.01, "charging wall power includes adapter loss")
     }
 
     private static func packed(_ storedDigits: String) -> Int {

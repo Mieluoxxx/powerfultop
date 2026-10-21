@@ -449,8 +449,8 @@ final class PowerMonitor {
             return (
                 buildResult(
                     systemPowerW, batteryPowerW, acInputW,
-                    wallEnergy.map { Double($0) / 1000.0 },
-                    adapterLoss.map { Double($0) / 1000.0 },
+                    wallEnergy.map(telemetryEnergyToWatts),
+                    adapterLoss.map(telemetryEnergyToWatts),
                     sysVoltage, sysCurrent, .telemetry
                 ),
                 true

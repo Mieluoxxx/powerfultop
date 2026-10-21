@@ -27,6 +27,12 @@ func getIOServiceProperties(className: String) -> [String: Any]? {
     return props as? [String: Any]
 }
 
+/// `WallEnergyEstimate`, `AdapterEfficiencyLoss` and `SystemEnergyConsumed` share an energy unit
+/// equal to mW / 3.6 (observed: SystemEnergyConsumed × 3.6 == SystemPowerIn, idle and charging).
+func telemetryEnergyToWatts(_ value: Int) -> Double {
+    Double(value) * 3.6 / 1000.0
+}
+
 func extractInt(from dict: [String: Any], key: String) -> Int? {
     guard let value = dict[key] else { return nil }
     if let intVal = value as? Int { return intVal }

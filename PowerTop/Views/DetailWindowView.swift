@@ -127,29 +127,28 @@ struct DetailWindowView: View {
                 }
             }
 
-            if data.wallPowerW != nil || data.adapterEfficiencyLossW != nil || data.averageSystemPowerW != nil {
+            if let avg = data.averageSystemPowerW, avg > 0.5 {
                 DetailSubheading(String(localized: "Historical Averages"))
-                if let avg = data.averageSystemPowerW, avg > 0.5 {
-                    DetailRow(
-                        label: String(localized: "Average System Power"),
-                        value: String(format: "%.1f W", avg)
-                    )
-                }
+                DetailRow(
+                    label: String(localized: "Average System Power"),
+                    value: String(format: "%.1f W", avg)
+                )
+            }
+
+            if data.effectiveIsOnAC && !data.isConnectingAC {
+                DetailSubheading(String(localized: "AC Adapter"))
                 if let wall = data.wallPowerW {
                     DetailRow(
-                        label: String(localized: "Avg Wall Outlet Power"),
+                        label: String(localized: "Wall Outlet Power"),
                         value: String(format: "%.1f W", wall)
                     )
                 }
                 if let loss = data.adapterEfficiencyLossW {
                     DetailRow(
-                        label: String(localized: "Avg Adapter Loss"),
+                        label: String(localized: "Adapter Loss"),
                         value: String(format: "%.1f W", loss)
                     )
                 }
-            }
-
-            if data.effectiveIsOnAC && !data.isConnectingAC {
                 if let sv = data.systemVoltageMV {
                     DetailRow(
                         label: String(localized: "Charger Output Voltage"),

@@ -56,8 +56,8 @@
 "Charging Status" = "Charging Status";
 "Not Charging" = "Not Charging";
 "Historical Averages" = "Historical Averages";
-"Avg Wall Outlet Power" = "Avg Wall Outlet Power";
-"Avg Adapter Loss" = "Avg Adapter Loss";
+"Wall Outlet Power" = "Power from Outlet (est.)";
+"Adapter Loss" = "Charger Conversion Loss";
 "Charger Output Voltage" = "Charger Output Voltage";
 "Charger Output Current" = "Charger Output Current";
 "Estimation Mode — telemetry unavailable" = "Estimation Mode — telemetry unavailable";

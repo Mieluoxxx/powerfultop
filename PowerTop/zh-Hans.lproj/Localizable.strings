@@ -56,8 +56,8 @@
 "Charging Status" = "充电状态";
 "Not Charging" = "未在充电";
 "Historical Averages" = "历史平均";
-"Avg Wall Outlet Power" = "平均墙插功耗";
-"Avg Adapter Loss" = "平均适配器损耗";
+"Wall Outlet Power" = "插座取电（估算）";
+"Adapter Loss" = "充电器转换损耗";
 "Charger Output Voltage" = "充电器输出电压";
 "Charger Output Current" = "充电器输出电流";
 "Estimation Mode — telemetry unavailable" = "估算模式 — 遥测数据不可用";
