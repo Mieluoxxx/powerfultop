@@ -25,8 +25,8 @@
 
 // Metrics
 "System Power" = "系统功耗";
+"Battery Power" = "电池功率";
 "AC Adapter Output" = "AC 适配器输出";
-"Charger Spec" = "充电器规格";
 "Data Source" = "数据源";
 "Estimation Mode" = "估算模式";
 
@@ -51,11 +51,7 @@
 "PowerTop Details" = "PowerTop 详细参数";
 
 // Detail - Power Section
-"Current Power" = "当前电源";
 "Power" = "电源";
-"Power Source" = "电源来源";
-"Battery Charging Power" = "电池充电功率";
-"Battery Discharging Power" = "电池放电功率";
 "Charger Load Rate" = "充电器负载率";
 "Charging Status" = "充电状态";
 "Not Charging" = "未在充电";
@@ -80,13 +76,9 @@
 
 // Detail - Battery Health
 "Battery Health" = "电池健康";
-"Capacity" = "容量";
-"Charging & Care" = "充电与保养";
-"Live Readings" = "实时读数";
 "Capacity Details" = "容量详情";
 "Electrical Readings" = "电气读数";
 "—" = "—";
-"Status & Alerts" = "状态与告警";
 "Design Capacity" = "设计容量";
 "Current Full Charge" = "当前满充电量";
 "Calibrated Full Charge" = "系统标定满电量";
@@ -112,12 +104,8 @@
 "Battery topology: %dS%dP (%d cells)" = "电芯拓扑：%d 串 × %d 并（共 %d 节）";
 "Battery topology: %d series groups" = "电芯拓扑：%d 个串联组";
 "Battery topology: %d cells" = "电芯拓扑：共 %d 节";
-"Series Groups" = "串联组";
 "Series Group %d" = "串联组 %d";
-"Parallel Cell Currents" = "并联节电流";
 "Series Group %d · Cell %d" = "串联组 %d · 并联节 %d";
-"Series group Qmax is the parallel pair's estimated full-charge capacity (mAh), not derived from cell currents." = "串联组 Qmax 是并联对的满充容量估计（mAh），与下方瞬时电流无关。";
-"Qmax %d mAh" = "Qmax %d mAh";
 "Instantaneous current per parallel cell; unequal split within a group is normal." = "各并联节的瞬时电流；同组内两节电流不均是正常现象。";
 "Cell Balance" = "电芯均衡";
 "Series Voltage Balance" = "串联组电压均衡";
@@ -165,9 +153,6 @@
 "Built-in battery not detected. PowerTop requires a MacBook." = "未检测到内置电池。PowerTop 仅支持 MacBook。";
 
 // Detail - Tabs
-"Cells" = "电芯";
-"Device" = "设备";
 "Status" = "状态";
 "Copy" = "复制";
 "Power Telemetry" = "电源遥测";
-"Bars and percentages are relative to design capacity." = "进度条与百分比均相对于设计容量。";

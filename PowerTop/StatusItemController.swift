@@ -185,8 +185,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
             let hosting = NSHostingController(rootView: DetailWindowView(monitor: monitor))
             let window = NSWindow(contentViewController: hosting)
             window.title = String(localized: "PowerTop Details")
-            window.styleMask = [.titled, .closable, .miniaturizable]
-            window.setContentSize(NSSize(width: DetailWindowView.preferredWidth, height: 640))
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            window.setContentSize(NSSize(width: DetailWindowView.preferredWidth, height: DetailWindowView.preferredHeight))
+            window.contentMinSize = NSSize(width: DetailWindowView.minimumWidth, height: 480)
+            window.center()
             window.isReleasedWhenClosed = false
             window.delegate = self
             detailWindow = window

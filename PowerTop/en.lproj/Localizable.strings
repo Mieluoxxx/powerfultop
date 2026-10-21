@@ -25,8 +25,8 @@
 
 // Metrics
 "System Power" = "System Power";
+"Battery Power" = "Battery Power";
 "AC Adapter Output" = "AC Adapter Output";
-"Charger Spec" = "Charger Spec";
 "Data Source" = "Data Source";
 "Estimation Mode" = "Estimation Mode";
 
@@ -51,11 +51,7 @@
 "PowerTop Details" = "PowerTop Details";
 
 // Detail - Power Section
-"Current Power" = "Current Power";
 "Power" = "Power";
-"Power Source" = "Power Source";
-"Battery Charging Power" = "Battery Charging Power";
-"Battery Discharging Power" = "Battery Discharging Power";
 "Charger Load Rate" = "Charger Load Rate";
 "Charging Status" = "Charging Status";
 "Not Charging" = "Not Charging";
@@ -80,13 +76,9 @@
 
 // Detail - Battery Health
 "Battery Health" = "Battery Health";
-"Capacity" = "Capacity";
-"Charging & Care" = "Charging & Care";
-"Live Readings" = "Live Readings";
 "Capacity Details" = "Capacity Details";
 "Electrical Readings" = "Electrical Readings";
 "—" = "—";
-"Status & Alerts" = "Status & Alerts";
 "Design Capacity" = "Design Capacity";
 "Current Full Charge" = "Current Full Charge";
 "Calibrated Full Charge" = "Calibrated Full Charge";
@@ -112,12 +104,8 @@
 "Battery topology: %dS%dP (%d cells)" = "Battery topology: %dS%dP (%d cells)";
 "Battery topology: %d series groups" = "Battery topology: %d series groups";
 "Battery topology: %d cells" = "Battery topology: %d cells";
-"Series Groups" = "Series Groups";
 "Series Group %d" = "Series Group %d";
-"Parallel Cell Currents" = "Parallel Cell Currents";
 "Series Group %d · Cell %d" = "Series Group %d · Cell %d";
-"Series group Qmax is the parallel pair's estimated full-charge capacity (mAh), not derived from cell currents." = "Series group Qmax is the parallel pair's estimated full-charge capacity (mAh), not derived from cell currents.";
-"Qmax %d mAh" = "Qmax %d mAh";
 "Instantaneous current per parallel cell; unequal split within a group is normal." = "Instantaneous current per parallel cell; unequal split within a group is normal.";
 "Cell Balance" = "Cell Balance";
 "Series Voltage Balance" = "Series Voltage Balance";
@@ -165,9 +153,6 @@
 "Built-in battery not detected. PowerTop requires a MacBook." = "Built-in battery not detected. PowerTop requires a MacBook.";
 
 // Detail - Tabs
-"Cells" = "Cells";
-"Device" = "Device";
 "Status" = "Status";
 "Copy" = "Copy";
 "Power Telemetry" = "Power Telemetry";
-"Bars and percentages are relative to design capacity." = "Bars and percentages are relative to design capacity.";

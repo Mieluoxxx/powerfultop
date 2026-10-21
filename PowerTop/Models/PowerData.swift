@@ -26,6 +26,9 @@ struct PowerData {
     let batteryPowerW: Double         // BatteryPower / 1000 — positive=discharge, negative=charge
     let acInputW: Double              // SystemPowerIn / 1000 — total DC from charger
     let acAdapterWattage: Int
+    /// Negotiated USB-PD contract from `AdapterDetails`.
+    let adapterRatedVoltageMV: Int?
+    let adapterRatedCurrentMA: Int?
     let batteryPercent: Int
     let isOnAC: Bool
     let isCharging: Bool
@@ -100,7 +103,9 @@ struct PowerData {
     // Full memberwise init (package-internal; centralizes all assignments to avoid drift across call sites)
     init(
         systemPowerW: Double, batteryPowerW: Double, acInputW: Double,
-        acAdapterWattage: Int, batteryPercent: Int,
+        acAdapterWattage: Int,
+        adapterRatedVoltageMV: Int? = nil, adapterRatedCurrentMA: Int? = nil,
+        batteryPercent: Int,
         isOnAC: Bool, isCharging: Bool, fullyCharged: Bool,
         wallPowerW: Double?, adapterEfficiencyLossW: Double?,
         systemVoltageMV: Int?, systemCurrentMA: Int?,
@@ -131,6 +136,8 @@ struct PowerData {
         self.batteryPowerW = batteryPowerW
         self.acInputW = acInputW
         self.acAdapterWattage = acAdapterWattage
+        self.adapterRatedVoltageMV = adapterRatedVoltageMV
+        self.adapterRatedCurrentMA = adapterRatedCurrentMA
         self.batteryPercent = batteryPercent
         self.isOnAC = isOnAC
         self.isCharging = isCharging
@@ -554,7 +561,9 @@ struct PowerData {
     ) -> PowerData {
         PowerData(
             systemPowerW: systemPowerW, batteryPowerW: batteryPowerW, acInputW: acInputW,
-            acAdapterWattage: acAdapterWattage, batteryPercent: batteryPercent,
+            acAdapterWattage: acAdapterWattage,
+            adapterRatedVoltageMV: adapterRatedVoltageMV, adapterRatedCurrentMA: adapterRatedCurrentMA,
+            batteryPercent: batteryPercent,
             isOnAC: isOnAC, isCharging: isCharging, fullyCharged: fullyCharged,
             wallPowerW: wallPowerW, adapterEfficiencyLossW: adapterEfficiencyLossW,
             systemVoltageMV: systemVoltageMV, systemCurrentMA: systemCurrentMA,

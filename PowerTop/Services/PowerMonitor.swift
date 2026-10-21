@@ -327,6 +327,8 @@ final class PowerMonitor {
         // Adapter details
         let adapterDetails = extractDict(from: props, key: "AdapterDetails")
         let acAdapterWattage = adapterDetails.flatMap { extractInt(from: $0, key: "Watts") } ?? 0
+        let adapterRatedVoltage = adapterDetails.flatMap { extractInt(from: $0, key: "AdapterVoltage") }
+        let adapterRatedCurrent = adapterDetails.flatMap { extractInt(from: $0, key: "Current") }
         let adapterDescription = adapterDetails.flatMap { extractString(from: $0, key: "Description") }
 
         // Charger data
@@ -383,7 +385,9 @@ final class PowerMonitor {
         ) -> PowerData = { spw, bpw, aiw, wall, loss, sv, sc, ds in
             PowerData(
                 systemPowerW: spw, batteryPowerW: bpw, acInputW: aiw,
-                acAdapterWattage: acAdapterWattage, batteryPercent: batteryPercent,
+                acAdapterWattage: acAdapterWattage,
+                adapterRatedVoltageMV: adapterRatedVoltage, adapterRatedCurrentMA: adapterRatedCurrent,
+                batteryPercent: batteryPercent,
                 isOnAC: isOnAC, isCharging: isCharging, fullyCharged: fullyCharged,
                 wallPowerW: wall, adapterEfficiencyLossW: loss,
                 systemVoltageMV: sv, systemCurrentMA: sc,
