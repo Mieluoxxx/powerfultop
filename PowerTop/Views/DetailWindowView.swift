@@ -1,30 +1,65 @@
+import AppKit
 import SwiftUI
 
 struct DetailWindowView: View {
     static let preferredWidth: CGFloat = 480
 
+    enum Tab: String, CaseIterable, Identifiable {
+        case power, battery, cells, device
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .power: return String(localized: "Power")
+            case .battery: return String(localized: "Battery")
+            case .cells: return String(localized: "Cells")
+            case .device: return String(localized: "Device")
+            }
+        }
+    }
+
     let monitor: PowerMonitor
+    @AppStorage("detailWindowTab") private var selectedTab: Tab = .power
 
     private var data: PowerData { monitor.currentData }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if monitor.isDataAvailable {
-                    currentPowerSection
-                    batteryHealthSection
-                    if hasCellData { cellDataSection }
-                    if hasLifetimeData { lifetimeSection }
-                    if hasDeviceInfo { deviceInfoSection }
-                    footerTimestamp
-                } else {
-                    unavailableState
+        VStack(spacing: 0) {
+            if monitor.isDataAvailable {
+                overviewTiles
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+
+                Picker("", selection: $selectedTab) {
+                    ForEach(availableTabs) { tab in
+                        Text(tab.title).tag(tab)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+
+                Divider()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        switch currentTab {
+                        case .power: powerTab
+                        case .battery: batteryTab
+                        case .cells: cellsTab
+                        case .device: deviceTab
+                        }
+                        footerTimestamp
+                    }
+                    .padding(20)
+                }
+            } else {
+                unavailableState
             }
-            .padding(20)
         }
         .frame(width: Self.preferredWidth)
-        .frame(minHeight: 500)
+        .frame(minHeight: 500, maxHeight: .infinity, alignment: .top)
         .background(.windowBackground)
         .focusEffectDisabled()
         .onAppear {
@@ -34,74 +69,131 @@ struct DetailWindowView: View {
         }
     }
 
-    // MARK: - Current Power (merged power + contextual charging)
+    private var availableTabs: [Tab] {
+        Tab.allCases.filter { $0 != .cells || hasCellData }
+    }
 
-    private var currentPowerSection: some View {
+    private var currentTab: Tab {
+        availableTabs.contains(selectedTab) ? selectedTab : .power
+    }
+
+    // MARK: - Overview
+
+    private var overviewTiles: some View {
+        HStack(spacing: 8) {
+            OverviewTile(
+                value: "\(batteryLevelPercent)%",
+                label: String(localized: "Battery Level"),
+                tint: batteryLevelBarTint,
+                fraction: Double(batteryLevelPercent) / 100
+            )
+            OverviewTile(
+                value: data.batteryHealthPercent.map { "\($0)%" } ?? unavailableValue,
+                label: String(localized: "Health"),
+                tint: healthColor,
+                fraction: data.batteryHealthPercent.map { Double($0) / 100 }
+            )
+            OverviewTile(
+                value: data.cycleCount.map(String.init) ?? unavailableValue,
+                caption: data.designCycleCount.map { "/ \($0)" },
+                label: String(localized: "Cycle Count"),
+                tint: .secondary,
+                fraction: cycleCountFraction
+            )
+            if let temp = data.batteryTemperatureC {
+                OverviewTile(
+                    value: String(format: "%.1f°", temp),
+                    label: String(localized: "Battery Temp"),
+                    tint: temp > 40 ? .red : .secondary,
+                    fraction: nil
+                )
+            }
+        }
+    }
+
+    // MARK: - Power Tab
+
+    @ViewBuilder
+    private var powerTab: some View {
         DetailSection(title: String(localized: "Current Power"), icon: "bolt.fill", color: .green) {
             DetailRow(label: String(localized: "Power Source"), value: data.powerSourceDescription)
             DetailRow(
                 label: String(localized: "System Power"),
-                value: String(format: "%.1f W", data.systemPowerW),
+                value: watts(data.systemPowerW),
                 highlight: true
             )
 
             if data.effectiveIsOnAC && !data.isConnectingAC {
-                DetailRow(
-                    label: String(localized: "AC Adapter Output"),
-                    value: String(format: "%.1f W", data.effectiveACOutputW)
-                )
+                DetailRow(label: String(localized: "AC Adapter Output"), value: watts(data.effectiveACOutputW))
             }
 
             if data.isBatteryCharging {
-                DetailRow(
-                    label: String(localized: "Battery Charging"),
-                    value: String(format: "%.1f W", data.batteryChargeRateW)
-                )
+                DetailRow(label: String(localized: "Battery Charging"), value: watts(data.batteryChargeRateW))
             } else if data.isSupplementalDischarge {
-                DetailRow(
-                    label: String(localized: "Battery Supplement"),
-                    value: String(format: "%.1f W", data.batterySupplementalW)
-                )
+                DetailRow(label: String(localized: "Battery Supplement"), value: watts(data.batterySupplementalW))
             } else if !data.effectiveIsOnAC, data.batteryPowerW > 0.3 {
-                DetailRow(
-                    label: String(localized: "Battery Discharging Power"),
-                    value: String(format: "%.1f W", data.batteryPowerW)
-                )
+                DetailRow(label: String(localized: "Battery Discharging Power"), value: watts(data.batteryPowerW))
             } else if data.effectiveIsOnAC, data.batteryPowerW < -0.3 {
-                DetailRow(
-                    label: String(localized: "Battery Charging Power"),
-                    value: String(format: "%.1f W", abs(data.batteryPowerW))
-                )
-            }
-
-            if data.effectiveIsOnAC && !data.isConnectingAC && data.acAdapterWattage > 0 {
-                DetailRow(
-                    label: String(localized: "Charger Spec"),
-                    value: "\(data.acAdapterWattage) W" + (data.adapterDescription.map { " (\($0))" } ?? "")
-                )
-                let usage = data.effectiveACOutputW / Double(data.acAdapterWattage) * 100
-                OverviewMetricRow(
-                    label: String(localized: "Charger Load Rate"),
-                    value: String(format: "%.0f%%", usage),
-                    barValue: min(usage, 100),
-                    barTotal: 100,
-                    barTint: usage > 90 ? .orange : .green
-                )
+                DetailRow(label: String(localized: "Battery Charging Power"), value: watts(abs(data.batteryPowerW)))
             }
 
             if let timeText = data.estimatedTimeRemainingText {
                 DetailRow(label: data.estimatedTimeRemainingLabel, value: timeText)
                 if let footnote = data.estimatedTimeFootnote {
-                    Text(footnote)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                    DetailNote(footnote)
                 }
             }
 
-            if data.effectiveIsOnAC && !data.isConnectingAC {
-                DetailSubheading(String(localized: "Charging Status"))
+            if let avg = data.averageSystemPowerW, avg > 0.5 {
+                DetailRow(label: String(localized: "Average System Power"), value: watts(avg))
+            }
+
+            if data.dataSource == .legacy {
                 DetailRow(
-                    label: String(localized: "Charging Status"),
+                    label: String(localized: "Data Source"),
+                    value: String(localized: "Estimation Mode — telemetry unavailable")
+                )
+            }
+        }
+
+        if data.effectiveIsOnAC && !data.isConnectingAC {
+            DetailSection(title: String(localized: "AC Adapter"), icon: "powerplug.fill", color: .green) {
+                if data.acAdapterWattage > 0 {
+                    DetailRow(
+                        label: String(localized: "Charger Spec"),
+                        value: "\(data.acAdapterWattage) W" + (data.adapterDescription.map { " (\($0))" } ?? "")
+                    )
+                    let usage = data.effectiveACOutputW / Double(data.acAdapterWattage) * 100
+                    BarRow(
+                        label: String(localized: "Charger Load Rate"),
+                        value: String(format: "%.0f%%", usage),
+                        fraction: usage / 100,
+                        tint: usage > 90 ? .orange : .green
+                    )
+                }
+                if let wall = data.wallPowerW {
+                    DetailRow(label: String(localized: "Wall Outlet Power"), value: watts(wall))
+                }
+                if let loss = data.adapterEfficiencyLossW {
+                    DetailRow(label: String(localized: "Adapter Loss"), value: watts(loss))
+                }
+                if let sv = data.systemVoltageMV {
+                    DetailRow(
+                        label: String(localized: "Charger Output Voltage"),
+                        value: String(format: "%.2f V", Double(sv) / 1000.0)
+                    )
+                }
+                if let sc = data.systemCurrentMA {
+                    DetailRow(
+                        label: String(localized: "Charger Output Current"),
+                        value: String(format: "%.3f A", Double(sc) / 1000.0)
+                    )
+                }
+            }
+
+            DetailSection(title: String(localized: "Charging Status"), icon: "battery.100.bolt", color: .blue) {
+                DetailRow(
+                    label: String(localized: "Status"),
                     value: data.isBatteryCharging ? String(localized: "Charging") : String(localized: "Not Charging")
                 )
                 if data.fullyCharged {
@@ -126,122 +218,40 @@ struct DetailWindowView: View {
                     )
                 }
             }
-
-            if let avg = data.averageSystemPowerW, avg > 0.5 {
-                DetailSubheading(String(localized: "Historical Averages"))
-                DetailRow(
-                    label: String(localized: "Average System Power"),
-                    value: String(format: "%.1f W", avg)
-                )
-            }
-
-            if data.effectiveIsOnAC && !data.isConnectingAC {
-                DetailSubheading(String(localized: "AC Adapter"))
-                if let wall = data.wallPowerW {
-                    DetailRow(
-                        label: String(localized: "Wall Outlet Power"),
-                        value: String(format: "%.1f W", wall)
-                    )
-                }
-                if let loss = data.adapterEfficiencyLossW {
-                    DetailRow(
-                        label: String(localized: "Adapter Loss"),
-                        value: String(format: "%.1f W", loss)
-                    )
-                }
-                if let sv = data.systemVoltageMV {
-                    DetailRow(
-                        label: String(localized: "Charger Output Voltage"),
-                        value: String(format: "%.2f V", Double(sv) / 1000.0)
-                    )
-                }
-                if let sc = data.systemCurrentMA {
-                    DetailRow(
-                        label: String(localized: "Charger Output Current"),
-                        value: String(format: "%.3f A", Double(sc) / 1000.0)
-                    )
-                }
-            }
-
-            if data.dataSource == .legacy {
-                DetailRow(
-                    label: String(localized: "Data Source"),
-                    value: String(localized: "Estimation Mode — telemetry unavailable")
-                )
-            }
         }
     }
 
-    // MARK: - Battery Health
+    // MARK: - Battery Tab
 
-    private var batteryHealthSection: some View {
-        DetailSection(title: String(localized: "Battery Health"), icon: "heart.fill", color: healthColor) {
-            DetailSubheading(String(localized: "At a Glance"))
-            OverviewMetricRow(
-                label: String(localized: "Battery Level"),
-                value: "\(batteryLevelPercent)%",
-                barValue: Double(batteryLevelPercent),
-                barTotal: 100,
-                barTint: batteryLevelBarTint
+    @ViewBuilder
+    private var batteryTab: some View {
+        DetailSection(title: String(localized: "Capacity"), icon: "battery.100", color: healthColor) {
+            capacityRow(String(localized: "Design Capacity"), data.designCapacityMAH, tint: .secondary)
+            capacityRow(
+                String(localized: "Current Full Charge"),
+                data.fullChargeCapacityMAH ?? data.rawMaxCapacityMAH,
+                tint: healthColor
             )
-            OverviewMetricRow(
-                label: String(localized: "Health"),
-                value: data.batteryHealthPercent.map { "\($0)%" } ?? unavailableValue,
-                highlight: data.batteryHealthPercent != nil,
-                barValue: data.batteryHealthPercent.map(Double.init),
-                barTotal: 100,
-                barTint: healthColor
-            )
-            OverviewMetricRow(
-                label: String(localized: "Cycle Count"),
-                value: cycleCountText,
-                barValue: cycleCountBar?.0,
-                barTotal: cycleCountBar?.1 ?? 100,
-                barTint: .secondary
-            )
+            capacityRow(String(localized: "Calibrated Full Charge"), data.nominalChargeCapacityMAH, tint: healthColor)
+            capacityRow(String(localized: "Remaining Charge"), data.remainingCapacityMAH, tint: batteryLevelBarTint)
+            if data.designCapacityMAH != nil {
+                DetailNote(String(localized: "Bars and percentages are relative to design capacity."))
+            }
+        }
 
-            DetailSubheading(String(localized: "Capacity"))
-            DetailRow(
-                label: String(localized: "Design Capacity"),
-                value: formatCapacityMAH(data.designCapacityMAH)
-            )
-            DetailRow(
-                label: String(localized: "Current Full Charge"),
-                value: formatCapacityMAH(data.fullChargeCapacityMAH ?? data.rawMaxCapacityMAH)
-            )
-            DetailRow(
-                label: String(localized: "Calibrated Full Charge"),
-                value: formatCapacityMAH(data.nominalChargeCapacityMAH)
-            )
-            DetailRow(
-                label: String(localized: "Remaining Charge"),
-                value: formatCapacityMAH(data.remainingCapacityMAH)
-            )
-
-            if hasChargingCareDetails {
-                DetailSubheading(String(localized: "Charging & Care"))
+        if hasChargingCareDetails {
+            DetailSection(title: String(localized: "Charging & Care"), icon: "leaf.fill", color: .green) {
                 if data.chargeLimitPercent < 100 {
-                    DetailRow(
-                        label: String(localized: "Charge Limit"),
-                        value: chargeLimitText
-                    )
+                    DetailRow(label: String(localized: "Charge Limit"), value: chargeLimitText)
                 }
                 if let minSoc = data.dailyMinSoc, let maxSoc = data.dailyMaxSoc {
-                    DetailRow(
-                        label: String(localized: "Optimized Charging Range"),
-                        value: "\(minSoc)% – \(maxSoc)%"
-                    )
-                }
-                if let temp = data.batteryTemperatureC {
-                    DetailRow(
-                        label: String(localized: "Battery Temp"),
-                        value: String(format: "%.1f °C", temp)
-                    )
+                    DetailRow(label: String(localized: "Optimized Charging Range"), value: "\(minSoc)% – \(maxSoc)%")
                 }
             }
+        }
 
-            if hasElectricalReadings {
-                DetailSubheading(String(localized: "Live Readings"))
+        if hasElectricalReadings {
+            DetailSection(title: String(localized: "Live Readings"), icon: "waveform.path.ecg", color: .orange) {
                 if let voltage = data.batteryVoltageMV {
                     DetailRow(
                         label: String(localized: "Battery Voltage"),
@@ -249,24 +259,20 @@ struct DetailWindowView: View {
                     )
                 }
                 if let amp = data.batteryAmperageMA {
-                    let sign = amp > 0
-                        ? String(localized: "Discharging")
-                        : (amp < 0 ? String(localized: "Charging") : String(localized: "Idle"))
-                    DetailRow(
-                        label: String(localized: "Battery Current"),
-                        value: String(format: "%d mA (%@)", abs(amp), sign)
-                    )
+                    DetailRow(label: String(localized: "Battery Current"), value: currentText(amp))
                 }
                 if let instant = data.instantAmperageMA {
-                    DetailRow(
-                        label: String(localized: "Battery Instant Current"),
-                        value: String(format: "%d mA", instant)
-                    )
+                    DetailRow(label: String(localized: "Battery Instant Current"), value: currentText(instant))
                 }
             }
+        }
 
-            if hasStatusAlerts {
-                DetailSubheading(String(localized: "Status & Alerts"))
+        if hasLifetimeData {
+            lifetimeSection
+        }
+
+        if hasStatusAlerts {
+            DetailSection(title: String(localized: "Status & Alerts"), icon: "exclamationmark.shield", color: .secondary) {
                 if let critical = data.atCriticalLevel {
                     DetailRow(
                         label: String(localized: "Critical Low Battery"),
@@ -285,70 +291,35 @@ struct DetailWindowView: View {
         }
     }
 
-    // MARK: - Additional sections
+    private func capacityRow(_ label: String, _ value: Int?, tint: Color) -> some View {
+        let fraction = capacityFraction(value)
+        let text: String = {
+            guard let value else { return unavailableValue }
+            guard let fraction else { return "\(value) mAh" }
+            return String(format: "%d mAh · %.0f%%", value, fraction * 100)
+        }()
+        return BarRow(label: label, value: text, fraction: fraction, tint: tint)
+    }
 
-    private var cellDataSection: some View {
-        DetailSection(title: String(localized: "Cell Data"), icon: "battery.100", color: .cyan) {
-            if let topology = cellTopologyDescription {
-                Text(topology)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-                    .padding(.bottom, 2)
-            }
+    private func capacityFraction(_ value: Int?) -> Double? {
+        guard let value, let design = data.designCapacityMAH, design > 0 else { return nil }
+        return Double(value) / Double(design)
+    }
 
-            if let cells = data.cellVoltagesMV, let balance = seriesVoltageBalanceSummary(cells) {
-                DetailRow(label: String(localized: "Series Voltage Balance"), value: balance)
-            }
-            if usesSeriesParallelLayout,
-               let currents = data.batteryParallelCellCurrents,
-               let balance = parallelCurrentBalanceSummary(currents) {
-                DetailRow(label: String(localized: "Parallel Current Balance"), value: balance)
-            }
-
-            if usesSeriesParallelLayout {
-                DetailSubheading(String(localized: "Series Groups"))
-                Text(String(localized: "Series group Qmax is the parallel pair's estimated full-charge capacity (mAh), not derived from cell currents."))
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .padding(.bottom, 2)
-                ForEach(Array(seriesGroupEntries.enumerated()), id: \.offset) { idx, entry in
-                    DetailRow(
-                        label: String(format: String(localized: "Series Group %d"), idx + 1),
-                        value: seriesGroupSummary(voltageMV: entry.voltageMV, qmaxMAH: entry.qmaxMAH)
-                    )
-                }
-                if let currents = data.batteryParallelCellCurrents, !currents.isEmpty {
-                    DetailSubheading(String(localized: "Parallel Cell Currents"))
-                    Text(String(localized: "Instantaneous current per parallel cell; unequal split within a group is normal."))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                        .padding(.bottom, 2)
-                    ForEach(Array(currents.enumerated()), id: \.offset) { _, cell in
-                        DetailRow(
-                            label: parallelCellLabel(bankID: cell.bankID, cellID: cell.cellID),
-                            value: "\(cell.currentMA) mA"
-                        )
-                    }
-                }
-            } else {
-                ForEach(Array(cellDisplayEntries.enumerated()), id: \.offset) { idx, entry in
-                    DetailRow(
-                        label: String(format: String(localized: "Cell %d"), idx + 1),
-                        value: cellSummary(voltageMV: entry.voltageMV, qmaxMAH: entry.qmaxMAH)
-                    )
-                }
-            }
-        }
+    /// Raw IOKit amperage: positive = charging, negative = discharging.
+    private func currentText(_ milliamps: Int) -> String {
+        let direction = milliamps > 0
+            ? String(localized: "Charging")
+            : (milliamps < 0 ? String(localized: "Discharging") : String(localized: "Idle"))
+        return String(format: "%d mA (%@)", abs(milliamps), direction)
     }
 
     private var lifetimeSection: some View {
         DetailSection(title: String(localized: "Lifetime Statistics"), icon: "clock.arrow.circlepath", color: .purple) {
-            DetailSubheading(String(localized: "Since First Use"))
             if let total = data.totalOperatingTimeMin {
-                let hours = total / 60
                 DetailRow(
                     label: String(localized: "Total Operating Time"),
-                    value: "\(hours) \(String(localized: "hours"))"
+                    value: "\(total / 60) \(String(localized: "hours"))"
                 )
             }
             if let maxT = data.lifetimeMaxTempC {
@@ -366,16 +337,10 @@ struct DetailWindowView: View {
                 )
             }
             if let maxV = data.lifetimeMaxPackVoltageMV {
-                DetailRow(
-                    label: String(localized: "Max Pack Voltage"),
-                    value: String(format: "%.3f V", Double(maxV) / 1000.0)
-                )
+                DetailRow(label: String(localized: "Max Pack Voltage"), value: String(format: "%.3f V", Double(maxV) / 1000.0))
             }
             if let minV = data.lifetimeMinPackVoltageMV {
-                DetailRow(
-                    label: String(localized: "Min Pack Voltage"),
-                    value: String(format: "%.3f V", Double(minV) / 1000.0)
-                )
+                DetailRow(label: String(localized: "Min Pack Voltage"), value: String(format: "%.3f V", Double(minV) / 1000.0))
             }
             if let maxCharge = data.lifetimeMaxChargeCurrentMA, maxCharge < 100_000 {
                 DetailRow(label: String(localized: "Max Charging Current"), value: "\(maxCharge) mA")
@@ -384,18 +349,86 @@ struct DetailWindowView: View {
                 DetailRow(label: String(localized: "Max Discharging Current"), value: "\(maxDischarge) mA")
             }
             if let discCount = data.batteryCellDisconnectCount {
-                DetailRow(
-                    label: String(localized: "Protection Trigger Count"),
-                    value: protectionTriggerLabel(count: discCount)
-                )
+                DetailRow(label: String(localized: "Protection Trigger Count"), value: protectionTriggerLabel(count: discCount))
             }
         }
     }
 
-    private var deviceInfoSection: some View {
+    // MARK: - Cells Tab
+
+    @ViewBuilder
+    private var cellsTab: some View {
+        DetailSection(title: String(localized: "Cell Data"), icon: "battery.100", color: .cyan) {
+            if let topology = cellTopologyDescription {
+                DetailNote(topology)
+            }
+            if let cells = data.cellVoltagesMV, let balance = seriesVoltageBalanceSummary(cells) {
+                DetailRow(label: String(localized: "Series Voltage Balance"), value: balance)
+            }
+            if usesSeriesParallelLayout,
+               let currents = data.batteryParallelCellCurrents,
+               let balance = parallelCurrentBalanceSummary(currents) {
+                DetailRow(label: String(localized: "Parallel Current Balance"), value: balance)
+            }
+        }
+
+        DetailSection(
+            title: usesSeriesParallelLayout ? String(localized: "Series Groups") : String(localized: "Cell Data"),
+            icon: "square.stack.3d.up",
+            color: .cyan
+        ) {
+            if usesSeriesParallelLayout {
+                DetailNote(String(localized: "Series group Qmax is the parallel pair's estimated full-charge capacity (mAh), not derived from cell currents."))
+            }
+            ForEach(Array(cellDisplayEntries.enumerated()), id: \.offset) { idx, entry in
+                BarRow(
+                    label: usesSeriesParallelLayout
+                        ? String(format: String(localized: "Series Group %d"), idx + 1)
+                        : String(format: String(localized: "Cell %d"), idx + 1),
+                    value: usesSeriesParallelLayout
+                        ? seriesGroupSummary(voltageMV: entry.voltageMV, qmaxMAH: entry.qmaxMAH)
+                        : cellSummary(voltageMV: entry.voltageMV, qmaxMAH: entry.qmaxMAH),
+                    fraction: entry.voltageMV.map(cellVoltageFraction),
+                    tint: .cyan
+                )
+            }
+        }
+
+        if usesSeriesParallelLayout, let currents = data.batteryParallelCellCurrents, !currents.isEmpty {
+            DetailSection(title: String(localized: "Parallel Cell Currents"), icon: "arrow.left.arrow.right", color: .cyan) {
+                DetailNote(String(localized: "Instantaneous current per parallel cell; unequal split within a group is normal."))
+                ForEach(Array(currents.enumerated()), id: \.offset) { _, cell in
+                    DetailRow(
+                        label: parallelCellLabel(bankID: cell.bankID, cellID: cell.cellID),
+                        value: "\(cell.currentMA) mA"
+                    )
+                }
+            }
+        }
+    }
+
+    /// Li-ion working window; only used to draw a comparable bar per cell.
+    private func cellVoltageFraction(_ millivolts: Int) -> Double {
+        (Double(millivolts) - 3000) / (4400 - 3000)
+    }
+
+    // MARK: - Device Tab
+
+    @ViewBuilder
+    private var deviceTab: some View {
         DetailSection(title: String(localized: "Device Information"), icon: "info.circle", color: .secondary) {
             if let serial = data.batterySerial {
-                DetailRow(label: String(localized: "Battery Serial Number"), value: serial)
+                HStack(spacing: DetailLayout.hSpacing) {
+                    DetailRow(label: String(localized: "Battery Serial Number"), value: serial)
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(serial, forType: .string)
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(String(localized: "Copy"))
+                }
             }
             if let name = data.deviceName {
                 DetailRow(label: String(localized: "Battery Management Chip"), value: name)
@@ -403,6 +436,13 @@ struct DetailWindowView: View {
             if let mfg = data.batteryManufactureDate {
                 DetailRow(label: String(localized: "Manufacture Date"), value: mfg)
             }
+            DetailRow(
+                label: String(localized: "Data Source"),
+                value: data.dataSource == .telemetry
+                    ? String(localized: "Power Telemetry")
+                    : String(localized: "Estimation Mode")
+            )
+            DetailNote(String(localized: "Device info is shown locally only and is not uploaded."))
         }
     }
 
@@ -437,6 +477,10 @@ struct DetailWindowView: View {
 
     // MARK: - Helpers
 
+    private func watts(_ value: Double) -> String {
+        String(format: "%.1f W", value)
+    }
+
     private var hasCellData: Bool {
         !cellDisplayEntries.isEmpty
             || !(data.batteryParallelCellCurrents?.isEmpty ?? true)
@@ -470,10 +514,6 @@ struct DetailWindowView: View {
         case nil:
             return nil
         }
-    }
-
-    private var seriesGroupEntries: [(voltageMV: Int?, qmaxMAH: Int?)] {
-        cellDisplayEntries
     }
 
     private var cellDisplayEntries: [(voltageMV: Int?, qmaxMAH: Int?)] {
@@ -531,18 +571,12 @@ struct DetailWindowView: View {
             || data.batteryCellDisconnectCount != nil
     }
 
-    private var hasDeviceInfo: Bool {
-        data.batterySerial != nil || data.deviceName != nil || data.batteryManufactureDate != nil
-    }
-
     private var unavailableValue: String {
         String(localized: "—")
     }
 
     private var hasChargingCareDetails: Bool {
-        data.chargeLimitPercent < 100
-            || (data.dailyMinSoc != nil && data.dailyMaxSoc != nil)
-            || data.batteryTemperatureC != nil
+        data.chargeLimitPercent < 100 || (data.dailyMinSoc != nil && data.dailyMaxSoc != nil)
     }
 
     private var chargeLimitText: String {
@@ -550,14 +584,6 @@ struct DetailWindowView: View {
             return "\(data.chargeLimitPercent)% (\(source))"
         }
         return "\(data.chargeLimitPercent)%"
-    }
-
-    private var cycleCountText: String {
-        guard let cycles = data.cycleCount else { return unavailableValue }
-        if let designCycles = data.designCycleCount {
-            return "\(cycles) / \(designCycles) (\(String(localized: "design life")))"
-        }
-        return "\(cycles)"
     }
 
     private var batteryLevelPercent: Int {
@@ -571,15 +597,11 @@ struct DetailWindowView: View {
         return .green
     }
 
-    private var cycleCountBar: (Double, Double)? {
+    private var cycleCountFraction: Double? {
         guard let cycles = data.cycleCount, let designCycles = data.designCycleCount, designCycles > 0 else {
             return nil
         }
-        return (Double(cycles), Double(designCycles))
-    }
-
-    private func formatCapacityMAH(_ value: Int?) -> String {
-        value.map { "\($0) mAh" } ?? unavailableValue
+        return Double(cycles) / Double(designCycles)
     }
 
     private var hasElectricalReadings: Bool {
@@ -639,16 +661,52 @@ struct DetailWindowView: View {
         }
         return "\(count)"
     }
-
 }
 
 // MARK: - Helper Views
 
 /// Shared column geometry so EN/ZH label length does not shift bars or values.
 private enum DetailLayout {
-    static let labelWidth: CGFloat = 156
-    static let barWidth: CGFloat = 80
+    static let labelWidth: CGFloat = 150
+    static let barWidth: CGFloat = 96
     static let hSpacing: CGFloat = 10
+}
+
+private struct OverviewTile: View {
+    let value: String
+    var caption: String? = nil
+    let label: String
+    let tint: Color
+    let fraction: Double?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(value)
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                if let caption {
+                    Text(caption)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                        .monospacedDigit()
+                }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            Text(label)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            // Reserve bar height so tiles without a bar stay aligned.
+            LevelBar(fraction: fraction ?? 0, tint: tint, height: 4)
+                .opacity(fraction == nil ? 0 : 1)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
+    }
 }
 
 private struct DetailSection<Content: View>: View {
@@ -658,7 +716,7 @@ private struct DetailSection<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 6) {
                 Image(systemName: icon).foregroundStyle(color).font(.system(size: 12))
                 Text(title).font(.system(size: 13, weight: .semibold))
@@ -668,18 +726,30 @@ private struct DetailSection<Content: View>: View {
             content
         }
         .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
-/// Label | fixed bar column | trailing value — used for at-a-glance metrics and charger load.
-private struct OverviewMetricRow: View {
+private struct DetailNote: View {
+    let text: String
+
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 10))
+            .foregroundStyle(.tertiary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Label | fixed bar column | trailing value.
+private struct BarRow: View {
     let label: String
     let value: String
-    var highlight: Bool = false
-    var barValue: Double?
-    var barTotal: Double = 100
-    var barTint: Color = .accentColor
+    let fraction: Double?
+    var tint: Color = .accentColor
 
     var body: some View {
         HStack(alignment: .center, spacing: DetailLayout.hSpacing) {
@@ -690,55 +760,25 @@ private struct OverviewMetricRow: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.85)
 
-            // Always reserve bar width so rows stay aligned when a value is missing.
-            Group {
-                if barValue != nil {
-                    ProgressView(value: progressValue, total: max(barTotal, 1))
-                        .progressViewStyle(.linear)
-                        .tint(barTint)
-                } else {
-                    ProgressView(value: 0, total: 1)
-                        .progressViewStyle(.linear)
-                        .tint(.clear)
-                        .opacity(0)
-                }
-            }
-            .frame(width: DetailLayout.barWidth)
+            LevelBar(fraction: fraction ?? 0, tint: tint)
+                .frame(width: DetailLayout.barWidth)
+                .opacity(fraction == nil ? 0 : 1)
 
             Spacer(minLength: 8)
 
             Text(value)
-                .font(.system(size: 12, weight: highlight ? .bold : .regular, design: .rounded))
+                .font(.system(size: 12, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(highlight ? .primary : .secondary)
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.trailing)
-                .lineLimit(2)
-                .minimumScaleFactor(0.85)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-
-    private var progressValue: Double {
-        guard let barValue, barTotal > 0 else { return 0 }
-        return min(max(barValue, 0), barTotal)
-    }
 }
 
-private struct DetailSubheading: View {
-    let text: String
-
-    init(_ text: String) { self.text = text }
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.tertiary)
-            .padding(.top, 6)
-            .padding(.bottom, 2)
-    }
-}
-
-/// Key–value row with the same fixed label column as overview metrics (no bar).
+/// Key–value row with the same fixed label column as bar rows.
 private struct DetailRow: View {
     let label: String
     let value: String
@@ -764,6 +804,7 @@ private struct DetailRow: View {
                 .lineLimit(3)
                 .minimumScaleFactor(0.85)
                 .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

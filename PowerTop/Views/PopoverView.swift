@@ -296,23 +296,6 @@ struct PopoverView: View {
 
 // MARK: - Components
 
-private struct LevelBar: View {
-    let fraction: Double
-    let tint: Color
-
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule().fill(.quaternary)
-                Capsule()
-                    .fill(tint)
-                    .frame(width: max(6, proxy.size.width * min(max(fraction, 0), 1)))
-            }
-        }
-        .frame(height: 6)
-    }
-}
-
 private struct FlowNode: Identifiable {
     let icon: String
     let title: String

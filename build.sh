@@ -35,6 +35,7 @@ SWIFT_FILES=(
     "$PROJECT_DIR/PowerTop/Models/PowerData.swift"
     "$PROJECT_DIR/PowerTop/Services/PowerMonitor.swift"
     "$PROJECT_DIR/PowerTop/Views/MenuBarLabelView.swift"
+    "$PROJECT_DIR/PowerTop/Views/LevelBar.swift"
     "$PROJECT_DIR/PowerTop/Views/PopoverView.swift"
     "$PROJECT_DIR/PowerTop/Views/DetailWindowView.swift"
     "$PROJECT_DIR/PowerTop/StatusItemController.swift"

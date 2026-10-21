@@ -56,7 +56,6 @@
 "Charger Load Rate" = "Charger Load Rate";
 "Charging Status" = "Charging Status";
 "Not Charging" = "Not Charging";
-"Historical Averages" = "Historical Averages";
 "Wall Outlet Power" = "Power from Outlet (est.)";
 "Adapter Loss" = "Charger Conversion Loss";
 "Charger Output Voltage" = "Charger Output Voltage";
@@ -78,7 +77,6 @@
 
 // Detail - Battery Health
 "Battery Health" = "Battery Health";
-"At a Glance" = "At a Glance";
 "Capacity" = "Capacity";
 "Charging & Care" = "Charging & Care";
 "Live Readings" = "Live Readings";
@@ -92,7 +90,6 @@
 "Remaining Charge" = "Remaining Charge";
 "Full Charge Capacity" = "Full Charge Capacity";
 "Nominal Full Charge Capacity" = "Nominal Full Charge Capacity";
-"design life" = "design life";
 "Discharging" = "Discharging";
 "Charging" = "Charging";
 "Idle" = "Idle";
@@ -149,7 +146,6 @@
 "Min Pack Voltage" = "Min Pack Voltage";
 "Max Charging Current" = "Max Charging Current";
 "Max Discharging Current" = "Max Discharging Current";
-"Since First Use" = "Since First Use";
 "Protection Trigger Count" = "Protection Trigger Count";
 "0 (normal)" = "0 (normal)";
 
@@ -164,3 +160,11 @@
 
 // Hardware availability
 "Built-in battery not detected. PowerTop requires a MacBook." = "Built-in battery not detected. PowerTop requires a MacBook.";
+
+// Detail - Tabs
+"Cells" = "Cells";
+"Device" = "Device";
+"Status" = "Status";
+"Copy" = "Copy";
+"Power Telemetry" = "Power Telemetry";
+"Bars and percentages are relative to design capacity." = "Bars and percentages are relative to design capacity.";
