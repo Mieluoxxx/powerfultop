@@ -1,30 +1,29 @@
 import Foundation
 import IOKit
 
-func getIOServiceProperties(className: String) -> [String: Any]? {
-    let matching = IOServiceMatching(className)
+/// Properties of every registry entry matching an IOKit class, in registry order.
+func ioServiceProperties(className: String) -> [[String: Any]] {
     var iterator: io_iterator_t = 0
-
-    let kr = IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator)
-    guard kr == KERN_SUCCESS else { return nil }
+    guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching(className), &iterator) == KERN_SUCCESS else {
+        return []
+    }
     defer { IOObjectRelease(iterator) }
 
-    let service = IOIteratorNext(iterator)
-    guard service != 0 else { return nil }
-    defer { IOObjectRelease(service) }
-
-    var properties: Unmanaged<CFMutableDictionary>?
-    let propResult = IORegistryEntryCreateCFProperties(
-        service,
-        &properties,
-        kCFAllocatorDefault,
-        0
-    )
-    guard propResult == KERN_SUCCESS, let props = properties?.takeRetainedValue() else {
-        return nil
+    var results: [[String: Any]] = []
+    while true {
+        let service = IOIteratorNext(iterator)
+        guard service != 0 else { break }
+        defer { IOObjectRelease(service) }
+        var properties: Unmanaged<CFMutableDictionary>?
+        guard IORegistryEntryCreateCFProperties(service, &properties, kCFAllocatorDefault, 0) == KERN_SUCCESS,
+              let props = properties?.takeRetainedValue() as? [String: Any] else { continue }
+        results.append(props)
     }
+    return results
+}
 
-    return props as? [String: Any]
+func getIOServiceProperties(className: String) -> [String: Any]? {
+    ioServiceProperties(className: className).first
 }
 
 /// `WallEnergyEstimate`, `AdapterEfficiencyLoss` and `SystemEnergyConsumed` share an energy unit
@@ -204,7 +203,8 @@ struct BatteryCapacitySnapshot: Equatable {
     }
 }
 
-func readBatteryCapacitySnapshot(from props: [String: Any]) -> BatteryCapacitySnapshot {
+/// `banks` are the `AppleSmartBatteryBank` entries; some machines only report SoC and Qmax there.
+func readBatteryCapacitySnapshot(from props: [String: Any], banks: [[String: Any]]) -> BatteryCapacitySnapshot {
     let batteryData = extractDict(from: props, key: "BatteryData")
 
     func packOrBatteryData(_ key: String) -> Int? {
@@ -212,7 +212,7 @@ func readBatteryCapacitySnapshot(from props: [String: Any]) -> BatteryCapacitySn
             ?? batteryData.flatMap { extractInt(from: $0, key: key) }
     }
 
-    let bankBatteryData = readFirstBankBatteryData()
+    let bankBatteryData = banks.lazy.compactMap { extractDict(from: $0, key: "BatteryData") }.first
     return BatteryCapacitySnapshot(
         designCapacityMAH: packOrBatteryData("DesignCapacity"),
         fullChargeCapacityMAH: batteryData.flatMap { extractInt(from: $0, key: "FullChargeCapacity") }
@@ -234,25 +234,6 @@ func readBatteryCapacitySnapshot(from props: [String: Any]) -> BatteryCapacitySn
         temperatureCentidegrees: packOrBatteryData("Temperature")
             ?? bankBatteryData.flatMap { extractInt(from: $0, key: "Temperature") }
     )
-}
-
-private func readFirstBankBatteryData() -> [String: Any]? {
-    let matching = IOServiceMatching("AppleSmartBatteryBank")
-    var iterator: io_iterator_t = 0
-    guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else {
-        return nil
-    }
-    defer { IOObjectRelease(iterator) }
-
-    while true {
-        let service = IOIteratorNext(iterator)
-        guard service != 0 else { break }
-        defer { IOObjectRelease(service) }
-        guard let props = copyServiceProperties(service),
-              let batteryData = extractDict(from: props, key: "BatteryData") else { continue }
-        return batteryData
-    }
-    return nil
 }
 
 /// macOS uses 65535 as an invalid sentinel for battery time estimates.
@@ -280,15 +261,19 @@ private struct BatteryCellSlot {
 }
 
 /// Reads cell telemetry. Apple Silicon exposes series groups via bank nodes; pack-level arrays are a fallback when each entry is a distinct physical cell.
-func readBatteryCellTelemetry(packBatteryData: [String: Any]?) -> BatteryCellTelemetry? {
-    let banks = readBatteryBankReadings()
+func readBatteryCellTelemetry(
+    packBatteryData: [String: Any]?,
+    banks bankProperties: [[String: Any]],
+    cells cellProperties: [[String: Any]]
+) -> BatteryCellTelemetry? {
+    let banks = readBatteryBankReadings(bankProperties)
     if !banks.isEmpty {
         let sortedBanks = banks.sorted { $0.bankID < $1.bankID }
         let voltages = sortedBanks.compactMap(\.voltageMV)
         let qmaxValues = sortedBanks.compactMap(\.qmaxMAH)
         if !voltages.isEmpty, voltages.count == qmaxValues.count {
-            let parallelCells = readBatteryParallelCellCurrents()
-            let cellSlots = readBatteryCellSlots()
+            let parallelCells = readBatteryParallelCellCurrents(cellProperties)
+            let cellSlots = readBatteryCellSlots(cellProperties)
             let parallelCount = inferredParallelCount(parallelCells: parallelCells, cellSlots: cellSlots)
             let parallelCountKnown = parallelCount > 1
                 || !parallelCells.isEmpty
@@ -336,89 +321,36 @@ private func inferredParallelCount(
     return 1
 }
 
-private func readBatteryBankReadings() -> [BatteryBankReading] {
-    let matching = IOServiceMatching("AppleSmartBatteryBank")
-    var iterator: io_iterator_t = 0
-    guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else {
-        return []
-    }
-    defer { IOObjectRelease(iterator) }
-
-    var results: [BatteryBankReading] = []
-    while true {
-        let service = IOIteratorNext(iterator)
-        guard service != 0 else { break }
-        defer { IOObjectRelease(service) }
-
-        guard let props = copyServiceProperties(service) else { continue }
-        let bankID = extractInt(from: props, key: "BankID") ?? results.count
+private func readBatteryBankReadings(_ banks: [[String: Any]]) -> [BatteryBankReading] {
+    banks.enumerated().compactMap { index, props in
         let batteryData = extractDict(from: props, key: "BatteryData")
         let voltageMV = batteryData.flatMap { extractInt(from: $0, key: "CellVoltage") }
         let qmaxMAH = batteryData.flatMap { extractInt(from: $0, key: "Qmax") }
-        if voltageMV != nil || qmaxMAH != nil {
-            results.append(BatteryBankReading(bankID: bankID, voltageMV: voltageMV, qmaxMAH: qmaxMAH))
-        }
+        guard voltageMV != nil || qmaxMAH != nil else { return nil }
+        return BatteryBankReading(
+            bankID: extractInt(from: props, key: "BankID") ?? index,
+            voltageMV: voltageMV,
+            qmaxMAH: qmaxMAH
+        )
     }
-    return results
 }
 
-private func readBatteryCellSlots() -> [BatteryCellSlot] {
-    let matching = IOServiceMatching("AppleSmartBatteryCell")
-    var iterator: io_iterator_t = 0
-    guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else {
-        return []
-    }
-    defer { IOObjectRelease(iterator) }
-
-    var results: [BatteryCellSlot] = []
-    while true {
-        let service = IOIteratorNext(iterator)
-        guard service != 0 else { break }
-        defer { IOObjectRelease(service) }
-
-        guard let props = copyServiceProperties(service) else { continue }
+private func readBatteryCellSlots(_ cells: [[String: Any]]) -> [BatteryCellSlot] {
+    cells.compactMap { props -> BatteryCellSlot? in
         guard let bankID = extractInt(from: props, key: "BankID"),
-              let cellID = extractInt(from: props, key: "CellID") else { continue }
-        results.append(BatteryCellSlot(bankID: bankID, cellID: cellID))
+              let cellID = extractInt(from: props, key: "CellID") else { return nil }
+        return BatteryCellSlot(bankID: bankID, cellID: cellID)
     }
-    return results.sorted { lhs, rhs in
-        if lhs.bankID == rhs.bankID { return lhs.cellID < rhs.cellID }
-        return lhs.bankID < rhs.bankID
-    }
+    .sorted { ($0.bankID, $0.cellID) < ($1.bankID, $1.cellID) }
 }
 
-private func readBatteryParallelCellCurrents() -> [BatteryParallelCellCurrent] {
-    let matching = IOServiceMatching("AppleSmartBatteryCell")
-    var iterator: io_iterator_t = 0
-    guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else {
-        return []
-    }
-    defer { IOObjectRelease(iterator) }
-
-    var results: [BatteryParallelCellCurrent] = []
-    while true {
-        let service = IOIteratorNext(iterator)
-        guard service != 0 else { break }
-        defer { IOObjectRelease(service) }
-
-        guard let props = copyServiceProperties(service) else { continue }
+private func readBatteryParallelCellCurrents(_ cells: [[String: Any]]) -> [BatteryParallelCellCurrent] {
+    cells.compactMap { props -> BatteryParallelCellCurrent? in
         guard let bankID = extractInt(from: props, key: "BankID"),
-              let cellID = extractInt(from: props, key: "CellID") else { continue }
-        let cellData = extractDict(from: props, key: "CellData")
-        guard let currentMA = cellData.flatMap({ extractInt(from: $0, key: "CellCurrent") }) else { continue }
-        results.append(BatteryParallelCellCurrent(bankID: bankID, cellID: cellID, currentMA: currentMA))
+              let cellID = extractInt(from: props, key: "CellID"),
+              let currentMA = extractDict(from: props, key: "CellData").flatMap({ extractInt(from: $0, key: "CellCurrent") })
+        else { return nil }
+        return BatteryParallelCellCurrent(bankID: bankID, cellID: cellID, currentMA: currentMA)
     }
-    return results.sorted { lhs, rhs in
-        if lhs.bankID == rhs.bankID { return lhs.cellID < rhs.cellID }
-        return lhs.bankID < rhs.bankID
-    }
-}
-
-private func copyServiceProperties(_ service: io_service_t) -> [String: Any]? {
-    var properties: Unmanaged<CFMutableDictionary>?
-    guard IORegistryEntryCreateCFProperties(service, &properties, kCFAllocatorDefault, 0) == KERN_SUCCESS,
-          let props = properties?.takeRetainedValue() else {
-        return nil
-    }
-    return props as? [String: Any]
+    .sorted { ($0.bankID, $0.cellID) < ($1.bankID, $1.cellID) }
 }

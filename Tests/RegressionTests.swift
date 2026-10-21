@@ -16,6 +16,7 @@ struct RegressionTests {
         testTelemetryEnergyUnits()
         testMenuBarLabelStyles()
         testPowerStateClassification()
+        testCellTelemetryParsing()
 
         guard failures == 0 else {
             fputs("\(failures) regression test(s) failed\n", stderr)
@@ -269,6 +270,36 @@ struct RegressionTests {
         expect(abs(telemetryEnergyToWatts(3321) - 11.956) < 0.01, "idle wall power includes adapter loss")
         expect(abs(telemetryEnergyToWatts(13390) - 48.207) < 0.01, "charging SystemEnergyConsumed matches SystemPowerIn")
         expect(abs(telemetryEnergyToWatts(14741) - 53.068) < 0.01, "charging wall power includes adapter loss")
+    }
+
+    private static func testCellTelemetryParsing() {
+        // Mirrors this machine's registry: three series banks, one parallel cell each.
+        let banks: [[String: Any]] = [(0, 4190, 6066), (1, 4189, 6085), (2, 4191, 6112)].map { id, mv, qmax in
+            ["BankID": id, "BatteryData": ["CellVoltage": mv, "Qmax": qmax, "StateOfCharge": 85]]
+        }
+        let cells: [[String: Any]] = [(2, 1417), (0, 1112), (1, 1271)].map { bank, ma in
+            ["BankID": bank, "CellID": 0, "CellData": ["CellCurrent": ma]]
+        }
+
+        let telemetry = readBatteryCellTelemetry(packBatteryData: nil, banks: banks, cells: cells)
+        expectEqual(telemetry?.voltagesMV ?? [], [4190, 4189, 4191], "series voltages in bank order")
+        expectEqual(telemetry?.qmaxMAH ?? [], [6066, 6085, 6112], "series Qmax in bank order")
+        expectEqual(telemetry?.parallelCellCurrents.map(\.currentMA) ?? [], [1112, 1271, 1417], "cell currents sorted by bank")
+        expectEqual(
+            telemetry?.layout,
+            .seriesParallel(seriesCount: 3, parallelCount: 1, parallelCountKnown: true),
+            "3S1P topology"
+        )
+
+        let snapshot = readBatteryCapacitySnapshot(from: [:], banks: banks)
+        expectEqual(snapshot.stateOfCharge, 85, "fall back to bank SoC when the pack omits it")
+
+        let packOnly = readBatteryCellTelemetry(
+            packBatteryData: ["CellVoltage": [3900, 3910], "Qmax": [5000, 5010]],
+            banks: [],
+            cells: []
+        )
+        expectEqual(packOnly?.layout, .perCellArrays, "per-cell arrays without bank nodes")
     }
 
     private static func testPowerStateClassification() {

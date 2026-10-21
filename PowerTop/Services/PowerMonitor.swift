@@ -312,7 +312,10 @@ final class PowerMonitor {
         let cellDisconnectCount = extractInt(from: props, key: "BatteryCellDisconnectCount")
 
         // Battery health — DesignCapacity / FCC / Nominal often live in BatteryData on Apple Silicon.
-        let capacitySnapshot = readBatteryCapacitySnapshot(from: props)
+        // Bank and cell nodes are read once per refresh and shared by every parser below.
+        let bankProperties = ioServiceProperties(className: "AppleSmartBatteryBank")
+        let cellProperties = ioServiceProperties(className: "AppleSmartBatteryCell")
+        let capacitySnapshot = readBatteryCapacitySnapshot(from: props, banks: bankProperties)
         let designCapacity = capacitySnapshot.designCapacityMAH
         let rawMaxCapacity = capacitySnapshot.rawMaxCapacityMAH
         let nominalChargeCapacity = capacitySnapshot.nominalChargeCapacityMAH
@@ -339,7 +342,11 @@ final class PowerMonitor {
 
         // BatteryData (deep)
         let batteryData = extractDict(from: props, key: "BatteryData")
-        let cellTelemetry = readBatteryCellTelemetry(packBatteryData: batteryData)
+        let cellTelemetry = readBatteryCellTelemetry(
+            packBatteryData: batteryData,
+            banks: bankProperties,
+            cells: cellProperties
+        )
         let cellVoltages = cellTelemetry?.voltagesMV
         let qmax = cellTelemetry?.qmaxMAH
         let batteryCellLayout = cellTelemetry?.layout
