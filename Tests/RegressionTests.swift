@@ -25,6 +25,8 @@ struct RegressionTests {
         testPowerdChargeLimitParsing()
         testMetricHistoryWindow()
         testForeignFanControlDetection()
+        testCPULoad()
+        testMemoryAndProcessParsing()
 
         guard failures == 0 else {
             fputs("\(failures) regression test(s) failed\n", stderr)
@@ -315,6 +317,69 @@ struct RegressionTests {
 
         let encoded = try? JSONEncoder().encode(ramp)
         expectEqual(encoded.flatMap { try? JSONDecoder().decode(FanControlMode.self, from: $0) }, ramp, "mode persists")
+    }
+
+    private static func testCPULoad() {
+        let before = [
+            CoreTicks(user: 100, system: 50, idle: 850, nice: 0),
+            CoreTicks(user: 0, system: 0, idle: 1000, nice: 0),
+        ]
+        let after = [
+            CoreTicks(user: 160, system: 70, idle: 870, nice: 0),   // 80 busy of 100
+            CoreTicks(user: 10, system: 0, idle: 1090, nice: 0),    // 10 busy of 100
+        ]
+        let load = cpuLoad(previous: before, current: after, kinds: [.efficiency, .performance])
+        expectApproximately(load?.usage, 0.45, "overall busy share across cores")
+        expectApproximately(load?.user, 0.35, "user share")
+        expectApproximately(load?.efficiency, 0.8, "efficiency cluster share")
+        expectApproximately(load?.performance, 0.1, "performance cluster share")
+        expectEqual(load?.perCore.count, 2, "per-core values")
+
+        // Counters reset across sleep must not produce a negative or huge delta.
+        let reset = [CoreTicks(user: 5, system: 0, idle: 5, nice: 0), CoreTicks(user: 20, system: 0, idle: 1180, nice: 0)]
+        let afterReset = cpuLoad(previous: after, current: reset, kinds: [.efficiency, .performance])
+        expectEqual(afterReset?.perCore.first, 0, "a core whose counters went backwards contributes nothing")
+        expectNil(cpuLoad(previous: [], current: after, kinds: []), "no load without a previous sample")
+    }
+
+    private static func testMemoryAndProcessParsing() {
+        let gib: UInt64 = 1 << 30
+        let page: UInt64 = 16_384
+        let memory = MemoryStats(
+            totalBytes: 128 * gib,
+            internalPages: 46 * gib / page, purgeablePages: 2 * gib / page,
+            wiredPages: 7 * gib / page, compressorPages: 3 * gib / page,
+            pageSize: page, swapUsedBytes: 0, pressure: .normal
+        )
+        expectEqual(memory.appBytes, 44 * gib, "app memory excludes purgeable")
+        expectEqual(memory.usedBytes, 54 * gib, "used = app + wired + compressed")
+        expectApproximately(memory.usedFraction, 54.0 / 128.0, "used fraction")
+
+        // Live `ps -Aceo pid=,pcpu=,comm= -r` lines; names may contain spaces.
+        let ps = """
+          410  33.5 WindowServer
+         5269  25.1 ego Helper (Renderer)
+            1  20.6 launchd
+        """
+        let cpu = parseProcessCPU(ps, limit: 2)
+        expectEqual(cpu.map(\.name), ["WindowServer", "ego Helper (Renderer)"], "top CPU processes keep spaced names")
+        expectEqual(cpu.first?.value, 33.5, "CPU percent")
+
+        // Live `top -l 1 -o mem -stats pid,command,mem` tail.
+        let top = """
+        Processes: 1076 total, 3 running
+        PID    COMMAND         MEM
+        1110   OrbStack Helper 1730M
+        410    WindowServer    1461M+
+        5892   WeChat          583K
+        """
+        let memoryList = parseProcessMemory(top, limit: 8)
+        expectEqual(memoryList.map(\.name), ["OrbStack Helper", "WindowServer", "WeChat"], "top memory processes")
+        expectEqual(memoryList.first?.value, 1730 * 1_048_576, "MEM megabytes")
+        expectEqual(memoryList.last?.value, 583 * 1024, "MEM kilobytes")
+        expectEqual(parseTopMemory("1.5G"), 1.5 * 1_073_741_824, "fractional gigabytes")
+        let names = parseProcessNames("  5218 ego Helper (Renderer)\n  410 WindowServer\n")
+        expectEqual(names[5218], "ego Helper (Renderer)", "full names replace top's 16-character truncation")
     }
 
     private static func testForeignFanControlDetection() {

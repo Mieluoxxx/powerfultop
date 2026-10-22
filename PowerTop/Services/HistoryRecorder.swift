@@ -8,11 +8,13 @@ final class HistoryRecorder {
 
     private let monitor: PowerMonitor
     private let thermal: ThermalMonitor
+    private let system: SystemMonitor
     private var timer: Timer?
 
-    init(monitor: PowerMonitor, thermal: ThermalMonitor) {
+    init(monitor: PowerMonitor, thermal: ThermalMonitor, system: SystemMonitor) {
         self.monitor = monitor
         self.thermal = thermal
+        self.system = system
     }
 
     func start() {
@@ -40,7 +42,9 @@ final class HistoryRecorder {
             systemPowerW: data.systemPowerW,
             cpuAverageC: snapshot.temperatures[.cpu]?.averageC,
             fanRPM: snapshot.hasFans ? snapshot.fans.map(\.actualRPM).max() : nil,
-            batteryTemperatureC: batteryTemperatureC(data: data, thermal: snapshot)
+            batteryTemperatureC: batteryTemperatureC(data: data, thermal: snapshot),
+            cpuUsage: system.cpu.perCore.isEmpty ? nil : system.cpu.usage * 100,
+            memoryUsage: system.memory.map { $0.usedFraction * 100 }
         ))
     }
 }

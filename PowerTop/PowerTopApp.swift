@@ -4,7 +4,8 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let monitor = PowerMonitor()
     let thermal = ThermalMonitor()
-    private(set) lazy var history = HistoryRecorder(monitor: monitor, thermal: thermal)
+    let system = SystemMonitor()
+    private(set) lazy var history = HistoryRecorder(monitor: monitor, thermal: thermal, system: system)
     private var didStart = false
     private var statusItemController: StatusItemController?
 
@@ -13,8 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         didStart = true
         monitor.start()
         thermal.start()
+        system.start()
         history.start()
-        statusItemController = StatusItemController(monitor: monitor, thermal: thermal, history: history)
+        statusItemController = StatusItemController(monitor: monitor, thermal: thermal, system: system, history: history)
         if CommandLine.arguments.contains("--smoke-launch") {
             scheduleSmokeLaunchCheck()
         }
@@ -58,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Runs synchronously: a deferred Task may never execute before exit, leaving fans in manual mode.
         MainActor.assumeIsolated {
             history.stop()
+            system.stop()
             thermal.shutdown()
             statusItemController?.invalidate()
             statusItemController = nil

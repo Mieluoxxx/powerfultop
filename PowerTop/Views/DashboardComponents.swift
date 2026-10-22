@@ -239,22 +239,34 @@ struct ChartPanel: View {
     }
 
     private var chart: some View {
+        ChartPanelChart(points: points, tint: tint, domain: domain, height: 110)
+    }
+}
+
+/// Gradient area chart shared by dashboard panels and the system page sparklines.
+struct ChartPanelChart: View {
+    let points: [(date: Date, value: Double)]
+    let tint: Color
+    var domain: ClosedRange<Double>? = nil
+    var height: CGFloat = 110
+
+    var body: some View {
         let scale = domain ?? autoDomain
         return Chart {
             ForEach(points, id: \.date) { point in
                 // Fill from the visible floor; the default zero baseline spills below a raised axis.
                 AreaMark(
                     x: .value("Time", point.date),
-                    yStart: .value(title, scale.lowerBound),
-                    yEnd: .value(title, point.value)
+                    yStart: .value("Value", scale.lowerBound),
+                    yEnd: .value("Value", point.value)
                 )
-                    .foregroundStyle(LinearGradient(
-                        colors: [tint.opacity(0.35), tint.opacity(0.02)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ))
-                    .interpolationMethod(.monotone)
-                LineMark(x: .value("Time", point.date), y: .value(title, point.value))
+                .foregroundStyle(LinearGradient(
+                    colors: [tint.opacity(0.35), tint.opacity(0.02)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ))
+                .interpolationMethod(.monotone)
+                LineMark(x: .value("Time", point.date), y: .value("Value", point.value))
                     .foregroundStyle(tint)
                     .lineStyle(StrokeStyle(lineWidth: 1.6))
                     .interpolationMethod(.monotone)
@@ -268,7 +280,7 @@ struct ChartPanel: View {
             }
         }
         .chartYScale(domain: scale)
-        .frame(height: 110)
+        .frame(height: height)
         .clipped()
     }
 

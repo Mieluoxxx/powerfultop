@@ -7,12 +7,13 @@ struct DetailWindowView: View {
     static let minimumWidth: CGFloat = 760
 
     enum Page: String, CaseIterable, Identifiable {
-        case overview, cooling, battery, settings
+        case overview, system, cooling, battery, settings
         var id: String { rawValue }
 
         var title: String {
             switch self {
             case .overview: return String(localized: "Overview")
+            case .system: return String(localized: "System")
             case .cooling: return String(localized: "Cooling")
             case .battery: return String(localized: "Battery")
             case .settings: return String(localized: "Settings")
@@ -22,6 +23,7 @@ struct DetailWindowView: View {
         var icon: String {
             switch self {
             case .overview: return "square.grid.2x2"
+            case .system: return "cpu"
             case .cooling: return "fan"
             case .battery: return "battery.75percent"
             case .settings: return "gearshape"
@@ -31,6 +33,7 @@ struct DetailWindowView: View {
 
     let monitor: PowerMonitor
     let thermal: ThermalMonitor
+    let system: SystemMonitor
     let history: HistoryRecorder
     @AppStorage("dashboardPage") private var page: Page = .overview
 
@@ -70,7 +73,9 @@ struct DetailWindowView: View {
                 .font(.system(size: 22, weight: .bold))
             switch page {
             case .overview:
-                OverviewPage(monitor: monitor, thermal: thermal, history: history)
+                OverviewPage(monitor: monitor, thermal: thermal, system: system, history: history)
+            case .system:
+                SystemPage(system: system, thermal: thermal, history: history, columnCount: width >= 760 ? 2 : 1)
             case .cooling:
                 CoolingPage(thermal: thermal, history: history)
             case .battery:

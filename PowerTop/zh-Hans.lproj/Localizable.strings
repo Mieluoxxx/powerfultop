@@ -205,3 +205,29 @@
 "Voltage" = "电压";
 "macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerTop is closed or the Mac sleeps." = "充电上限（80–100%）由 macOS 在固件层执行，PowerTop 关闭或 Mac 睡眠时依然有效。";
 "AlDente is currently managing the charge limit. Change it in AlDente, or quit AlDente to use the macOS setting." = "当前由 AlDente 管理充电上限。请在 AlDente 中调整，或退出 AlDente 后使用系统设置。";
+
+// System monitor
+"1 min" = "1 分钟";
+"15 min" = "15 分钟";
+"5 min" = "5 分钟";
+"App Memory" = "App 内存";
+"Available" = "可用";
+"CPU Usage" = "CPU 占用";
+"Compressed" = "被压缩";
+"Efficiency Cores" = "能效核心";
+"Load" = "负载";
+"Load %.2f" = "负载 %.2f";
+"Load Average" = "平均负载";
+"Memory" = "内存";
+"Performance Cores" = "性能核心";
+"Pressure Critical" = "压力严重";
+"Pressure Normal" = "压力正常";
+"Pressure Warning" = "压力警告";
+"Swap Used" = "交换区";
+"Temperature" = "温度";
+"Top Processes" = "高占用进程";
+"Uptime" = "启动时间";
+"Usage" = "占用";
+"Used" = "已用";
+"User" = "用户";
+"Wired Memory" = "联动内存";

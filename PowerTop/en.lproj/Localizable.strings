@@ -205,3 +205,29 @@
 "Voltage" = "Voltage";
 "macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerTop is closed or the Mac sleeps." = "macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerTop is closed or the Mac sleeps.";
 "AlDente is currently managing the charge limit. Change it in AlDente, or quit AlDente to use the macOS setting." = "AlDente is currently managing the charge limit. Change it in AlDente, or quit AlDente to use the macOS setting.";
+
+// System monitor
+"1 min" = "1 min";
+"15 min" = "15 min";
+"5 min" = "5 min";
+"App Memory" = "App Memory";
+"Available" = "Available";
+"CPU Usage" = "CPU Usage";
+"Compressed" = "Compressed";
+"Efficiency Cores" = "Efficiency Cores";
+"Load" = "Load";
+"Load %.2f" = "Load %.2f";
+"Load Average" = "Load Average";
+"Memory" = "Memory";
+"Performance Cores" = "Performance Cores";
+"Pressure Critical" = "Pressure Critical";
+"Pressure Normal" = "Pressure Normal";
+"Pressure Warning" = "Pressure Warning";
+"Swap Used" = "Swap Used";
+"Temperature" = "Temperature";
+"Top Processes" = "Top Processes";
+"Uptime" = "Uptime";
+"Usage" = "Usage";
+"Used" = "Used";
+"User" = "User";
+"Wired Memory" = "Wired Memory";

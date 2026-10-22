@@ -4,6 +4,7 @@ import SwiftUI
 struct OverviewPage: View {
     let monitor: PowerMonitor
     let thermal: ThermalMonitor
+    let system: SystemMonitor
     let history: HistoryRecorder
 
     private var data: PowerData { monitor.currentData }
@@ -38,6 +39,26 @@ struct OverviewPage: View {
                     tint: .purple,
                     points: samples.series { $0.systemPowerW }
                 )
+                ChartPanel(
+                    title: String(localized: "CPU Usage"),
+                    value: String(format: "%.0f%%", system.cpu.usage * 100),
+                    detail: system.loadAverage.first.map { String(format: String(localized: "Load %.2f"), $0) },
+                    icon: "cpu",
+                    tint: .blue,
+                    points: samples.series { $0.cpuUsage },
+                    domain: 0...100
+                )
+                if let memory = system.memory {
+                    ChartPanel(
+                        title: String(localized: "Memory"),
+                        value: String(format: "%.0f%%", memory.usedFraction * 100),
+                        detail: "\(formatBytes(Double(memory.usedBytes))) / \(formatBytes(Double(memory.totalBytes)))",
+                        icon: "memorychip",
+                        tint: .green,
+                        points: samples.series { $0.memoryUsage },
+                        domain: 0...100
+                    )
+                }
                 if let cpu = thermal.snapshot.temperatures[.cpu] {
                     ChartPanel(
                         title: String(localized: "CPU Average"),

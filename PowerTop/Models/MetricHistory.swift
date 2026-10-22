@@ -7,6 +7,8 @@ struct MetricSample: Equatable, Identifiable {
     let cpuAverageC: Double?
     let fanRPM: Double?
     let batteryTemperatureC: Double?
+    var cpuUsage: Double? = nil
+    var memoryUsage: Double? = nil
 
     var id: Date { date }
 }
