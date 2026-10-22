@@ -9,19 +9,6 @@ struct SettingsPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            DashCard(title: String(localized: "Menu Bar"), icon: "menubar.rectangle", tint: .blue) {
-                Picker(String(localized: "Menu Bar Display"), selection: Binding(
-                    get: { monitor.menuBarDisplayStyle },
-                    set: { monitor.menuBarDisplayStyle = $0 }
-                )) {
-                    ForEach(MenuBarDisplayStyle.allCases) { style in
-                        Text(style.title).tag(style)
-                    }
-                }
-                .pickerStyle(.radioGroup)
-                .font(.system(size: 12))
-            }
-
             DashCard(title: String(localized: "General"), icon: "gearshape", tint: .gray) {
                 Toggle(String(localized: "Launch at Login"), isOn: Binding(
                     get: { monitor.launchAtLogin },

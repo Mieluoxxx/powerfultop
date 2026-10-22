@@ -569,25 +569,44 @@ struct RegressionTests {
     }
 
     private static func testMenuBarLabelStyles() {
-        let battery = makeData(systemPowerW: 7.4, batteryPowerW: 7.4, acInputW: 0, isOnAC: false, connectionPhase: .onBattery)
+        // Saved styles from earlier builds map onto catalog items.
+        expectEqual(MenuBarConfiguration(legacy: .batteryPercent).items, [.batteryPercent], "percent style migrates")
+        expectEqual(MenuBarConfiguration(legacy: .batteryPercentPower).items, [.batteryPercent, .systemPower], "percent + power migrates")
+        let powerOnly = MenuBarConfiguration(legacy: .powerOnly)
+        expectEqual(powerOnly.iconStyle, .hidden, "power-only drops the icon")
+        expectEqual(powerOnly.items, [.systemPower], "power-only keeps wattage")
 
-        let percent = MenuBarLabel(style: .batteryPercent, isDataAvailable: true, data: battery)
-        expectEqual(percent.title, "50%", "percent style hides power")
-        expectEqual(percent.symbolName, "battery.50", "percent style shows battery level icon")
+        var context = MenuBarContext()
+        context.batteryPercent = 50
+        context.systemPowerW = 7.4
+        context.batteryPowerW = 37.1
+        context.cpuUsage = 0.05
+        context.memoryUsage = 0.43
+        context.cpuTemperatureC = 42.6
+        context.fanRPM = 0
 
-        let full = MenuBarLabel(style: .batteryPercentPower, isDataAvailable: true, data: battery)
-        expectEqual(full.title, "50% \u{2007}7W", "pad single-digit power with a figure space")
+        var configuration = MenuBarConfiguration()
+        configuration.items = [.batteryPercent, .systemPower, .batteryPower, .cpuUsage, .memoryUsage, .cpuTemperature, .fanSpeed, .adapterPower]
+        let label = MenuBarLabel(configuration: configuration, context: context)
+        expectEqual(label.iconSymbol, "battery.50", "battery icon follows level")
+        expectEqual(label.segments.map(\.text), [
+            "50%", "\u{2007}7W", "+37W", "\u{2007}5%", "43%", "43°", "\u{2007}\u{2007}\u{2007}0",
+        ], "values are padded to a fixed width; adapter power is hidden on battery")
+        expectEqual(label.segments[1].symbol, "laptopcomputer", "system load carries its glyph")
 
-        let powerOnly = MenuBarLabel(style: .powerOnly, isDataAvailable: true, data: battery)
-        expectEqual(powerOnly.title, "\u{2007}7W", "power-only style shows padded wattage")
-        expectNil(powerOnly.symbolName, "power-only style has no icon next to the system battery")
+        var empty = MenuBarConfiguration()
+        empty.iconStyle = .hidden
+        empty.items = []
+        expectEqual(MenuBarLabel(configuration: empty, context: context).iconSymbol, "bolt.circle",
+                    "an empty menu bar item keeps a clickable icon")
 
-        let busy = makeData(systemPowerW: 23.6, batteryPowerW: 23.6, acInputW: 0, isOnAC: false, connectionPhase: .onBattery)
-        let busyLabel = MenuBarLabel(style: .powerOnly, isDataAvailable: true, data: busy)
-        expectEqual(busyLabel.title, "24W", "two-digit power needs no padding")
+        context.isDataAvailable = false
+        expectEqual(MenuBarLabel(configuration: configuration, context: context).iconSymbol, "exclamationmark.triangle",
+                    "warn when data is unavailable")
 
-        let unavailable = MenuBarLabel(style: .powerOnly, isDataAvailable: false, data: battery)
-        expectEqual(unavailable.symbolName, "exclamationmark.triangle", "warn when data is unavailable")
+        let encoded = try? JSONEncoder().encode(configuration)
+        expectEqual(encoded.flatMap { try? JSONDecoder().decode(MenuBarConfiguration.self, from: $0) }, configuration,
+                    "configuration persists")
     }
 
     private static func packed(_ storedDigits: String) -> Int {

@@ -1,56 +1,245 @@
 import Foundation
 
-enum MenuBarDisplayStyle: String, CaseIterable, Identifiable {
+/// Pre-catalog menu bar styles, kept only to migrate saved preferences.
+enum MenuBarDisplayStyle: String {
     case batteryPercent
     case batteryPercentPower
-    /// Wattage only, meant to sit next to the system battery icon.
     case powerOnly
+}
+
+enum MenuBarIconStyle: String, CaseIterable, Codable, Identifiable {
+    case hidden
+    /// Battery level glyph, or a bolt while on AC.
+    case battery
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .batteryPercent: return String(localized: "Battery + Percent")
-        case .batteryPercentPower: return String(localized: "Battery + Percent + Power")
-        case .powerOnly: return String(localized: "Power Only")
+        case .hidden: return String(localized: "Hidden")
+        case .battery: return String(localized: "Battery Level")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .hidden: return "eye.slash"
+        case .battery: return "battery.75percent"
         }
     }
 }
 
-/// Content for the status-item button; drawn by `StatusItemController` via title/image.
-struct MenuBarLabel: Equatable {
-    let symbolName: String?
-    let title: String
+enum MenuBarItemGroup: String, CaseIterable, Identifiable {
+    case battery, adapter, health, system
 
-    init(style: MenuBarDisplayStyle, isDataAvailable: Bool, data: PowerData) {
-        guard isDataAvailable else {
-            symbolName = "exclamationmark.triangle"
-            title = ""
-            return
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .battery: return String(localized: "Battery")
+        case .adapter: return String(localized: "Power Adapter")
+        case .health: return String(localized: "Battery Health")
+        case .system: return String(localized: "System")
         }
-        let batteryPercent = min(100, max(0, data.batteryPercent))
-        let percentage = "\(batteryPercent)%"
-        // A figure space is exactly one digit wide in the monospaced-digit status font, so
-        // single-digit wattage keeps the item width and neighbouring menu bar items don't shift.
-        let power = data.menuBarPowerRoundedW < 10
-            ? data.menuBarPowerText.replacingOccurrences(
-                of: "\(data.menuBarPowerRoundedW)W",
-                with: "\u{2007}\(data.menuBarPowerRoundedW)W"
-            )
-            : data.menuBarPowerText
-        let batterySymbol = data.effectiveIsOnAC ? "bolt.fill" : Self.batteryIconName(for: batteryPercent)
+    }
+}
 
+enum MenuBarItem: String, CaseIterable, Codable, Identifiable {
+    case batteryPercent
+    case timeRemaining
+    case batteryTemperature
+    case batteryCurrent
+    case batteryVoltage
+    case batteryPower
+    case systemPower
+    case adapterCurrent
+    case adapterVoltage
+    case adapterPower
+    case health
+    case cycleCount
+    case cpuUsage
+    case memoryUsage
+    case cpuTemperature
+    case fanSpeed
+
+    var id: String { rawValue }
+
+    var group: MenuBarItemGroup {
+        switch self {
+        case .batteryPercent, .timeRemaining, .batteryTemperature, .batteryCurrent, .batteryVoltage, .batteryPower, .systemPower:
+            return .battery
+        case .adapterCurrent, .adapterVoltage, .adapterPower:
+            return .adapter
+        case .health, .cycleCount:
+            return .health
+        case .cpuUsage, .memoryUsage, .cpuTemperature, .fanSpeed:
+            return .system
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .batteryPercent: return String(localized: "Percentage")
+        case .timeRemaining: return String(localized: "Time Remaining")
+        case .batteryTemperature: return String(localized: "Temperature")
+        case .batteryCurrent, .adapterCurrent: return String(localized: "Current")
+        case .batteryVoltage, .adapterVoltage: return String(localized: "Voltage")
+        case .batteryPower, .adapterPower: return String(localized: "Power")
+        case .systemPower: return String(localized: "System Load")
+        case .health: return String(localized: "Health")
+        case .cycleCount: return String(localized: "Cycle Count")
+        case .cpuUsage: return String(localized: "CPU Usage")
+        case .memoryUsage: return String(localized: "Memory")
+        case .cpuTemperature: return String(localized: "CPU Temperature")
+        case .fanSpeed: return String(localized: "Fan Speed")
+        }
+    }
+
+    /// Glyph shown before the value so several numbers in the menu bar stay distinguishable.
+    var symbol: String? {
+        switch self {
+        case .batteryPercent: return nil
+        case .timeRemaining: return "clock"
+        case .batteryTemperature: return "thermometer.medium"
+        case .batteryCurrent, .batteryVoltage, .batteryPower: return "battery.100"
+        case .systemPower: return "laptopcomputer"
+        case .adapterCurrent, .adapterVoltage, .adapterPower: return "powerplug"
+        case .health: return "heart"
+        case .cycleCount: return "arrow.triangle.2.circlepath"
+        case .cpuUsage: return "cpu"
+        case .memoryUsage: return "memorychip"
+        case .cpuTemperature: return "thermometer.variable"
+        case .fanSpeed: return "fan"
+        }
+    }
+}
+
+struct MenuBarConfiguration: Codable, Equatable {
+    var iconStyle: MenuBarIconStyle = .battery
+    var items: [MenuBarItem] = [.batteryPercent]
+    /// Points between items.
+    var spacing: Double = 6
+    /// Seconds between menu bar refreshes; fewer redraws keep the item steady and cheaper.
+    var updateInterval: Double = 2
+
+    static let `default` = MenuBarConfiguration()
+    static let spacingRange: ClosedRange<Double> = 0...12
+    static let updateIntervalRange: ClosedRange<Double> = 2...20
+
+    init() {}
+
+    init(legacy style: MenuBarDisplayStyle) {
         switch style {
         case .batteryPercent:
-            symbolName = batterySymbol
-            title = percentage
+            items = [.batteryPercent]
         case .batteryPercentPower:
-            symbolName = batterySymbol
-            title = "\(percentage) \(power)"
+            items = [.batteryPercent, .systemPower]
         case .powerOnly:
-            symbolName = nil
-            title = power
+            iconStyle = .hidden
+            items = [.systemPower]
         }
+    }
+}
+
+/// Everything the menu bar can show, captured from the monitors so labels are pure and testable.
+struct MenuBarContext: Equatable {
+    var isDataAvailable = true
+    var isOnAC = false
+    var batteryPercent = 0
+    var timeRemaining: String?
+    var batteryTemperatureC: Double?
+    var batteryCurrentMA: Int?
+    var batteryVoltageMV: Int?
+    /// Signed: positive into the pack.
+    var batteryPowerW: Double?
+    var systemPowerW = 0.0
+    var systemPowerWarning = false
+    var adapterCurrentA: Double?
+    var adapterVoltageV: Double?
+    var adapterPowerW: Double?
+    var health: Int?
+    var cycleCount: Int?
+    var cpuUsage: Double?
+    var memoryUsage: Double?
+    var cpuTemperatureC: Double?
+    var fanRPM: Double?
+}
+
+struct MenuBarSegment: Equatable {
+    let symbol: String?
+    let text: String
+}
+
+/// Content for the status-item button; drawn by `StatusItemController`.
+struct MenuBarLabel: Equatable {
+    let iconSymbol: String?
+    let segments: [MenuBarSegment]
+
+    init(configuration: MenuBarConfiguration, context: MenuBarContext) {
+        guard context.isDataAvailable else {
+            iconSymbol = "exclamationmark.triangle"
+            segments = []
+            return
+        }
+        let segments = configuration.items.compactMap { Self.segment(for: $0, context: context) }
+        self.segments = segments
+        switch configuration.iconStyle {
+        case .hidden:
+            // An empty status item cannot be clicked, which would lock users out of the settings.
+            iconSymbol = segments.isEmpty ? "bolt.circle" : nil
+        case .battery:
+            iconSymbol = context.isOnAC ? "bolt.fill" : Self.batteryIconName(for: context.batteryPercent)
+        }
+    }
+
+    /// Nil when the reading does not apply right now (e.g. adapter values on battery).
+    static func segment(for item: MenuBarItem, context: MenuBarContext) -> MenuBarSegment? {
+        let text: String?
+        switch item {
+        case .batteryPercent:
+            text = "\(min(100, max(0, context.batteryPercent)))%"
+        case .timeRemaining:
+            text = context.timeRemaining
+        case .batteryTemperature:
+            text = context.batteryTemperatureC.map { padded(Int($0.rounded()), digits: 2) + "°" }
+        case .batteryCurrent:
+            text = context.batteryCurrentMA.map { String(format: "%.1fA", Double($0) / 1000) }
+        case .batteryVoltage:
+            text = context.batteryVoltageMV.map { String(format: "%.1fV", Double($0) / 1000) }
+        case .batteryPower:
+            text = context.batteryPowerW.map { watts in
+                (watts > 0.05 ? "+" : (watts < -0.05 ? "−" : "")) + padded(Int(abs(watts).rounded()), digits: 2) + "W"
+            }
+        case .systemPower:
+            let rounded = min(99, max(0, Int(context.systemPowerW.rounded())))
+            text = (context.systemPowerWarning ? "⚠ " : "") + padded(rounded, digits: 2) + "W"
+        case .adapterCurrent:
+            text = context.adapterCurrentA.map { String(format: "%.1fA", $0) }
+        case .adapterVoltage:
+            text = context.adapterVoltageV.map { String(format: "%.0fV", $0) }
+        case .adapterPower:
+            text = context.adapterPowerW.map { padded(Int($0.rounded()), digits: 2) + "W" }
+        case .health:
+            text = context.health.map { "\($0)%" }
+        case .cycleCount:
+            text = context.cycleCount.map(String.init)
+        case .cpuUsage:
+            text = context.cpuUsage.map { padded(Int(($0 * 100).rounded()), digits: 2) + "%" }
+        case .memoryUsage:
+            text = context.memoryUsage.map { padded(Int(($0 * 100).rounded()), digits: 2) + "%" }
+        case .cpuTemperature:
+            text = context.cpuTemperatureC.map { padded(Int($0.rounded()), digits: 2) + "°" }
+        case .fanSpeed:
+            text = context.fanRPM.map { padded(Int($0.rounded()), digits: 4) }
+        }
+        return text.map { MenuBarSegment(symbol: item.symbol, text: $0) }
+    }
+
+    /// A figure space is exactly one digit wide in the monospaced-digit status font, so values keep
+    /// their width as they change and neighbouring menu bar items don't shift.
+    static func padded(_ value: Int, digits: Int) -> String {
+        let text = String(value)
+        return String(repeating: "\u{2007}", count: max(0, digits - text.count)) + text
     }
 
     static func batteryIconName(for batteryPercent: Int) -> String {

@@ -285,15 +285,10 @@ struct PopoverView: View {
                 get: { monitor.launchAtLogin },
                 set: { monitor.launchAtLogin = $0 }
             ))
-            Picker(String(localized: "Menu Bar Display"), selection: Binding(
-                get: { monitor.menuBarDisplayStyle },
-                set: { monitor.menuBarDisplayStyle = $0 }
-            )) {
-                ForEach(MenuBarDisplayStyle.allCases) { style in
-                    Text(style.title).tag(style)
-                }
+            Button(String(localized: "Customize Menu Bar…")) {
+                UserDefaults.standard.set(DetailWindowView.Page.menuBar.rawValue, forKey: "dashboardPage")
+                openDetails()
             }
-            .pickerStyle(.inline)
             Divider()
             Text(AppInfo.versionLabel)
             Button(String(localized: "Quit")) {

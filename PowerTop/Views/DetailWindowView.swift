@@ -7,7 +7,7 @@ struct DetailWindowView: View {
     static let minimumWidth: CGFloat = 760
 
     enum Page: String, CaseIterable, Identifiable {
-        case overview, system, cooling, battery, settings
+        case overview, system, cooling, battery, menuBar, settings
         var id: String { rawValue }
 
         var title: String {
@@ -16,6 +16,7 @@ struct DetailWindowView: View {
             case .system: return String(localized: "System")
             case .cooling: return String(localized: "Cooling")
             case .battery: return String(localized: "Battery")
+            case .menuBar: return String(localized: "Menu Bar")
             case .settings: return String(localized: "Settings")
             }
         }
@@ -26,6 +27,7 @@ struct DetailWindowView: View {
             case .system: return "cpu"
             case .cooling: return "fan"
             case .battery: return "battery.75percent"
+            case .menuBar: return "menubar.rectangle"
             case .settings: return "gearshape"
             }
         }
@@ -80,6 +82,8 @@ struct DetailWindowView: View {
                 CoolingPage(thermal: thermal, history: history)
             case .battery:
                 BatteryPage(monitor: monitor, columnCount: width >= 760 ? 2 : 1)
+            case .menuBar:
+                MenuBarPage(monitor: monitor, thermal: thermal, system: system)
             case .settings:
                 SettingsPage(monitor: monitor, thermal: thermal)
             }

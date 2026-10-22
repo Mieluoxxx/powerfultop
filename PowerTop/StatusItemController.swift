@@ -13,6 +13,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     private var detailWindow: NSWindow?
     /// Skip redundant status-item layout; rewriting length/title every 2s shifts the item.
     private var renderedLabel: MenuBarLabel?
+    private var renderedSpacing: Double?
+    private var refreshTimer: Timer?
     /// Accessory apps often don't resign key, so `.transient` misses outside clicks on macOS 15/26.
     private var localClickMonitor: Any?
     private var globalClickMonitor: Any?
@@ -31,6 +33,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     }
 
     func invalidate() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
         stopDismissMonitors()
         popover.performClose(nil)
         detailWindow?.delegate = nil
@@ -69,43 +73,84 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     }
 
     private func startObservingMonitor() {
-        observeMonitor()
+        observeConfiguration()
+        scheduleRefresh()
     }
 
-    private func observeMonitor() {
+    /// Redraw at the user's chosen interval; values come from three monitors, so polling is simpler
+    /// than observing every field and also caps how often the menu bar reflows.
+    private func scheduleRefresh() {
+        refreshTimer?.invalidate()
+        let timer = Timer(timeInterval: monitor.menuBarConfiguration.updateInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.updateStatusItem() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        refreshTimer = timer
+    }
+
+    private func observeConfiguration() {
         withObservationTracking {
-            _ = monitor.menuBarDisplayStyle
+            _ = monitor.menuBarConfiguration
             _ = monitor.isDataAvailable
-            _ = monitor.currentData.menuBarPowerText
-            _ = monitor.currentData.effectiveIsOnAC
-            _ = monitor.currentData.batteryPercent
         } onChange: { [weak self] in
             Task { @MainActor in
-                self?.updateStatusItem()
-                self?.observeMonitor()
+                guard let self else { return }
+                self.updateStatusItem()
+                self.scheduleRefresh()
+                self.observeConfiguration()
             }
         }
     }
 
     private func updateStatusItem() {
+        let configuration = monitor.menuBarConfiguration
         let label = MenuBarLabel(
-            style: monitor.menuBarDisplayStyle,
-            isDataAvailable: monitor.isDataAvailable,
-            data: monitor.currentData
+            configuration: configuration,
+            context: makeMenuBarContext(monitor: monitor, thermal: thermal, system: system)
         )
-        guard label != renderedLabel else { return }
+        guard label != renderedLabel || configuration.spacing != renderedSpacing else { return }
         renderedLabel = label
+        renderedSpacing = configuration.spacing
 
         guard let button = statusItem.button else { return }
-        let image = label.symbolName.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+        let image = label.iconSymbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
         image?.isTemplate = true
         button.image = image
+        let title = Self.attributedTitle(for: label.segments, spacing: configuration.spacing, leadingGap: image != nil)
         if image == nil {
             button.imagePosition = .noImage
         } else {
-            button.imagePosition = label.title.isEmpty ? .imageOnly : .imageLeading
+            button.imagePosition = title.length == 0 ? .imageOnly : .imageLeading
         }
-        button.title = label.title
+        button.attributedTitle = title
+    }
+
+    static func attributedTitle(for segments: [MenuBarSegment], spacing: Double, leadingGap: Bool) -> NSAttributedString {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        // An attributed title loses the button's automatic colour; labelColor resolves against the
+        // menu bar's appearance at draw time, so text and template glyphs follow light/dark bars.
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
+        let result = NSMutableAttributedString()
+        for (index, segment) in segments.enumerated() {
+            if index > 0 {
+                // Kern on a plain space sets the user's item spacing without changing the font.
+                result.append(NSAttributedString(string: " ", attributes: attributes.merging([.kern: spacing]) { $1 }))
+            }
+            if let symbol = segment.symbol,
+               let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: 10, weight: .medium)) {
+                image.isTemplate = true
+                let attachment = NSTextAttachment()
+                attachment.image = image
+                attachment.bounds = CGRect(x: 0, y: -1, width: image.size.width, height: image.size.height)
+                let glyph = NSMutableAttributedString(attachment: attachment)
+                glyph.addAttributes(attributes, range: NSRange(location: 0, length: glyph.length))
+                result.append(glyph)
+                result.append(NSAttributedString(string: "\u{2009}", attributes: attributes))
+            }
+            result.append(NSAttributedString(string: segment.text, attributes: attributes))
+        }
+        return result
     }
 
     @objc private func statusItemClicked() {

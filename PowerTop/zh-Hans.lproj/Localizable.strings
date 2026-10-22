@@ -34,10 +34,6 @@
 // Footer
 "Details" = "详细参数";
 "Launch at Login" = "开机启动";
-"Menu Bar Display" = "菜单栏显示";
-"Battery + Percent" = "电池图标 + 百分比";
-"Battery + Percent + Power" = "电池图标 + 百分比 + 功率";
-"Power Only" = "仅功率（搭配系统电池图标）";
 "Quit" = "退出";
 
 // Detail Window
@@ -231,3 +227,23 @@
 "Used" = "已用";
 "User" = "用户";
 "Wired Memory" = "联动内存";
+
+// Menu bar editor
+"%.0f s" = "%.0f 秒";
+"(choose one)" = "（选择一个）";
+"CPU Temperature" = "CPU 温度";
+"Clear All" = "全部清除";
+"Customize Menu Bar…" = "自定义菜单栏…";
+"Drag items to reorder. Readings that don't apply right now, such as adapter values on battery, are hidden." = "拖动可调整顺序。当前不适用的读数（例如使用电池时的适配器数值）会自动隐藏。";
+"Hidden" = "不显示";
+"Item Catalog" = "菜单项目录";
+"Item Spacing" = "菜单项间距";
+"Layout" = "布局";
+"Main Icon" = "主图标样式";
+"Nothing selected; a small icon stays in the menu bar so PowerTop can still be opened." = "未选择任何项；菜单栏会保留一个小图标，以便仍能打开 PowerTop。";
+"Percentage" = "百分比";
+"Reset" = "重置";
+"Selected Items" = "已选菜单项";
+"System Load" = "系统负载";
+"Time Remaining" = "满载/剩余时间";
+"Update Interval" = "菜单更新间隔";

@@ -8,7 +8,8 @@ import ServiceManagement
 @MainActor
 @Observable
 final class PowerMonitor {
-    private static let menuBarDisplayStyleKey = "menuBarDisplayStyle"
+    private static let menuBarConfigurationKey = "menuBarConfiguration"
+    private static let legacyDisplayStyleKey = "menuBarDisplayStyle"
     private static let legacyShowPowerInMenuBarKey = "showPowerInMenuBar"
 
     var currentData: PowerData = .empty
@@ -29,9 +30,9 @@ final class PowerMonitor {
             }
         }
     }
-    var menuBarDisplayStyle: MenuBarDisplayStyle {
+    var menuBarConfiguration: MenuBarConfiguration {
         didSet {
-            UserDefaults.standard.set(menuBarDisplayStyle.rawValue, forKey: Self.menuBarDisplayStyleKey)
+            UserDefaults.standard.set(try? JSONEncoder().encode(menuBarConfiguration), forKey: Self.menuBarConfigurationKey)
         }
     }
 
@@ -56,17 +57,20 @@ final class PowerMonitor {
 
     init() {
         launchAtLogin = (SMAppService.mainApp.status == .enabled)
-        menuBarDisplayStyle = Self.loadMenuBarDisplayStyle()
+        menuBarConfiguration = Self.loadMenuBarConfiguration()
     }
 
-    private static func loadMenuBarDisplayStyle() -> MenuBarDisplayStyle {
+    private static func loadMenuBarConfiguration() -> MenuBarConfiguration {
         let defaults = UserDefaults.standard
-        if let raw = defaults.string(forKey: menuBarDisplayStyleKey),
-           let style = MenuBarDisplayStyle(rawValue: raw) {
-            return style
+        if let data = defaults.data(forKey: menuBarConfigurationKey),
+           let configuration = try? JSONDecoder().decode(MenuBarConfiguration.self, from: data) {
+            return configuration
         }
-        // Users who enabled the old "Show Power in Menu Bar" toggle keep wattage visible.
-        return defaults.bool(forKey: legacyShowPowerInMenuBarKey) ? .batteryPercentPower : .batteryPercent
+        // Earlier builds stored one of three fixed styles, and before that a single power toggle.
+        if let raw = defaults.string(forKey: legacyDisplayStyleKey), let style = MenuBarDisplayStyle(rawValue: raw) {
+            return MenuBarConfiguration(legacy: style)
+        }
+        return MenuBarConfiguration(legacy: defaults.bool(forKey: legacyShowPowerInMenuBarKey) ? .batteryPercentPower : .batteryPercent)
     }
 
     func refreshNow() {

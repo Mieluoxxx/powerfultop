@@ -34,10 +34,6 @@
 // Footer
 "Details" = "Details";
 "Launch at Login" = "Launch at Login";
-"Menu Bar Display" = "Menu Bar Display";
-"Battery + Percent" = "Battery + Percent";
-"Battery + Percent + Power" = "Battery + Percent + Power";
-"Power Only" = "Power Only (next to system battery)";
 "Quit" = "Quit";
 
 // Detail Window
@@ -231,3 +227,23 @@
 "Used" = "Used";
 "User" = "User";
 "Wired Memory" = "Wired Memory";
+
+// Menu bar editor
+"%.0f s" = "%.0f s";
+"(choose one)" = "(choose one)";
+"CPU Temperature" = "CPU Temperature";
+"Clear All" = "Clear All";
+"Customize Menu Bar…" = "Customize Menu Bar…";
+"Drag items to reorder. Readings that don't apply right now, such as adapter values on battery, are hidden." = "Drag items to reorder. Readings that don't apply right now, such as adapter values on battery, are hidden.";
+"Hidden" = "Hidden";
+"Item Catalog" = "Item Catalog";
+"Item Spacing" = "Item Spacing";
+"Layout" = "Layout";
+"Main Icon" = "Main Icon";
+"Nothing selected; a small icon stays in the menu bar so PowerTop can still be opened." = "Nothing selected; a small icon stays in the menu bar so PowerTop can still be opened.";
+"Percentage" = "Percentage";
+"Reset" = "Reset";
+"Selected Items" = "Selected Items";
+"System Load" = "System Load";
+"Time Remaining" = "Time Remaining";
+"Update Interval" = "Update Interval";
