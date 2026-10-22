@@ -247,3 +247,11 @@
 "System Load" = "System Load";
 "Time Remaining" = "Time Remaining";
 "Update Interval" = "Update Interval";
+
+// Menu bar icon styles
+"PowerTop Icon" = "PowerTop Icon";
+"Ring" = "Ring";
+"Simple" = "Simple";
+"iOS Native" = "iOS Native";
+"macOS Color" = "macOS Color";
+"macOS Native" = "macOS Native";

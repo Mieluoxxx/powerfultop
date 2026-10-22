@@ -588,7 +588,7 @@ struct RegressionTests {
         var configuration = MenuBarConfiguration()
         configuration.items = [.batteryPercent, .systemPower, .batteryPower, .cpuUsage, .memoryUsage, .cpuTemperature, .fanSpeed, .adapterPower]
         let label = MenuBarLabel(configuration: configuration, context: context)
-        expectEqual(label.iconSymbol, "battery.50", "battery icon follows level")
+        expectEqual(label.icon, .symbol("battery.50"), "battery icon follows level")
         expectEqual(label.segments.map(\.text), [
             "50%", "\u{2007}7W", "+37W", "\u{2007}5%", "43%", "43°", "\u{2007}\u{2007}\u{2007}0",
         ], "values are padded to a fixed width; adapter power is hidden on battery")
@@ -597,11 +597,19 @@ struct RegressionTests {
         var empty = MenuBarConfiguration()
         empty.iconStyle = .hidden
         empty.items = []
-        expectEqual(MenuBarLabel(configuration: empty, context: context).iconSymbol, "bolt.circle",
+        expectEqual(MenuBarLabel(configuration: empty, context: context).icon, .symbol("bolt.circle"),
                     "an empty menu bar item keeps a clickable icon")
 
+        var drawn = configuration
+        drawn.iconStyle = .iOS
+        expectEqual(MenuBarLabel(configuration: drawn, context: context).icon, .battery(style: .iOS, percent: 50, charging: false),
+                    "drawn styles carry the exact level")
+        let legacyJSON = #"{"iconStyle":"battery","items":["batteryPercent"],"spacing":6,"updateInterval":2}"#.data(using: .utf8)!
+        expectEqual((try? JSONDecoder().decode(MenuBarConfiguration.self, from: legacyJSON))?.iconStyle, .battery,
+                    "saved simple style still decodes")
+
         context.isDataAvailable = false
-        expectEqual(MenuBarLabel(configuration: configuration, context: context).iconSymbol, "exclamationmark.triangle",
+        expectEqual(MenuBarLabel(configuration: configuration, context: context).icon, .symbol("exclamationmark.triangle"),
                     "warn when data is unavailable")
 
         let encoded = try? JSONEncoder().encode(configuration)

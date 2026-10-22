@@ -113,8 +113,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
         renderedSpacing = configuration.spacing
 
         guard let button = statusItem.button else { return }
-        let image = label.iconSymbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
-        image?.isTemplate = true
+        let image = label.icon.flatMap(MenuBarIconRenderer.image(for:))
         button.image = image
         let title = Self.attributedTitle(for: label.segments, spacing: configuration.spacing, leadingGap: image != nil)
         if image == nil {

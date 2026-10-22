@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// AlDente-style editor: selected items preview live values; the catalog toggles items on and off.
@@ -18,6 +19,14 @@ struct MenuBarPage: View {
         .frame(maxWidth: 760, alignment: .leading)
     }
 
+    /// Each style chip shows how that style would draw the current level.
+    private func preview(_ style: MenuBarIconStyle) -> NSImage? {
+        guard style != .hidden else { return nil }
+        var sample = configuration
+        sample.iconStyle = style
+        return MenuBarLabel(configuration: sample, context: context).icon.flatMap(MenuBarIconRenderer.image(for:))
+    }
+
     private func update(_ change: (inout MenuBarConfiguration) -> Void) {
         var next = monitor.menuBarConfiguration
         change(&next)
@@ -29,9 +38,8 @@ struct MenuBarPage: View {
     private var selectedSection: some View {
         DashCard(title: String(localized: "Selected Items"), icon: "menubar.rectangle", tint: .blue) {
             FlowLayout(spacing: 8) {
-                if configuration.iconStyle != .hidden {
-                    Chip(symbol: MenuBarLabel(configuration: configuration, context: context).iconSymbol ?? configuration.iconStyle.symbol,
-                         text: nil, filled: true)
+                if configuration.iconStyle != .hidden, let icon = MenuBarLabel(configuration: configuration, context: context).icon {
+                    Chip(symbol: nil, image: MenuBarIconRenderer.image(for: icon), text: nil, filled: true)
                 }
                 ForEach(configuration.items) { item in
                     Chip(
@@ -70,7 +78,7 @@ struct MenuBarPage: View {
                     Button {
                         update { $0.iconStyle = style }
                     } label: {
-                        Chip(symbol: style.symbol, text: style.title, filled: configuration.iconStyle == style)
+                        Chip(symbol: style == .hidden ? style.symbol : nil, image: preview(style), text: style.title, filled: configuration.iconStyle == style)
                     }
                     .buttonStyle(.plain)
                 }
@@ -180,13 +188,17 @@ private struct CatalogGroup<Content: View>: View {
 
 private struct Chip: View {
     let symbol: String?
+    var image: NSImage? = nil
     let text: String?
     let filled: Bool
     var onRemove: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 5) {
-            if let symbol {
+            if let image {
+                Image(nsImage: image)
+                    .renderingMode(image.isTemplate ? .template : .original)
+            } else if let symbol {
                 Image(systemName: symbol)
                     .font(.system(size: 11, weight: .medium))
             }

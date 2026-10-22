@@ -247,3 +247,11 @@
 "System Load" = "系统负载";
 "Time Remaining" = "满载/剩余时间";
 "Update Interval" = "菜单更新间隔";
+
+// Menu bar icon styles
+"PowerTop Icon" = "PowerTop 图标";
+"Ring" = "圆环";
+"Simple" = "简约";
+"iOS Native" = "iOS 原生";
+"macOS Color" = "macOS 彩色";
+"macOS Native" = "macOS 原生";

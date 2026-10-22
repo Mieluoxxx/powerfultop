@@ -9,15 +9,29 @@ enum MenuBarDisplayStyle: String {
 
 enum MenuBarIconStyle: String, CaseIterable, Codable, Identifiable {
     case hidden
-    /// Battery level glyph, or a bolt while on AC.
+    /// SF Symbols battery in five steps, or a bolt while on AC. Raw value predates the other styles.
     case battery
+    /// Outline filled to the exact level, like the macOS battery item.
+    case macOS
+    /// Same outline with a green/red fill.
+    case macOSColor
+    /// Solid battery with the percentage printed inside, like iOS.
+    case iOS
+    /// Small ring that fills with the level.
+    case ring
+    case appIcon
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .hidden: return String(localized: "Hidden")
-        case .battery: return String(localized: "Battery Level")
+        case .battery: return String(localized: "Simple")
+        case .macOS: return String(localized: "macOS Native")
+        case .macOSColor: return String(localized: "macOS Color")
+        case .iOS: return String(localized: "iOS Native")
+        case .ring: return String(localized: "Ring")
+        case .appIcon: return String(localized: "PowerTop Icon")
         }
     }
 
@@ -25,8 +39,17 @@ enum MenuBarIconStyle: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .hidden: return "eye.slash"
         case .battery: return "battery.75percent"
+        case .macOS, .macOSColor, .iOS: return "battery.100"
+        case .ring: return "circle.dashed"
+        case .appIcon: return "bolt.circle"
         }
     }
+}
+
+enum MenuBarIcon: Equatable {
+    case symbol(String)
+    /// Drawn per refresh because it reflects the exact level rather than five symbol steps.
+    case battery(style: MenuBarIconStyle, percent: Int, charging: Bool)
 }
 
 enum MenuBarItemGroup: String, CaseIterable, Identifiable {
@@ -172,23 +195,28 @@ struct MenuBarSegment: Equatable {
 
 /// Content for the status-item button; drawn by `StatusItemController`.
 struct MenuBarLabel: Equatable {
-    let iconSymbol: String?
+    let icon: MenuBarIcon?
     let segments: [MenuBarSegment]
 
     init(configuration: MenuBarConfiguration, context: MenuBarContext) {
         guard context.isDataAvailable else {
-            iconSymbol = "exclamationmark.triangle"
+            icon = .symbol("exclamationmark.triangle")
             segments = []
             return
         }
         let segments = configuration.items.compactMap { Self.segment(for: $0, context: context) }
         self.segments = segments
+        let percent = min(100, max(0, context.batteryPercent))
         switch configuration.iconStyle {
         case .hidden:
             // An empty status item cannot be clicked, which would lock users out of the settings.
-            iconSymbol = segments.isEmpty ? "bolt.circle" : nil
+            icon = segments.isEmpty ? .symbol("bolt.circle") : nil
         case .battery:
-            iconSymbol = context.isOnAC ? "bolt.fill" : Self.batteryIconName(for: context.batteryPercent)
+            icon = .symbol(context.isOnAC ? "bolt.fill" : Self.batteryIconName(for: percent))
+        case .appIcon:
+            icon = .symbol("bolt.circle")
+        case .macOS, .macOSColor, .iOS, .ring:
+            icon = .battery(style: configuration.iconStyle, percent: percent, charging: context.isOnAC)
         }
     }
 
