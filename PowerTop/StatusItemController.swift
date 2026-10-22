@@ -6,6 +6,7 @@ import SwiftUI
 final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate {
     private let monitor: PowerMonitor
     private let thermal: ThermalMonitor
+    private let history: HistoryRecorder
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
     private var detailWindow: NSWindow?
@@ -15,9 +16,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     private var localClickMonitor: Any?
     private var globalClickMonitor: Any?
 
-    init(monitor: PowerMonitor, thermal: ThermalMonitor) {
+    init(monitor: PowerMonitor, thermal: ThermalMonitor, history: HistoryRecorder) {
         self.monitor = monitor
         self.thermal = thermal
+        self.history = history
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
         configureStatusItem()
@@ -184,7 +186,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
         popover.performClose(nil)
         NSApp.activate(ignoringOtherApps: true)
         if detailWindow == nil {
-            let hosting = NSHostingController(rootView: DetailWindowView(monitor: monitor, thermal: thermal))
+            let hosting = NSHostingController(rootView: DetailWindowView(monitor: monitor, thermal: thermal, history: history))
             let window = NSWindow(contentViewController: hosting)
             window.title = String(localized: "PowerTop Details")
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]

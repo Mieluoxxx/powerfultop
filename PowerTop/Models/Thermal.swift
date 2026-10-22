@@ -113,6 +113,14 @@ func groupSensorKeys(_ keys: [String]) -> [SensorGroup: [String]] {
     return groups
 }
 
+/// Manual fan state only counts as another tool's when our helper's marker is absent; otherwise a
+/// single failed request would make PowerTop back off from its own control and let the watchdog fire.
+func isForeignFanControl(snapshot: ThermalSnapshot, helperHoldsFans: Bool, otherToolRunning: Bool) -> Bool {
+    if otherToolRunning { return true }
+    guard snapshot.anyFanManual || snapshot.diagnosticUnlocked else { return false }
+    return !helperHoldsFans
+}
+
 enum FanControlMode: Equatable, Codable {
     case automatic
     case fullBlast
@@ -151,6 +159,10 @@ enum FanHelperConstants {
     static let installedPath = "/Library/PrivilegedHelperTools/\(label)"
     static let launchDaemonPath = "/Library/LaunchDaemons/\(label).plist"
     static let clientRequirementPath = "/Library/Application Support/PowerTop/fan-helper-client.req"
+    /// Present while our helper holds the fans; survives a helper crash so the next launch can restore.
+    static let engagedMarkerPath = "/Library/Application Support/PowerTop/fan-helper.engaged"
+    /// Ftst handoff took 10–12 s on an M4 Max under macOS 27, longer than the 3–6 s reported elsewhere.
+    static let engageTimeout: TimeInterval = 20
     static let protocolVersion = 1
     /// Helper hands fans back to macOS if the app stops checking in for this long.
     static let heartbeatTimeout: TimeInterval = 15

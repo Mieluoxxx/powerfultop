@@ -13,7 +13,12 @@ used = set(re.findall(r'String\(localized: "((?:[^"\\]|\\.)*)"\)', source))
 
 failed = False
 for strings in sorted((root / "PowerTop").glob("*.lproj/Localizable.strings")):
-    keys = set(re.findall(r'^"((?:[^"\\]|\\.)*)"\s*=', strings.read_text(), re.M))
+    key_list = re.findall(r'^"((?:[^"\\]|\\.)*)"\s*=', strings.read_text(), re.M)
+    keys = set(key_list)
+    duplicates = sorted({key for key in key_list if key_list.count(key) > 1})
+    if duplicates:
+        failed = True
+        print(f"{strings.relative_to(root)}: duplicate keys: {duplicates}", file=sys.stderr)
     for label, diff in (("missing", used - keys), ("unused", keys - used)):
         if diff:
             failed = True

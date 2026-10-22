@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 enum BatteryChargeLimitSource: Equatable {
@@ -106,7 +107,16 @@ private final class PowerdChargeLimitCache: @unchecked Sendable {
     }
 }
 
+/// AlDente keeps its last limit in preferences after it quits, so only trust it while it runs.
 private func readAlDenteChargeLimitPercent() -> Int? {
+    let running = ["com.apphousekitchen.aldente-pro", "com.davidwernhart.AlDente"].contains { bundleID in
+        !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
+    }
+    guard running else { return nil }
+    return readRunningAlDenteChargeLimitPercent()
+}
+
+private func readRunningAlDenteChargeLimitPercent() -> Int? {
     if let limit = readAlDenteProChargeLimitPercent() {
         return limit
     }

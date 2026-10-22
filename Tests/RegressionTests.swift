@@ -23,6 +23,8 @@ struct RegressionTests {
         testSensorGrouping()
         testTemperatureSmoothing()
         testPowerdChargeLimitParsing()
+        testMetricHistoryWindow()
+        testForeignFanControlDetection()
 
         guard failures == 0 else {
             fputs("\(failures) regression test(s) failed\n", stderr)
@@ -313,6 +315,44 @@ struct RegressionTests {
 
         let encoded = try? JSONEncoder().encode(ramp)
         expectEqual(encoded.flatMap { try? JSONDecoder().decode(FanControlMode.self, from: $0) }, ramp, "mode persists")
+    }
+
+    private static func testForeignFanControlDetection() {
+        let manualFan = FanReading(index: 0, actualRPM: 5500, minRPM: 2317, maxRPM: 7826, targetRPM: 5517, mode: 1)
+        let systemFan = FanReading(index: 0, actualRPM: 0, minRPM: 2317, maxRPM: 7826, targetRPM: 0, mode: 3)
+        let ours = ThermalSnapshot(fans: [manualFan], temperatures: [:], diagnosticUnlocked: true)
+        let idle = ThermalSnapshot(fans: [systemFan], temperatures: [:], diagnosticUnlocked: false)
+
+        // Regression: a timed-out first request made PowerTop treat its own helper as a rival,
+        // stop sending heartbeats, and the watchdog handed fans back every 30 s.
+        expect(!isForeignFanControl(snapshot: ours, helperHoldsFans: true, otherToolRunning: false),
+               "our helper's manual mode is not a conflict")
+        expect(isForeignFanControl(snapshot: ours, helperHoldsFans: false, otherToolRunning: false),
+               "manual mode without our marker belongs to another tool")
+        expect(!isForeignFanControl(snapshot: idle, helperHoldsFans: false, otherToolRunning: false),
+               "system-managed fans are free to take")
+        expect(isForeignFanControl(snapshot: idle, helperHoldsFans: false, otherToolRunning: true),
+               "a running fan app always counts as a conflict")
+    }
+
+    private static func testMetricHistoryWindow() {
+        func sample(_ seconds: TimeInterval) -> MetricSample {
+            MetricSample(date: Date(timeIntervalSince1970: seconds), batteryPercent: 80, systemPowerW: 10,
+                         cpuAverageC: nil, fanRPM: nil, batteryTemperatureC: 30)
+        }
+        var history = MetricHistory()
+        history.append(sample(0))
+        history.append(sample(1))
+        expectEqual(history.samples.count, 1, "bursts closer than half an interval are dropped")
+
+        for second in stride(from: 5.0, through: 40 * 60, by: 5) {
+            history.append(sample(second))
+        }
+        let span = (history.samples.last?.date.timeIntervalSince(history.samples.first!.date)) ?? 0
+        expect(span <= MetricHistory.window, "history keeps at most 30 minutes")
+        expectEqual(history.samples.count, Int(MetricHistory.window / MetricHistory.sampleInterval) + 1, "one sample per 5 s")
+        expectEqual(history.series { $0.cpuAverageC }.count, 0, "missing values are skipped in a series")
+        expectEqual(history.series { $0.batteryTemperatureC }.count, history.samples.count, "present values are kept")
     }
 
     private static func testPowerdChargeLimitParsing() {

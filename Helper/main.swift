@@ -13,8 +13,7 @@ final class FanController {
     /// Consecutive 1 s ticks at or above the failsafe; a single core spike must not trip it.
     private var overheatTicks = 0
 
-    /// Survives a helper crash so the next launch can hand fans back to macOS.
-    private static let engagedMarkerPath = "/Library/Application Support/PowerTop/fan-helper.engaged"
+    private static let engagedMarkerPath = FanHelperConstants.engagedMarkerPath
 
     init(smc: SMCConnection) {
         self.smc = smc
@@ -85,7 +84,7 @@ final class FanController {
         if hasDiagnosticKey, smc.write("Ftst", bytes: [1]) != 0 {
             return "SMC rejected the diagnostic unlock"
         }
-        let deadline = Date().addingTimeInterval(10)
+        let deadline = Date().addingTimeInterval(FanHelperConstants.engageTimeout)
         var pending = Set(modeKeys)
         while !pending.isEmpty, Date() < deadline {
             for key in pending where smc.write(key, bytes: [1]) == 0 && smc.read(key)?.doubleValue == 1 {

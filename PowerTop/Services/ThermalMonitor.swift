@@ -34,6 +34,11 @@ final class ThermalMonitor {
 
     var isControlling: Bool { !mode.isAutomatic && weEngaged }
 
+    /// A failed request clears `weEngaged`, but the helper may still hold the fans; the marker is authoritative.
+    private var helperHoldsFans: Bool {
+        weEngaged || FileManager.default.fileExists(atPath: FanHelperConstants.engagedMarkerPath)
+    }
+
     func start() {
         guard timer == nil, smc != nil else { return }
         helperStatus = helper.status
@@ -64,7 +69,7 @@ final class ThermalMonitor {
         timer = nil
         workspaceObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         workspaceObservers.removeAll()
-        if weEngaged {
+        if helperHoldsFans {
             helper.restoreAutomaticSynchronously()
             weEngaged = false
         }
@@ -99,13 +104,28 @@ final class ThermalMonitor {
         refresh()
     }
 
+    func uninstallHelper() {
+        setMode(.automatic)
+        helper.restoreAutomaticSynchronously()
+        weEngaged = false
+        do {
+            try helper.uninstall()
+            lastError = nil
+        } catch FanHelperError.cancelled {
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+        helperStatus = helper.status
+    }
+
     private func rememberCustom(_ custom: FanControlMode) {
         lastCustomMode = custom
         Self.saveMode(custom, key: Self.lastCustomModeKey)
     }
 
     private func releaseFans() {
-        guard weEngaged else { return }
+        guard helperHoldsFans else { return }
         weEngaged = false
         helper.restoreAutomatic { [weak self] error in
             Task { @MainActor in self?.lastError = error }
@@ -123,12 +143,16 @@ final class ThermalMonitor {
         )
         lastRefreshAt = now
         snapshot = next
-        conflictDetected = Self.isOtherFanToolRunning() || (!weEngaged && (snapshot.anyFanManual || snapshot.diagnosticUnlocked))
+        conflictDetected = isForeignFanControl(
+            snapshot: snapshot,
+            helperHoldsFans: FileManager.default.fileExists(atPath: FanHelperConstants.engagedMarkerPath),
+            otherToolRunning: Self.isOtherFanToolRunning()
+        )
         applyControl()
     }
 
     private func applyControl() {
-        guard !mode.isAutomatic, snapshot.hasFans, !conflictDetected || weEngaged, helperStatus == .ready else { return }
+        guard !mode.isAutomatic, snapshot.hasFans, !conflictDetected, helperStatus == .ready else { return }
         let targets = snapshot.fans.map { fan in
             fanTargetRPM(mode: mode, fan: fan, temperatures: snapshot.temperatures) ?? fan.minRPM
         }

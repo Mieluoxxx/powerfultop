@@ -173,12 +173,11 @@ struct PopoverView: View {
     // MARK: - Battery Stats
 
     private var hasBatteryStats: Bool {
-        data.batteryHealthPercent != nil || batteryTemperatureC != nil || data.cycleCount != nil || thermal.snapshot.hasFans
+        data.batteryHealthPercent != nil || packTemperatureC != nil || data.cycleCount != nil || thermal.snapshot.hasFans
     }
 
-    /// Some machines drop `Temperature` from AppleSmartBattery; the SMC pack thermistors still report it.
-    private var batteryTemperatureC: Double? {
-        data.batteryTemperatureC ?? thermal.snapshot.temperatures[.battery]?.averageC
+    private var packTemperatureC: Double? {
+        batteryTemperatureC(data: data, thermal: thermal.snapshot)
     }
 
     private var batteryStatsSection: some View {
@@ -190,7 +189,7 @@ struct PopoverView: View {
                     tint: health >= 80 ? .primary : (health >= 60 ? .orange : .red)
                 )
             }
-            if let temp = batteryTemperatureC {
+            if let temp = packTemperatureC {
                 StatCell(
                     value: String(format: "%.1f°", temp),
                     label: String(localized: "Battery Temp"),

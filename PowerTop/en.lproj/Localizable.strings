@@ -83,7 +83,6 @@
 
 // Detail - Cell Data
 "Cell %d" = "Cell %d";
-"—" = "—";
 "Battery topology: %dS%dP (%d cells)" = "Battery topology: %dS%dP (%d cells)";
 "Battery topology: %d series groups" = "Battery topology: %d series groups";
 "Battery topology: %d cells" = "Battery topology: %d cells";
@@ -166,9 +165,43 @@
 "Charger & Charging" = "Charger & Charging";
 "Cooling" = "Cooling";
 "Copy serial number. Device info is shown locally only and is not uploaded." = "Copy serial number. Device info is shown locally only and is not uploaded.";
-"Manufactured %@" = "Manufactured %@";
 
 // Charge limit
 "Off" = "Off";
 "Adjust the charge limit (80–100%) in System Settings" = "Adjust the charge limit (80–100%) in System Settings";
 "Charge Limit: %@…" = "Charge Limit: %@…";
+
+// Dashboard pages
+"About" = "About";
+"Adjust in System Settings…" = "Adjust in System Settings…";
+"Another fan tool is in control" = "Another fan tool is in control";
+"Battery Level" = "Battery Level";
+"Battery Management Chip" = "Battery Management Chip";
+"Battery Power" = "Battery Power";
+"Battery Serial Number" = "Battery Serial Number";
+"Collecting data…" = "Collecting data…";
+"Current" = "Current";
+"Fan Helper" = "Fan Helper";
+"Fan Speed" = "Fan Speed";
+"Fans are resting" = "Fans are resting";
+"General" = "General";
+"Hottest core %@" = "Hottest core %@";
+"Installed" = "Installed";
+"Manufacture Date" = "Manufacture Date";
+"Menu Bar" = "Menu Bar";
+"Needs authorization" = "Needs authorization";
+"Not connected to power" = "Not connected to power";
+"Not installed" = "Not installed";
+"Overview" = "Overview";
+"Power" = "Power";
+"Power Adapter" = "Power Adapter";
+"Readings are smoothed over about 10 seconds; individual cores spike briefly under load." = "Readings are smoothed over about 10 seconds; individual cores spike briefly under load.";
+"Safety handback armed" = "Safety handback armed";
+"Settings" = "Settings";
+"System Power" = "System Power";
+"Temperatures" = "Temperatures";
+"The helper runs as root only to write fan speeds. It accepts requests from this exact PowerTop build and hands fans back to macOS whenever PowerTop stops checking in." = "The helper runs as root only to write fan speeds. It accepts requests from this exact PowerTop build and hands fans back to macOS whenever PowerTop stops checking in.";
+"Uninstall" = "Uninstall";
+"Voltage" = "Voltage";
+"macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerTop is closed or the Mac sleeps." = "macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerTop is closed or the Mac sleeps.";
+"AlDente is currently managing the charge limit. Change it in AlDente, or quit AlDente to use the macOS setting." = "AlDente is currently managing the charge limit. Change it in AlDente, or quit AlDente to use the macOS setting.";
