@@ -165,14 +165,23 @@ struct StripItem: View {
     let tint: Color
     let label: String
     let value: String
+    /// Hides the label; the icon identifies the item and the label moves to the tooltip.
+    var compact = false
+    var tooltip: String? = nil
+
+    private var helpText: String {
+        [compact ? label : nil, tooltip].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
+    }
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .foregroundStyle(tint)
-            Text(label)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            if !compact {
+                Text(label)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
             Text(value)
                 .fontWeight(.semibold)
                 .monospacedDigit()
@@ -181,6 +190,7 @@ struct StripItem: View {
         .font(.system(size: 12))
         .padding(.horizontal, 10)
         .fixedSize()
+        .help(helpText)
     }
 }
 

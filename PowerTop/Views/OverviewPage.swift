@@ -12,7 +12,7 @@ struct OverviewPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            PowerStrip(data: data)
+            PowerStrip(data: data, displayPowerW: thermal.snapshot.displayPowerW)
 
             HStack(alignment: .top, spacing: 16) {
                 batterySpecCard
@@ -172,8 +172,9 @@ struct OverviewPage: View {
 /// Top summary shared by the overview: level, flow and time remaining in one line.
 struct PowerStrip: View {
     let data: PowerData
+    var displayPowerW: Double? = nil
 
-    var body: some View {
+    private func row(compact: Bool) -> some View {
         HStack(spacing: 0) {
             StripItem(
                 icon: data.batteryLevelSymbol,
@@ -183,23 +184,33 @@ struct PowerStrip: View {
             )
             StripDivider()
             if data.hasSettledAC {
-                StripItem(icon: "powerplug.fill", tint: .green, label: String(localized: "Charger"), value: String(format: "%.1f W", data.effectiveACOutputW))
+                StripItem(icon: "powerplug.fill", tint: .green, label: String(localized: "Charger"), value: String(format: "%.1f W", data.effectiveACOutputW), compact: compact)
                 StripDivider()
             }
-            StripItem(icon: "laptopcomputer", tint: .primary, label: String(localized: "System"), value: String(format: "%.1f W", data.systemPowerW))
+            StripItem(icon: "laptopcomputer", tint: .primary, label: String(localized: "System"), value: String(format: "%.1f W", data.systemPowerW), compact: compact)
             StripDivider()
-            StripItem(icon: batteryIcon, tint: batteryTint, label: String(localized: "Battery"), value: data.signedBatteryPowerText)
+            if let displayPowerW {
+                StripItem(icon: "sun.max.fill", tint: .yellow, label: String(localized: "Screen"), value: String(format: "%.1f W", displayPowerW), compact: compact, tooltip: String(localized: "Built-in display, included in system power"))
+                StripDivider()
+            }
+            StripItem(icon: batteryIcon, tint: batteryTint, label: String(localized: "Battery"), value: data.signedBatteryPowerText, compact: compact)
             if let time = data.estimatedTimeRemainingText {
                 StripDivider()
-                StripItem(icon: "clock", tint: .secondary, label: data.estimatedTimeRemainingLabel, value: time)
-                    .help(data.estimatedTimeFootnote ?? "")
+                StripItem(icon: "clock", tint: .secondary, label: data.estimatedTimeRemainingLabel, value: time, compact: compact, tooltip: data.estimatedTimeFootnote ?? "")
             }
             if data.dataSource == .legacy {
                 StripDivider()
-                StripItem(icon: "exclamationmark.triangle.fill", tint: .yellow, label: String(localized: "Estimation Mode"), value: "")
-                    .help(String(localized: "Estimation Mode — telemetry unavailable"))
+                StripItem(icon: "exclamationmark.triangle.fill", tint: .yellow, label: String(localized: "Estimation Mode"), value: "", compact: compact, tooltip: String(localized: "Estimation Mode — telemetry unavailable"))
             }
             Spacer(minLength: 0)
+        }
+    }
+
+    var body: some View {
+        // Items are fixed-size, so a full-width row would clip; fall back to icons with values.
+        ViewThatFits(in: .horizontal) {
+            row(compact: false)
+            row(compact: true)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

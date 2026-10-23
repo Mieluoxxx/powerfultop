@@ -250,7 +250,9 @@ struct PopoverView: View {
     private var displaySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(displays.displays) { display in
-                BrightnessRow(display: display) { displays.setLevel($0, for: display.id) }
+                BrightnessRow(display: display, powerW: display.isBuiltIn ? thermal.snapshot.displayPowerW : nil) {
+                    displays.setLevel($0, for: display.id)
+                }
             }
         }
     }
@@ -531,6 +533,8 @@ private struct UsageMeter: View {
 
 private struct BrightnessRow: View {
     let display: DisplayBrightness
+    /// Only the built-in panel's draw is measurable; external monitors have their own supply.
+    let powerW: Double?
     let onChange: (Double) -> Void
 
     private var methodLabel: String {
@@ -565,6 +569,12 @@ private struct BrightnessRow: View {
                     .background(.quaternary, in: Capsule())
                     .help(methodHelp)
                 Spacer(minLength: 4)
+                if let powerW {
+                    Text(String(format: "%.1f W", powerW))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .help(String(localized: "Built-in display, included in system power"))
+                }
                 Text(String(format: "%.0f%%", display.level * 100))
                     .fontWeight(.semibold)
                     .monospacedDigit()

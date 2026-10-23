@@ -203,7 +203,8 @@ final class ThermalMonitor {
         return ThermalSnapshot(
             fans: fans,
             temperatures: temperatures,
-            diagnosticUnlocked: smc.read("Ftst")?.doubleValue == 1
+            diagnosticUnlocked: smc.read("Ftst")?.doubleValue == 1,
+            displayPowerW: smc.read("PDBR")?.doubleValue.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
         )
     }
 

@@ -91,6 +91,8 @@ struct ThermalSnapshot: Equatable {
     var temperatures: [SensorGroup: TemperatureSummary] = [:]
     /// `Ftst` = 1 means something has put the SMC into diagnostic (manual fan) mode.
     var diagnosticUnlocked = false
+    /// Built-in display power from SMC `PDBR`; tracks brightness from 0.2 W to about 7 W on an M4 Max.
+    var displayPowerW: Double?
 
     static let empty = ThermalSnapshot()
 

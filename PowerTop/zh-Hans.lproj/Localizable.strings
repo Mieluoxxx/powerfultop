@@ -262,3 +262,5 @@
 "Native" = "原生";
 "Software" = "软件";
 "This monitor doesn't answer DDC/CI, so the picture is darkened instead of the backlight. Turn on DDC/CI in the monitor's menu or connect over USB-C or DisplayPort." = "这台显示器没有响应 DDC/CI，只能调暗画面，背光亮度不变。请在显示器菜单中开启 DDC/CI，或改用 USB-C / DisplayPort 连接。";
+"Screen" = "屏幕";
+"Built-in display, included in system power" = "内建屏幕功耗，已包含在系统功耗中";
