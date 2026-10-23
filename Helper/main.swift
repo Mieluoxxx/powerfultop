@@ -1,5 +1,8 @@
 import Foundation
 
+// The Ftst unlock and FnMd/FnTg handoff follow the research in macos-smc-fan
+// (https://github.com/agoodkind/macos-smc-fan, MIT License, © 2026 Alexander Goodkind).
+
 /// Root-only SMC writer. Accepts fan keys exclusively and always fails towards macOS control.
 final class FanController {
     private let smc: SMCConnection

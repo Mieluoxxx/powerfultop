@@ -79,6 +79,9 @@ done
 iconutil -c icns "$ICONSET_DIR" -o "$APP_BUNDLE/Contents/Resources/AppIcon.icns" 2>/dev/null || true
 rm -rf "$ICONSET_DIR"
 
+# MIT notices must travel with binary copies, not only the source tree.
+cp "$PROJECT_DIR/LICENSE" "$PROJECT_DIR/THIRD_PARTY_NOTICES.md" "$APP_BUNDLE/Contents/Resources/"
+
 # Copy localization resources
 for lproj in en.lproj zh-Hans.lproj; do
     if [ -d "$PROJECT_DIR/PowerTop/$lproj" ]; then

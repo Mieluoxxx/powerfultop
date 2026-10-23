@@ -136,6 +136,17 @@ open build/PowerTop.app
 
 [Older releases →](https://github.com/kDolphin/PowerTop/releases)
 
+## Acknowledgements
+
+PowerTop builds on the work of these projects:
+
+- [MonitorControl](https://github.com/MonitorControl/MonitorControl) — display brightness over DisplayServices and DDC/CI (MIT)
+- [macos-smc-fan](https://github.com/agoodkind/macos-smc-fan) — the `Ftst` unlock research behind manual fan control on Apple silicon (MIT)
+- [Stats](https://github.com/exelban/stats) — inspiration for the CPU and memory monitoring page (MIT)
+- [AlDente](https://apphousekitchen.com) — inspiration for the customizable menu bar and the power flow view
+- [Macs Fan Control](https://crystalidea.com/macs-fan-control) — inspiration for the fan control modes
+- [m1ddc](https://github.com/waydabber/m1ddc) — reference for DDC/CI checksums
+
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License. See [LICENSE](LICENSE) for details. Third-party license notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

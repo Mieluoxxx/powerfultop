@@ -136,6 +136,17 @@ open build/PowerTop.app
 
 [更早版本 →](https://github.com/kDolphin/PowerTop/releases)
 
+## 致谢
+
+PowerTop 借鉴了以下项目：
+
+- [MonitorControl](https://github.com/MonitorControl/MonitorControl) — 通过 DisplayServices 和 DDC/CI 调节显示器亮度（MIT）
+- [macos-smc-fan](https://github.com/agoodkind/macos-smc-fan) — Apple 芯片手动控制风扇所依据的 `Ftst` 解锁研究（MIT）
+- [Stats](https://github.com/exelban/stats) — CPU 和内存监控页面的设计参考（MIT）
+- [AlDente](https://apphousekitchen.com) — 自定义菜单栏和能量流向视图的设计参考
+- [Macs Fan Control](https://crystalidea.com/macs-fan-control) — 风扇控制模式的设计参考
+- [m1ddc](https://github.com/waydabber/m1ddc) — DDC/CI 校验和的对照参考
+
 ## 许可证
 
-MIT 许可证。详见 [LICENSE](LICENSE)。
+MIT 许可证。详见 [LICENSE](LICENSE)。第三方许可证声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
