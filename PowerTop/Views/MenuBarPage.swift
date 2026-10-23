@@ -7,7 +7,11 @@ struct MenuBarPage: View {
     let thermal: ThermalMonitor
     let system: SystemMonitor
 
+    @State private var drag: ChipDrag?
+    @State private var chipFrames: [MenuBarItem: CGRect] = [:]
+
     private var configuration: MenuBarConfiguration { monitor.menuBarConfiguration }
+    private var displayedItems: [MenuBarItem] { drag?.order ?? configuration.items }
     private var context: MenuBarContext { makeMenuBarContext(monitor: monitor, thermal: thermal, system: system) }
 
     var body: some View {
@@ -35,30 +39,39 @@ struct MenuBarPage: View {
 
     // MARK: - Selected
 
+    private static let selectedSpace = "selectedChips"
+    private static let reorderAnimation = Animation.spring(response: 0.3, dampingFraction: 0.82)
+
     private var selectedSection: some View {
         DashCard(title: String(localized: "Selected Items"), icon: "menubar.rectangle", tint: .blue) {
             FlowLayout(spacing: 8) {
                 if configuration.iconStyle != .hidden, let icon = MenuBarLabel(configuration: configuration, context: context).icon {
                     Chip(symbol: nil, image: MenuBarIconRenderer.image(for: icon), text: nil, filled: true)
                 }
-                ForEach(configuration.items) { item in
-                    Chip(
-                        symbol: item.symbol,
-                        text: MenuBarLabel.segment(for: item, context: context)?.text ?? item.title,
-                        filled: true,
-                        onRemove: { update { $0.items.removeAll { $0 == item } } }
-                    )
-                    .help(item.title)
-                    .draggable(item.rawValue)
-                    .dropDestination(for: String.self) { dropped, _ in
-                        guard let raw = dropped.first, let moved = MenuBarItem(rawValue: raw), moved != item else { return false }
-                        update { configuration in
-                            configuration.items.removeAll { $0 == moved }
-                            let target = configuration.items.firstIndex(of: item) ?? configuration.items.endIndex
-                            configuration.items.insert(moved, at: target)
+                ForEach(displayedItems) { item in
+                    selectedChip(item)
+                        .opacity(drag?.item == item ? 0 : 1)
+                        .background {
+                            if drag?.item == item {
+                                Capsule()
+                                    .strokeBorder(Color.accentColor.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                                    .background(Color.accentColor.opacity(0.08), in: Capsule())
+                            }
                         }
-                        return true
-                    }
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.selectedSpace)) } action: { chipFrames[item] = $0 }
+                        .help(item.title)
+                        .gesture(reorderGesture(for: item))
+                }
+            }
+            .coordinateSpace(.named(Self.selectedSpace))
+            .overlay(alignment: .topLeading) {
+                // The lifted chip floats above the flow so its slot can animate independently of the pointer.
+                if let drag {
+                    selectedChip(drag.item)
+                        .scaleEffect(drag.settling ? 1 : 1.06)
+                        .shadow(color: .black.opacity(drag.settling ? 0 : 0.25), radius: 8, y: 3)
+                        .offset(x: drag.origin.x + drag.translation.width, y: drag.origin.y + drag.translation.height)
+                        .allowsHitTesting(false)
                 }
             }
             if configuration.items.isEmpty && configuration.iconStyle == .hidden {
@@ -67,6 +80,61 @@ struct MenuBarPage: View {
                 CardNote(String(localized: "Drag items to reorder. Readings that don't apply right now, such as adapter values on battery, are hidden."))
             }
         }
+    }
+
+    private func selectedChip(_ item: MenuBarItem) -> Chip {
+        Chip(
+            symbol: item.symbol,
+            text: MenuBarLabel.segment(for: item, context: context)?.text ?? item.title,
+            filled: true,
+            onRemove: { update { $0.items.removeAll { $0 == item } } }
+        )
+    }
+
+    private func reorderGesture(for item: MenuBarItem) -> some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .named(Self.selectedSpace))
+            .onChanged { value in
+                if drag == nil {
+                    guard let frame = chipFrames[item] else { return }
+                    drag = ChipDrag(item: item, origin: frame.origin, size: frame.size, order: configuration.items)
+                }
+                guard var current = drag, current.item == item, !current.settling else { return }
+                current.translation = value.translation
+                drag = current
+                if let order = reordered(current) {
+                    withAnimation(Self.reorderAnimation) { drag?.order = order }
+                }
+            }
+            .onEnded { _ in
+                guard let current = drag, current.item == item, !current.settling else { return }
+                update { $0.items = current.order }
+                let landing = chipFrames[item]?.origin ?? current.origin
+                withAnimation(Self.reorderAnimation) {
+                    drag?.translation = CGSize(width: landing.x - current.origin.x, height: landing.y - current.origin.y)
+                    drag?.settling = true
+                } completion: {
+                    if drag?.item == item { drag = nil }
+                }
+            }
+    }
+
+    /// Moves the dragged item once its center passes the middle of a neighbour; requiring the midpoint
+    /// keeps chips of different widths from swapping back and forth under a stationary pointer.
+    private func reordered(_ drag: ChipDrag) -> [MenuBarItem]? {
+        let center = CGPoint(
+            x: drag.origin.x + drag.translation.width + drag.size.width / 2,
+            y: drag.origin.y + drag.translation.height + drag.size.height / 2
+        )
+        guard let from = drag.order.firstIndex(of: drag.item) else { return nil }
+        for (index, other) in drag.order.enumerated() where other != drag.item {
+            guard let frame = chipFrames[other], frame.insetBy(dx: -4, dy: -4).contains(center) else { continue }
+            let sameRow = abs(frame.midY - (chipFrames[drag.item]?.midY ?? frame.midY)) < 1
+            if sameRow && (index > from ? center.x < frame.midX : center.x > frame.midX) { return nil }
+            var order = drag.order
+            order.move(fromOffsets: IndexSet(integer: from), toOffset: index > from ? index + 1 : index)
+            return order
+        }
+        return nil
     }
 
     // MARK: - Catalog
@@ -162,6 +230,15 @@ struct MenuBarPage: View {
                 .frame(width: 48, alignment: .trailing)
         }
     }
+}
+
+private struct ChipDrag {
+    let item: MenuBarItem
+    let origin: CGPoint
+    let size: CGSize
+    var order: [MenuBarItem]
+    var translation: CGSize = .zero
+    var settling = false
 }
 
 private struct CatalogGroup<Content: View>: View {
