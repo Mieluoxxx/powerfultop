@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let monitor = PowerMonitor()
     let thermal = ThermalMonitor()
     let system = SystemMonitor()
+    let displays = DisplayController()
     private(set) lazy var history = HistoryRecorder(monitor: monitor, thermal: thermal, system: system)
     private var didStart = false
     private var statusItemController: StatusItemController?
@@ -15,8 +16,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.start()
         thermal.start()
         system.start()
+        displays.start()
         history.start()
-        statusItemController = StatusItemController(monitor: monitor, thermal: thermal, system: system, history: history)
+        statusItemController = StatusItemController(monitor: monitor, thermal: thermal, system: system, displays: displays, history: history)
         if CommandLine.arguments.contains("--smoke-launch") {
             scheduleSmokeLaunchCheck()
         }
@@ -61,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             history.stop()
             system.stop()
+            displays.shutdown()
             thermal.shutdown()
             statusItemController?.invalidate()
             statusItemController = nil

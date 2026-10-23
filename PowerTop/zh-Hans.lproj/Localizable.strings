@@ -255,3 +255,10 @@
 "macOS Native" = "macOS 原生";
 "%@ ramp %.0f–%.0f°C" = "%1$@ %2$.0f–%3$.0f°C 提速";
 "Holding %.0f RPM" = "保持 %.0f RPM";
+"Backlight controlled by macOS" = "由 macOS 调节背光";
+"Backlight controlled over DDC/CI" = "通过 DDC/CI 调节背光";
+"DDC" = "DDC";
+"Display" = "显示器";
+"Native" = "原生";
+"Software" = "软件";
+"This monitor doesn't answer DDC/CI, so the picture is darkened instead of the backlight. Turn on DDC/CI in the monitor's menu or connect over USB-C or DisplayPort." = "这台显示器没有响应 DDC/CI，只能调暗画面，背光亮度不变。请在显示器菜单中开启 DDC/CI，或改用 USB-C / DisplayPort 连接。";

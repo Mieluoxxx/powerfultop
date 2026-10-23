@@ -6,6 +6,7 @@ struct PopoverView: View {
     let monitor: PowerMonitor
     let thermal: ThermalMonitor
     let system: SystemMonitor
+    let displays: DisplayController
     let openDetails: () -> Void
 
     private var data: PowerData { monitor.currentData }
@@ -38,6 +39,12 @@ struct PopoverView: View {
             systemSection
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
+            if !displays.displays.isEmpty {
+                Divider().padding(.horizontal, 12)
+                displaySection
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+            }
             if thermal.snapshot.hasFans {
                 Divider().padding(.horizontal, 12)
                 fanSection
@@ -235,6 +242,16 @@ struct PopoverView: View {
                 tint: system.memory?.pressure == .normal || system.memory == nil ? .green : .orange,
                 detail: system.memory.map { "\(formatBytes(Double($0.usedBytes))) / \(formatBytes(Double($0.totalBytes)))" }
             )
+        }
+    }
+
+    // MARK: - Displays
+
+    private var displaySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(displays.displays) { display in
+                BrightnessRow(display: display) { displays.setLevel($0, for: display.id) }
+            }
         }
     }
 
@@ -509,5 +526,60 @@ private struct UsageMeter: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct BrightnessRow: View {
+    let display: DisplayBrightness
+    let onChange: (Double) -> Void
+
+    private var methodLabel: String {
+        switch display.method {
+        case .native: String(localized: "Native")
+        case .ddc: String(localized: "DDC")
+        case .software: String(localized: "Software")
+        }
+    }
+
+    private var methodHelp: String {
+        switch display.method {
+        case .native: String(localized: "Backlight controlled by macOS")
+        case .ddc: String(localized: "Backlight controlled over DDC/CI")
+        case .software: String(localized: "This monitor doesn't answer DDC/CI, so the picture is darkened instead of the backlight. Turn on DDC/CI in the monitor's menu or connect over USB-C or DisplayPort.")
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: display.isBuiltIn ? "laptopcomputer" : "display")
+                    .foregroundStyle(.yellow)
+                Text(display.name)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(methodLabel)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(display.method == .software ? .orange : .secondary)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(.quaternary, in: Capsule())
+                    .help(methodHelp)
+                Spacer(minLength: 4)
+                Text(String(format: "%.0f%%", display.level * 100))
+                    .fontWeight(.semibold)
+                    .monospacedDigit()
+            }
+            .font(.system(size: 12))
+            HStack(spacing: 6) {
+                Image(systemName: "sun.min")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                Slider(value: Binding(get: { display.level }, set: onChange), in: 0...1)
+                    .controlSize(.small)
+                Image(systemName: "sun.max")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }

@@ -7,6 +7,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     private let monitor: PowerMonitor
     private let thermal: ThermalMonitor
     private let system: SystemMonitor
+    private let displays: DisplayController
     private let history: HistoryRecorder
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
@@ -19,10 +20,11 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     private var localClickMonitor: Any?
     private var globalClickMonitor: Any?
 
-    init(monitor: PowerMonitor, thermal: ThermalMonitor, system: SystemMonitor, history: HistoryRecorder) {
+    init(monitor: PowerMonitor, thermal: ThermalMonitor, system: SystemMonitor, displays: DisplayController, history: HistoryRecorder) {
         self.monitor = monitor
         self.thermal = thermal
         self.system = system
+        self.displays = displays
         self.history = history
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
@@ -62,6 +64,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
             monitor: monitor,
             thermal: thermal,
             system: system,
+            displays: displays,
             openDetails: { [weak self] in self?.openDetails() },
             onMeasuredSize: { [weak self] size in
                 self?.applyPopoverSize(size)
@@ -165,6 +168,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
 
     private func showPopover() {
         guard let button = statusItem.button else { return }
+        displays.active = true
         if let hosting = popover.contentViewController {
             let fitted = hosting.view.fittingSize
             if fitted.width > 1, fitted.height > 1 {
@@ -253,6 +257,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     }
 
     func popoverDidClose(_ notification: Notification) {
+        displays.active = false
         stopDismissMonitors()
         statusItem.button?.highlight(false)
     }
@@ -269,11 +274,12 @@ private struct StatusPopoverContent: View {
     let monitor: PowerMonitor
     let thermal: ThermalMonitor
     let system: SystemMonitor
+    let displays: DisplayController
     let openDetails: () -> Void
     let onMeasuredSize: (CGSize) -> Void
 
     var body: some View {
-        PopoverView(monitor: monitor, thermal: thermal, system: system, openDetails: openDetails)
+        PopoverView(monitor: monitor, thermal: thermal, system: system, displays: displays, openDetails: openDetails)
             .background {
                 GeometryReader { proxy in
                     Color.clear.preference(key: PopoverMeasuredSizeKey.self, value: proxy.size)

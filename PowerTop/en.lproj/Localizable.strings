@@ -255,3 +255,10 @@
 "macOS Native" = "macOS Native";
 "%@ ramp %.0f–%.0f°C" = "%@ ramp %.0f–%.0f°C";
 "Holding %.0f RPM" = "Holding %.0f RPM";
+"Backlight controlled by macOS" = "Backlight controlled by macOS";
+"Backlight controlled over DDC/CI" = "Backlight controlled over DDC/CI";
+"DDC" = "DDC";
+"Display" = "Display";
+"Native" = "Native";
+"Software" = "Software";
+"This monitor doesn't answer DDC/CI, so the picture is darkened instead of the backlight. Turn on DDC/CI in the monitor's menu or connect over USB-C or DisplayPort." = "This monitor doesn't answer DDC/CI, so the picture is darkened instead of the backlight. Turn on DDC/CI in the monitor's menu or connect over USB-C or DisplayPort.";

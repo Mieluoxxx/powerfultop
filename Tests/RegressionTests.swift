@@ -27,6 +27,7 @@ struct RegressionTests {
         testForeignFanControlDetection()
         testCPULoad()
         testMemoryAndProcessParsing()
+        testDDCFraming()
 
         guard failures == 0 else {
             fputs("\(failures) regression test(s) failed\n", stderr)
@@ -340,6 +341,32 @@ struct RegressionTests {
         let afterReset = cpuLoad(previous: after, current: reset, kinds: [.efficiency, .performance])
         expectEqual(afterReset?.perCore.first, 0, "a core whose counters went backwards contributes nothing")
         expectNil(cpuLoad(previous: [], current: after, kinds: []), "no load without a previous sample")
+    }
+
+    private static func testDDCFraming() {
+        // Reference bytes from the DDC/CI spec examples: 6E 51 82 01 10 AC and 6E 51 84 03 10 00 32 9A.
+        expectEqual(DDC.getVCPPacket(0x10), [0x82, 0x01, 0x10, 0xAC], "get brightness packet")
+        expectEqual(DDC.setVCPPacket(0x10, value: 50), [0x84, 0x03, 0x10, 0x00, 0x32, 0x9A], "set brightness packet")
+
+        let reply: [UInt8] = [0x6E, 0x88, 0x02, 0x00, 0x10, 0x00, 0x00, 0x64, 0x00, 0x32, 0xF2]
+        let parsed = DDC.parseVCPReply(reply, code: 0x10)
+        expectEqual(parsed?.current, 50, "reply current")
+        expectEqual(parsed?.max, 100, "reply max")
+        // DELL U2520DR with DDC/CI off: valid checksum, zero length.
+        expectNil(DDC.parseVCPReply([0x6E, 0x80, 0xBE, 0, 0, 0, 0, 0, 0, 0, 0], code: 0x10), "null message is not a reading")
+        var corrupt = reply
+        corrupt[9] = 0x33
+        expectNil(DDC.parseVCPReply(corrupt, code: 0x10), "bad checksum")
+        var unsupported = reply
+        unsupported[3] = 0x01
+        unsupported[10] ^= 0x01
+        expectNil(DDC.parseVCPReply(unsupported, code: 0x10), "unsupported VCP code")
+        expectNil(DDC.parseVCPReply(reply, code: 0x12), "reply for another VCP code")
+
+        expectEqual(edidUUIDPrefix(vendor: 4268, model: 41299), "10AC53A1", "DELL U2520DR EDID UUID prefix")
+        expectApproximately(SoftwareDimming.gammaCeiling(level: 0), SoftwareDimming.floor, "software floor")
+        expectApproximately(SoftwareDimming.gammaCeiling(level: 1), 1, "software full")
+        expectApproximately(SoftwareDimming.gammaCeiling(level: 2), 1, "software clamps")
     }
 
     private static func testMemoryAndProcessParsing() {
