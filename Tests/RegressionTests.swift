@@ -28,6 +28,7 @@ struct RegressionTests {
         testCPULoad()
         testMemoryAndProcessParsing()
         testDDCFraming()
+        testLegacyDefaultsMigration()
 
         guard failures == 0 else {
             fputs("\(failures) regression test(s) failed\n", stderr)
@@ -341,6 +342,13 @@ struct RegressionTests {
         let afterReset = cpuLoad(previous: after, current: reset, kinds: [.efficiency, .performance])
         expectEqual(afterReset?.perCore.first, 0, "a core whose counters went backwards contributes nothing")
         expectNil(cpuLoad(previous: [], current: after, kinds: []), "no load without a previous sample")
+    }
+
+    private static func testLegacyDefaultsMigration() {
+        let legacy: [String: Any] = ["fanControlMode": Data([1]), "dashboardPage": "cooling"]
+        let migrated = LegacyDefaults.valuesToMigrate(legacy: legacy, current: ["dashboardPage": "overview"])
+        expectEqual(Set(migrated.keys), ["fanControlMode"], "keys set since the rename are not overwritten")
+        expectEqual(LegacyDefaults.valuesToMigrate(legacy: [:], current: [:]).count, 0, "nothing to migrate")
     }
 
     private static func testDDCFraming() {

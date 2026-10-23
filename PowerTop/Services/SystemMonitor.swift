@@ -23,7 +23,7 @@ final class SystemMonitor {
     private var timer: Timer?
     private var lastCPUListAt = Date.distantPast
     private var lastMemoryListAt = Date.distantPast
-    private let processQueue = DispatchQueue(label: "PowerTop.processes", qos: .utility)
+    private let processQueue = DispatchQueue(label: "PowerfulTop.processes", qos: .utility)
 
     init() {
         coreKinds = Self.readCoreKinds()

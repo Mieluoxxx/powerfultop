@@ -56,7 +56,7 @@ echo "Compiling fan helper..."
     -framework IOKit \
     -framework Foundation \
     -O \
-    -o "$APP_BUNDLE/Contents/MacOS/PowerTopFanHelper" \
+    -o "$APP_BUNDLE/Contents/MacOS/PowerfulTopFanHelper" \
     "$PROJECT_DIR"/Helper/*.swift \
     "$PROJECT_DIR/PowerTop/Utilities/SMC.swift" \
     "$PROJECT_DIR/PowerTop/Models/Thermal.swift"

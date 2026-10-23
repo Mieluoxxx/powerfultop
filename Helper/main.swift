@@ -10,7 +10,7 @@ final class FanController {
     private let modeKeys: [String]
     private let failsafeKeys: [String]
     private let hasDiagnosticKey: Bool
-    private var engaged = false
+    private(set) var engaged = false
     private var lastRequest = Date.distantPast
     private var cooldownUntil = Date.distantPast
     /// Consecutive 1 s ticks at or above the failsafe; a single core spike must not trip it.
@@ -158,6 +158,16 @@ let listener = NSXPCListener(machServiceName: FanHelperConstants.label)
 listener.setConnectionCodeSigningRequirement(requirement)
 listener.delegate = delegate
 listener.resume()
+
+// launchctl bootout (reinstall, uninstall) sends SIGTERM; without this the fans would stay manual.
+signal(SIGTERM, SIG_IGN)
+let termination = DispatchSource.makeSignalSource(signal: SIGTERM, queue: controlQueue)
+termination.setEventHandler {
+    // Only undo our own hold: another fan tool may own the fans while we sit idle.
+    if controller.engaged { _ = controller.restoreAutomatic() }
+    exit(0)
+}
+termination.resume()
 
 let watchdog = DispatchSource.makeTimerSource(queue: controlQueue)
 watchdog.schedule(deadline: .now() + 1, repeating: 1)

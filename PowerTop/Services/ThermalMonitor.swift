@@ -7,7 +7,8 @@ import Observation
 final class ThermalMonitor {
     private static let modeKey = "fanControlMode"
     private static let lastCustomModeKey = "fanControlLastCustomMode"
-    private static let conflictingBundleIDs = ["com.crystalidea.macsfancontrol"]
+    /// Includes pre-rename builds: they drive their own helper and would fight over the fans.
+    private static let conflictingBundleIDs = ["com.crystalidea.macsfancontrol", LegacyDefaults.bundleID]
 
     private(set) var snapshot = ThermalSnapshot.empty
     private(set) var helperStatus: FanHelperStatus = .notInstalled
@@ -95,6 +96,9 @@ final class ThermalMonitor {
         do {
             try helper.install()
             lastError = nil
+            // The helper starts on demand; in automatic mode nothing would launch it to act on a marker
+            // carried over from the legacy helper, leaving the fans manual.
+            if mode.isAutomatic { releaseFans() }
         } catch FanHelperError.cancelled {
             lastError = nil
         } catch {

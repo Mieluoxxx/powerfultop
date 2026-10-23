@@ -13,11 +13,15 @@ final class FanHelperClient {
     private var connection: NSXPCConnection?
 
     private var bundledHelperURL: URL? {
-        Bundle.main.url(forAuxiliaryExecutable: "PowerTopFanHelper")
+        Bundle.main.url(forAuxiliaryExecutable: "PowerfulTopFanHelper")
     }
 
     var status: FanHelperStatus {
         let fileManager = FileManager.default
+        // A helper left by the upstream bundle ID would otherwise stay registered as a root daemon forever.
+        if fileManager.fileExists(atPath: FanHelperConstants.Legacy.launchDaemonPath) {
+            return .needsUpdate
+        }
         guard fileManager.fileExists(atPath: FanHelperConstants.installedPath),
               fileManager.fileExists(atPath: FanHelperConstants.launchDaemonPath) else {
             return .notInstalled
@@ -47,11 +51,12 @@ final class FanHelperClient {
         <key>MachServices</key><dict><key>\(label)</key><true/></dict>
         </dict></plist>
         """
-        let supportDir = (FanHelperConstants.clientRequirementPath as NSString).deletingLastPathComponent
+        let supportDir = FanHelperConstants.supportDirectory
         let script = """
         set -e
         launchctl bootout system/\(label) 2>/dev/null || true
         mkdir -p /Library/PrivilegedHelperTools \(shellQuote(supportDir))
+        \(legacyCleanupScript)
         cp \(shellQuote(helper.path)) \(shellQuote(FanHelperConstants.installedPath))
         chown root:wheel \(shellQuote(FanHelperConstants.installedPath))
         chmod 755 \(shellQuote(FanHelperConstants.installedPath))
@@ -72,9 +77,22 @@ final class FanHelperClient {
         let script = """
         launchctl bootout system/\(label) 2>/dev/null || true
         rm -f \(shellQuote(FanHelperConstants.launchDaemonPath)) \(shellQuote(FanHelperConstants.installedPath)) \(shellQuote(FanHelperConstants.clientRequirementPath))
+        \(legacyCleanupScript)
         """
         try runAsAdministrator(script)
         invalidate()
+    }
+
+    /// The legacy helper has no SIGTERM handler, so if it held the fans when unloaded they stay manual.
+    /// Moving its engaged marker makes the new helper restore automatic control as soon as it starts.
+    private var legacyCleanupScript: String {
+        let legacy = FanHelperConstants.Legacy.self
+        return """
+        if [ -e \(shellQuote(legacy.engagedMarkerPath)) ]; then mkdir -p \(shellQuote(FanHelperConstants.supportDirectory)); touch \(shellQuote(FanHelperConstants.engagedMarkerPath)); fi
+        launchctl bootout system/\(legacy.label) 2>/dev/null || true
+        rm -f \(shellQuote(legacy.launchDaemonPath)) \(shellQuote(legacy.installedPath))
+        rm -rf \(shellQuote(legacy.supportDirectory))
+        """
     }
 
     func setFanTargets(_ rpms: [Double], completion: @escaping (String?) -> Void) {

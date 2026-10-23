@@ -155,12 +155,22 @@ func fanTargetRPM(mode: FanControlMode, fan: FanReading, temperatures: [SensorGr
 }
 
 enum FanHelperConstants {
-    static let label = "com.kdolphin.PowerTop.FanHelper"
+    static let label = "io.github.mieluoxxx.PowerfulTop.FanHelper"
     static let installedPath = "/Library/PrivilegedHelperTools/\(label)"
     static let launchDaemonPath = "/Library/LaunchDaemons/\(label).plist"
-    static let clientRequirementPath = "/Library/Application Support/PowerTop/fan-helper-client.req"
+    static let supportDirectory = "/Library/Application Support/PowerfulTop"
+    static let clientRequirementPath = "\(supportDirectory)/fan-helper-client.req"
     /// Present while our helper holds the fans; survives a helper crash so the next launch can restore.
-    static let engagedMarkerPath = "/Library/Application Support/PowerTop/fan-helper.engaged"
+    static let engagedMarkerPath = "\(supportDirectory)/fan-helper.engaged"
+
+    /// The helper as installed by builds published under the upstream bundle ID.
+    enum Legacy {
+        static let label = "com.kdolphin.PowerTop.FanHelper"
+        static let installedPath = "/Library/PrivilegedHelperTools/\(label)"
+        static let launchDaemonPath = "/Library/LaunchDaemons/\(label).plist"
+        static let supportDirectory = "/Library/Application Support/PowerTop"
+        static let engagedMarkerPath = "\(supportDirectory)/fan-helper.engaged"
+    }
     /// Ftst handoff took 10–12 s on an M4 Max under macOS 27, longer than the 3–6 s reported elsewhere.
     static let engageTimeout: TimeInterval = 20
     static let protocolVersion = 1

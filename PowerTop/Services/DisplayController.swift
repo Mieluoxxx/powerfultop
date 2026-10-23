@@ -36,7 +36,7 @@ final class DisplayController {
     @ObservationIgnored private var baselineGamma: [CGDirectDisplayID: GammaTable] = [:]
     @ObservationIgnored private var pollTimer: Timer?
     @ObservationIgnored private var screenObserver: NSObjectProtocol?
-    private let probeQueue = DispatchQueue(label: "PowerTop.ddc.probe", qos: .utility)
+    private let probeQueue = DispatchQueue(label: "PowerfulTop.ddc.probe", qos: .utility)
 
     func start() {
         guard screenObserver == nil else { return }
@@ -251,7 +251,7 @@ private final class DDCLink: @unchecked Sendable {
     let maxValue: UInt16
     private(set) var level: Double
 
-    private let queue = DispatchQueue(label: "PowerTop.ddc.write", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "PowerfulTop.ddc.write", qos: .userInitiated)
     private let lock = NSLock()
     private var pending: UInt16?
     private var writing = false

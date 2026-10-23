@@ -2,6 +2,8 @@ import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    // Declared first: stored properties initialise in order, and the monitors below read settings in init.
+    private let legacyDefaultsMigrated: Void = LegacyDefaults.migrate()
     let monitor = PowerMonitor()
     let thermal = ThermalMonitor()
     let system = SystemMonitor()
