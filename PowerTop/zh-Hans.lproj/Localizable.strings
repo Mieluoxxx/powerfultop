@@ -138,7 +138,6 @@
 "Could not connect to the fan helper." = "无法连接风扇控制组件。";
 "Custom" = "自定义";
 "Fan %d" = "风扇 %d";
-"Fan RPM" = "风扇转速";
 "Fans" = "风扇";
 "Fans return to macOS control when PowerTop quits, the Mac sleeps, or the CPU or GPU reaches %.0f°C." = "PowerTop 退出、Mac 睡眠，或 CPU/GPU 达到 %.0f°C 时，风扇会自动交还系统控制。";
 "Follow Temperature" = "跟随温度";
@@ -165,7 +164,6 @@
 // Charge limit
 "Off" = "关闭";
 "Adjust the charge limit (80–100%) in System Settings" = "在系统设置中调整充电上限（80–100%）";
-"Charge Limit: %@…" = "充电上限：%@…";
 
 // Dashboard pages
 "About" = "关于";
@@ -255,3 +253,5 @@
 "iOS Native" = "iOS 原生";
 "macOS Color" = "macOS 彩色";
 "macOS Native" = "macOS 原生";
+"%@ ramp %.0f–%.0f°C" = "%1$@ %2$.0f–%3$.0f°C 提速";
+"Holding %.0f RPM" = "保持 %.0f RPM";

@@ -1,10 +1,11 @@
 import SwiftUI
 
 struct PopoverView: View {
-    static let preferredWidth: CGFloat = 280
+    static let preferredWidth: CGFloat = 300
 
     let monitor: PowerMonitor
     let thermal: ThermalMonitor
+    let system: SystemMonitor
     let openDetails: () -> Void
 
     private var data: PowerData { monitor.currentData }
@@ -33,11 +34,25 @@ struct PopoverView: View {
             powerFlowSection
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
+            Divider().padding(.horizontal, 12)
+            systemSection
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            if thermal.snapshot.hasFans {
+                Divider().padding(.horizontal, 12)
+                fanSection
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+            }
             if hasBatteryStats {
                 Divider().padding(.horizontal, 12)
                 batteryStatsSection
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+                    .padding(.top, 10)
+                chargeLimitRow
+                    .padding(.horizontal, 14)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
             }
             Divider().padding(.horizontal, 12)
             footerSection
@@ -173,7 +188,7 @@ struct PopoverView: View {
     // MARK: - Battery Stats
 
     private var hasBatteryStats: Bool {
-        data.batteryHealthPercent != nil || packTemperatureC != nil || data.cycleCount != nil || thermal.snapshot.hasFans
+        data.batteryHealthPercent != nil || packTemperatureC != nil || data.cycleCount != nil
     }
 
     private var packTemperatureC: Double? {
@@ -199,14 +214,123 @@ struct PopoverView: View {
             if let cycles = data.cycleCount {
                 StatCell(value: "\(cycles)", label: String(localized: "Cycle Count"), tint: .primary)
             }
-            if thermal.snapshot.hasFans {
-                StatCell(
-                    value: String(format: "%.0f", thermal.snapshot.fans.map(\.actualRPM).max() ?? 0),
-                    label: String(localized: "Fan RPM"),
-                    tint: thermal.isControlling ? .teal : .primary
-                )
-            }
         }
+    }
+
+    // MARK: - System
+
+    private var systemSection: some View {
+        HStack(spacing: 14) {
+            UsageMeter(
+                icon: "cpu",
+                title: String(localized: "CPU"),
+                fraction: system.cpu.usage,
+                tint: .blue,
+                detail: thermal.snapshot.temperatures[.cpu].map { String(format: "%.0f°C", $0.averageC) }
+            )
+            UsageMeter(
+                icon: "memorychip",
+                title: String(localized: "Memory"),
+                fraction: system.memory?.usedFraction ?? 0,
+                tint: system.memory?.pressure == .normal || system.memory == nil ? .green : .orange,
+                detail: system.memory.map { "\(formatBytes(Double($0.usedBytes))) / \(formatBytes(Double($0.totalBytes)))" }
+            )
+        }
+    }
+
+    // MARK: - Fans
+
+    private enum FanPreset: Hashable { case automatic, fullBlast, custom }
+
+    private var fanPreset: FanPreset {
+        switch thermal.mode {
+        case .automatic: return .automatic
+        case .fullBlast: return .fullBlast
+        case .constant, .sensor: return .custom
+        }
+    }
+
+    private var fanSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "fan.fill")
+                    .foregroundStyle(.teal)
+                Text(String(format: "%.0f RPM", thermal.snapshot.fans.map(\.actualRPM).max() ?? 0))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                Text(thermal.isControlling ? String(localized: "Controlled by PowerTop") : String(localized: "Controlled by macOS"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .font(.system(size: 12))
+            Picker("", selection: Binding(get: { fanPreset }, set: { preset in
+                switch preset {
+                case .automatic: thermal.setMode(.automatic)
+                case .fullBlast: thermal.setMode(.fullBlast)
+                case .custom: thermal.setMode(thermal.lastCustomMode)
+                }
+            })) {
+                Text(String(localized: "Auto")).tag(FanPreset.automatic)
+                Text(String(localized: "Full Blast")).tag(FanPreset.fullBlast)
+                Text(String(localized: "Custom")).tag(FanPreset.custom)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+            fanStatus
+        }
+    }
+
+    @ViewBuilder
+    private var fanStatus: some View {
+        if thermal.conflictDetected && !thermal.isControlling {
+            StatusNote(icon: "exclamationmark.triangle.fill", tint: .orange, text: String(localized: "Another fan tool is in control"))
+        } else if !thermal.mode.isAutomatic && thermal.helperStatus != .ready {
+            Button {
+                thermal.installHelper()
+            } label: {
+                Label(
+                    thermal.helperStatus == .needsUpdate ? String(localized: "Update Fan Helper") : String(localized: "Install Fan Helper"),
+                    systemImage: "lock.shield"
+                )
+                .font(.system(size: 11))
+            }
+            .controlSize(.small)
+        } else if let error = thermal.lastError {
+            StatusNote(icon: "xmark.octagon.fill", tint: .red, text: error)
+        } else if case .constant(let rpm) = thermal.mode {
+            StatusNote(icon: "gauge.with.dots.needle.33percent", tint: .secondary, text: String(format: String(localized: "Holding %.0f RPM"), rpm))
+        } else if case .sensor(let group, let lowerC, let upperC) = thermal.mode {
+            StatusNote(icon: "thermometer.medium", tint: .secondary,
+                       text: String(format: String(localized: "%@ ramp %.0f–%.0f°C"), group.title, lowerC, upperC))
+        }
+    }
+
+    // MARK: - Charge limit
+
+    private var chargeLimitRow: some View {
+        Button {
+            NSWorkspace.shared.open(macOSChargeLimitSettingsURL)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "battery.100.bolt")
+                    .foregroundStyle(.green)
+                Text(String(localized: "Charge Limit"))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(data.chargeLimitText)
+                    .fontWeight(.medium)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.tertiary)
+            }
+            .font(.system(size: 12))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(String(localized: "Adjust the charge limit (80–100%) in System Settings"))
     }
 
     // MARK: - Footer
@@ -259,28 +383,6 @@ struct PopoverView: View {
 
     private var settingsMenu: some View {
         Menu {
-            if thermal.snapshot.hasFans {
-                Picker(String(localized: "Fans"), selection: Binding(
-                    get: { thermal.mode.isAutomatic ? 0 : (thermal.mode == .fullBlast ? 1 : 2) },
-                    set: { choice in
-                        switch choice {
-                        case 0: thermal.setMode(.automatic)
-                        case 1: thermal.setMode(.fullBlast)
-                        default: thermal.setMode(thermal.lastCustomMode)
-                        }
-                    }
-                )) {
-                    Text(String(localized: "Auto")).tag(0)
-                    Text(String(localized: "Full Blast")).tag(1)
-                    Text(String(localized: "Custom")).tag(2)
-                }
-                .pickerStyle(.menu)
-                Divider()
-            }
-            Button(String(format: String(localized: "Charge Limit: %@…"), data.chargeLimitText)) {
-                NSWorkspace.shared.open(macOSChargeLimitSettingsURL)
-            }
-            Divider()
             Toggle(String(localized: "Launch at Login"), isOn: Binding(
                 get: { monitor.launchAtLogin },
                 set: { monitor.launchAtLogin = $0 }
@@ -374,5 +476,38 @@ private struct StatCell: View {
                 .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+/// Compact usage bar for the popover: icon, title, percent and a secondary reading.
+private struct UsageMeter: View {
+    let icon: String
+    let title: String
+    let fraction: Double
+    let tint: Color
+    let detail: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .foregroundStyle(tint)
+                Text(title)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 2)
+                Text(String(format: "%.0f%%", fraction * 100))
+                    .fontWeight(.semibold)
+                    .monospacedDigit()
+            }
+            .font(.system(size: 12))
+            LevelBar(fraction: fraction, tint: tint, height: 5)
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

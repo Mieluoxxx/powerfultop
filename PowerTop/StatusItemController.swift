@@ -61,6 +61,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
         let root = StatusPopoverContent(
             monitor: monitor,
             thermal: thermal,
+            system: system,
             openDetails: { [weak self] in self?.openDetails() },
             onMeasuredSize: { [weak self] size in
                 self?.applyPopoverSize(size)
@@ -267,11 +268,12 @@ private struct PopoverMeasuredSizeKey: PreferenceKey {
 private struct StatusPopoverContent: View {
     let monitor: PowerMonitor
     let thermal: ThermalMonitor
+    let system: SystemMonitor
     let openDetails: () -> Void
     let onMeasuredSize: (CGSize) -> Void
 
     var body: some View {
-        PopoverView(monitor: monitor, thermal: thermal, openDetails: openDetails)
+        PopoverView(monitor: monitor, thermal: thermal, system: system, openDetails: openDetails)
             .background {
                 GeometryReader { proxy in
                     Color.clear.preference(key: PopoverMeasuredSizeKey.self, value: proxy.size)
