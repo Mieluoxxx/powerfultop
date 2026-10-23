@@ -93,7 +93,7 @@ struct FanControlCard: View {
         DashCard(title: String(localized: "Fans"), icon: "fan.fill", tint: .teal) {
             CardHero(
                 value: String(format: "%.0f RPM", snapshot.fans.map(\.actualRPM).max() ?? 0),
-                caption: thermal.isControlling ? String(localized: "Controlled by PowerTop") : String(localized: "Controlled by macOS")
+                caption: thermal.isControlling ? String(localized: "Controlled by PowerfulTop") : String(localized: "Controlled by macOS")
             )
             ForEach(snapshot.fans) { fan in
                 CardBarRow(
@@ -198,7 +198,7 @@ struct FanControlCard: View {
                 icon: "exclamationmark.triangle.fill",
                 tint: .orange,
                 text: String(localized: "Another fan tool is in control"),
-                detail: String(localized: "Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerTop take over; until then PowerTop only monitors.")
+                detail: String(localized: "Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerfulTop take over; until then PowerfulTop only monitors.")
             )
         } else if !thermal.mode.isAutomatic && thermal.helperStatus != .ready {
             FanHelperInstallButton(thermal: thermal)
@@ -214,7 +214,7 @@ struct FanControlCard: View {
                 icon: "checkmark.shield",
                 tint: .green,
                 text: String(localized: "Safety handback armed"),
-                detail: String(format: String(localized: "Fans return to macOS control when PowerTop quits, the Mac sleeps, or the CPU or GPU reaches %.0f°C."), FanHelperConstants.failsafeCelsius)
+                detail: String(format: String(localized: "Fans return to macOS control when PowerfulTop quits, the Mac sleeps, or the CPU or GPU reaches %.0f°C."), FanHelperConstants.failsafeCelsius)
             )
         }
         if let error = thermal.lastError {
@@ -239,7 +239,7 @@ struct FanHelperInstallButton: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.regular)
             CardNote(thermal.helperStatus == .needsUpdate
-                ? String(localized: "PowerTop was updated, so the fan helper must be authorized again.")
+                ? String(localized: "PowerfulTop was updated, so the fan helper must be authorized again.")
                 : String(localized: "Controlling fans needs a small helper that runs as root. macOS asks for an administrator password once."))
         }
     }

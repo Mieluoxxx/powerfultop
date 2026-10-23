@@ -12,7 +12,7 @@ final class ThermalMonitor {
     private(set) var snapshot = ThermalSnapshot.empty
     private(set) var helperStatus: FanHelperStatus = .notInstalled
     private(set) var lastError: String?
-    /// Another fan tool is running or already holds the fans; PowerTop then only monitors.
+    /// Another fan tool is running or already holds the fans; PowerfulTop then only monitors.
     private(set) var conflictDetected = false
     private(set) var mode: FanControlMode
     /// Custom setting restored when switching back from Auto or Full Blast, like Macs Fan Control.

@@ -1,6 +1,8 @@
-# PowerTop
+# PowerfulTop
 
 **[English](README.md)** | **简体中文**
+
+> 原名 **PowerTop**。为避免与 Intel 的 Linux 工具 `powertop` 混淆而更名。
 
 一个简洁轻量的菜单栏应用，实时显示你的 MacBook 正在消耗多少功率。
 
@@ -15,7 +17,7 @@
 
 ## 终于能看到 MacBook 真实的功耗了
 
-macOS 从来不会直接告诉你「现在系统正在消耗多少瓦」。PowerTop 解决了这个问题。
+macOS 从来不会直接告诉你「现在系统正在消耗多少瓦」。PowerfulTop 解决了这个问题。
 
 它把清晰、实时的功率信息放在菜单栏和弹窗里，让你随时知道电脑的用电情况。
 
@@ -44,10 +46,10 @@ macOS 从来不会直接告诉你「现在系统正在消耗多少瓦」。Power
 
 ### 下载安装（推荐）
 
-从 [Releases](https://github.com/kDolphin/PowerTop/releases) 页面下载最新的 `PowerTop.zip`：
+从 [Releases](https://github.com/kDolphin/PowerTop/releases) 页面下载最新的 `PowerfulTop.zip`：
 
 1. 解压文件
-2. 把 `PowerTop.app` 拖到「应用程序」文件夹
+2. 把 `PowerfulTop.app` 拖到「应用程序」文件夹
 3. 首次启动：右键点击应用 → **打开**（应用未签名）
 
 ### 从源码构建
@@ -56,7 +58,7 @@ macOS 从来不会直接告诉你「现在系统正在消耗多少瓦」。Power
 git clone https://github.com/kDolphin/PowerTop.git
 cd PowerTop
 bash build.sh
-open build/PowerTop.app
+open build/PowerfulTop.app
 ```
 
 ## 系统要求
@@ -66,7 +68,7 @@ open build/PowerTop.app
 
 ## 使用方法
 
-1. 打开 PowerTop，图标会出现在菜单栏。
+1. 打开 PowerfulTop，图标会出现在菜单栏。
 2. 点击图标即可看到功率流向图和当前各项数据。
 3. 在弹窗底部开启「菜单栏显示功率」，即可让功率数值常驻菜单栏。
 4. 点击「详细参数」可查看完整的功率和电池信息。
@@ -138,7 +140,7 @@ open build/PowerTop.app
 
 ## 致谢
 
-PowerTop 借鉴了以下项目：
+PowerfulTop 借鉴了以下项目：
 
 - [MonitorControl](https://github.com/MonitorControl/MonitorControl) — 通过 DisplayServices 和 DDC/CI 调节显示器亮度（MIT）
 - [macos-smc-fan](https://github.com/agoodkind/macos-smc-fan) — Apple 芯片手动控制风扇所依据的 `Ftst` 解锁研究（MIT）

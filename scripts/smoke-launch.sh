@@ -1,15 +1,15 @@
 #!/bin/bash
-# Fails if PowerTop shows a content window at launch (the "flash").
+# Fails if PowerfulTop shows a content window at launch (the "flash").
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$ROOT/build/PowerTop.app"
-BIN="$APP/Contents/MacOS/PowerTop"
+APP="$ROOT/build/PowerfulTop.app"
+BIN="$APP/Contents/MacOS/PowerfulTop"
 
 cd "$ROOT"
 bash build.sh >/tmp/powertop-smoke-build.log 2>&1
 
-killall PowerTop >/dev/null 2>&1 || true
+killall PowerfulTop >/dev/null 2>&1 || true
 sleep 0.2
 
 set +e

@@ -30,7 +30,7 @@ struct SettingsPage: View {
                 }
                 CardNote(data.chargeLimitSource == .alDente
                     ? String(localized: "AlDente is currently managing the charge limit. Change it in AlDente, or quit AlDente to use the macOS setting.")
-                    : String(localized: "macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerTop is closed or the Mac sleeps."))
+                    : String(localized: "macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerfulTop is closed or the Mac sleeps."))
             }
 
             if thermal.snapshot.hasFans {
@@ -52,12 +52,12 @@ struct SettingsPage: View {
                     if let error = thermal.lastError {
                         StatusNote(icon: "xmark.octagon.fill", tint: .red, text: error)
                     }
-                    CardNote(String(localized: "The helper runs as root only to write fan speeds. It accepts requests from this exact PowerTop build and hands fans back to macOS whenever PowerTop stops checking in."))
+                    CardNote(String(localized: "The helper runs as root only to write fan speeds. It accepts requests from this exact PowerfulTop build and hands fans back to macOS whenever PowerfulTop stops checking in."))
                 }
             }
 
             DashCard(title: String(localized: "About"), icon: "info.circle", tint: .secondary) {
-                CardRow(label: "PowerTop", value: AppInfo.versionLabel)
+                CardRow(label: "PowerfulTop", value: AppInfo.versionLabel)
                 if let chip = data.deviceName {
                     CardRow(label: String(localized: "Battery Management Chip"), value: chip)
                 }

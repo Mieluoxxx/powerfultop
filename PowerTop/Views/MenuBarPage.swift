@@ -75,7 +75,7 @@ struct MenuBarPage: View {
                 }
             }
             if configuration.items.isEmpty && configuration.iconStyle == .hidden {
-                CardNote(String(localized: "Nothing selected; a small icon stays in the menu bar so PowerTop can still be opened."))
+                CardNote(String(localized: "Nothing selected; a small icon stays in the menu bar so PowerfulTop can still be opened."))
             } else {
                 CardNote(String(localized: "Drag items to reorder. Readings that don't apply right now, such as adapter values on battery, are hidden."))
             }

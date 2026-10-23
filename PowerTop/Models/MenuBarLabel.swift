@@ -31,7 +31,7 @@ enum MenuBarIconStyle: String, CaseIterable, Codable, Identifiable {
         case .macOSColor: return String(localized: "macOS Color")
         case .iOS: return String(localized: "iOS Native")
         case .ring: return String(localized: "Ring")
-        case .appIcon: return String(localized: "PowerTop Icon")
+        case .appIcon: return String(localized: "PowerfulTop Icon")
         }
     }
 

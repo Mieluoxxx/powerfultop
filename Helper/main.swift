@@ -140,14 +140,14 @@ final class ListenerDelegate: NSObject, NSXPCListenerDelegate {
 }
 
 guard getuid() == 0, let smc = SMCConnection() else {
-    fputs("PowerTop fan helper must run as root\n", stderr)
+    fputs("PowerfulTop fan helper must run as root\n", stderr)
     exit(1)
 }
 
 // Refuse every client unless the installer recorded which app build may connect.
 guard let requirement = try? String(contentsOfFile: FanHelperConstants.clientRequirementPath, encoding: .utf8)
     .trimmingCharacters(in: .whitespacesAndNewlines), !requirement.isEmpty else {
-    fputs("PowerTop fan helper has no client requirement\n", stderr)
+    fputs("PowerfulTop fan helper has no client requirement\n", stderr)
     exit(1)
 }
 

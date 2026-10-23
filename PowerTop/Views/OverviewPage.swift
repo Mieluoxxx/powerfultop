@@ -73,7 +73,7 @@ struct OverviewPage: View {
                     ChartPanel(
                         title: String(localized: "Fan Speed"),
                         value: String(format: "%.0f RPM", thermal.snapshot.fans.map(\.actualRPM).max() ?? 0),
-                        detail: thermal.isControlling ? String(localized: "Controlled by PowerTop") : String(localized: "Controlled by macOS"),
+                        detail: thermal.isControlling ? String(localized: "Controlled by PowerfulTop") : String(localized: "Controlled by macOS"),
                         icon: "fan.fill",
                         tint: .teal,
                         points: samples.series { $0.fanRPM },

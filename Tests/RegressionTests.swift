@@ -33,7 +33,7 @@ struct RegressionTests {
             fputs("\(failures) regression test(s) failed\n", stderr)
             exit(1)
         }
-        print("All PowerTop regression tests passed")
+        print("All PowerfulTop regression tests passed")
     }
 
     private static func testSupplementalEstimateUsesBatteryPower() {
@@ -415,7 +415,7 @@ struct RegressionTests {
         let ours = ThermalSnapshot(fans: [manualFan], temperatures: [:], diagnosticUnlocked: true)
         let idle = ThermalSnapshot(fans: [systemFan], temperatures: [:], diagnosticUnlocked: false)
 
-        // Regression: a timed-out first request made PowerTop treat its own helper as a rival,
+        // Regression: a timed-out first request made PowerfulTop treat its own helper as a rival,
         // stop sending heartbeats, and the watchdog handed fans back every 30 s.
         expect(!isForeignFanControl(snapshot: ours, helperHoldsFans: true, otherToolRunning: false),
                "our helper's manual mode is not a conflict")

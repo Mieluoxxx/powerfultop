@@ -73,7 +73,7 @@ struct PopoverView: View {
         HStack(spacing: 6) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
-            Text(String(localized: "Built-in battery not detected. PowerTop requires a MacBook."))
+            Text(String(localized: "Built-in battery not detected. PowerfulTop requires a MacBook."))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -275,7 +275,7 @@ struct PopoverView: View {
                 Text(String(format: "%.0f RPM", thermal.snapshot.fans.map(\.actualRPM).max() ?? 0))
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .monospacedDigit()
-                Text(thermal.isControlling ? String(localized: "Controlled by PowerTop") : String(localized: "Controlled by macOS"))
+                Text(thermal.isControlling ? String(localized: "Controlled by PowerfulTop") : String(localized: "Controlled by macOS"))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

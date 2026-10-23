@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$PROJECT_DIR/build"
-APP_NAME="PowerTop"
+APP_NAME="PowerfulTop"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 EXECUTABLE="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 

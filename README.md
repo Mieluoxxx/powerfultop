@@ -1,6 +1,8 @@
-# PowerTop
+# PowerfulTop
 
 **English** | **[简体中文](README.zh-CN.md)**
+
+> Formerly **PowerTop**. Renamed to avoid confusion with Intel's Linux `powertop` tool.
 
 A clean, lightweight menu bar app that shows you exactly how much power your MacBook is using.
 
@@ -15,7 +17,7 @@ A clean, lightweight menu bar app that shows you exactly how much power your Mac
 
 ## Finally Know How Much Power You're Using
 
-macOS never tells you the actual watts your MacBook is consuming right now. PowerTop changes that.
+macOS never tells you the actual watts your MacBook is consuming right now. PowerfulTop changes that.
 
 It gives you clear, real-time power information directly in the menu bar and a simple popover — so you can see exactly what's happening with power on your machine.
 
@@ -31,7 +33,7 @@ It gives you clear, real-time power information directly in the menu bar and a s
 
 Everything updates live and stays accurate even when you plug in or unplug your charger.
 
-## Why People Use PowerTop
+## Why People Use PowerfulTop
 
 - Curious about real power consumption on their MacBook
 - Want to know if their charger is powerful enough during heavy work
@@ -44,10 +46,10 @@ It's a small, native app that does one thing well — no bloat, no subscriptions
 
 ### Download (Recommended)
 
-Download the latest `PowerTop.zip` from the [Releases](https://github.com/kDolphin/PowerTop/releases) page:
+Download the latest `PowerfulTop.zip` from the [Releases](https://github.com/kDolphin/PowerTop/releases) page:
 
 1. Unzip the file
-2. Drag `PowerTop.app` into your `/Applications` folder
+2. Drag `PowerfulTop.app` into your `/Applications` folder
 3. First launch: right-click the app → **Open** (the app is not signed)
 
 ### Build from Source
@@ -56,7 +58,7 @@ Download the latest `PowerTop.zip` from the [Releases](https://github.com/kDolph
 git clone https://github.com/kDolphin/PowerTop.git
 cd PowerTop
 bash build.sh
-open build/PowerTop.app
+open build/PowerfulTop.app
 ```
 
 ## Requirements
@@ -66,7 +68,7 @@ open build/PowerTop.app
 
 ## How to Use
 
-1. Open PowerTop — the icon appears in your menu bar.
+1. Open PowerfulTop — the icon appears in your menu bar.
 2. Click the icon to open the popover with the power flow diagram and current readings.
 3. Turn on **Show Power in Menu Bar** at the bottom if you want the wattage always visible.
 4. Click **Details** for a full breakdown of power and battery information.
@@ -138,7 +140,7 @@ open build/PowerTop.app
 
 ## Acknowledgements
 
-PowerTop builds on the work of these projects:
+PowerfulTop builds on the work of these projects:
 
 - [MonitorControl](https://github.com/MonitorControl/MonitorControl) — display brightness over DisplayServices and DDC/CI (MIT)
 - [macos-smc-fan](https://github.com/agoodkind/macos-smc-fan) — the `Ftst` unlock research behind manual fan control on Apple silicon (MIT)

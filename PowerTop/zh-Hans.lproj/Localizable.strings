@@ -1,4 +1,4 @@
-/* PowerTop - 简体中文本地化 */
+/* PowerfulTop - 简体中文本地化 */
 
 // Power Source Description
 "AC Charging" = "AC 充电中";
@@ -37,7 +37,7 @@
 "Quit" = "退出";
 
 // Detail Window
-"PowerTop Details" = "PowerTop 详细参数";
+"PowerfulTop Details" = "PowerfulTop 详细参数";
 
 // Detail - Power Section
 "Charger Load Rate" = "充电器负载率";
@@ -119,34 +119,34 @@
 "Updated at %@" = "更新于 %@";
 
 // Hardware availability
-"Built-in battery not detected. PowerTop requires a MacBook." = "未检测到内置电池。PowerTop 仅支持 MacBook。";
+"Built-in battery not detected. PowerfulTop requires a MacBook." = "未检测到内置电池。PowerfulTop 仅支持 MacBook。";
 
 // Detail - Tabs
 "Status" = "状态";
 
 // Fans & Temperatures
 "%@ avg · %@ max" = "平均 %@ · 最高 %@";
-"Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerTop take over; until then PowerTop only monitors." = "检测到其他风扇工具（如 Macs Fan Control）正在控制风扇。退出它之后 PowerTop 才会接管，在此之前只做监控。";
+"Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerfulTop take over; until then PowerfulTop only monitors." = "检测到其他风扇工具（如 Macs Fan Control）正在控制风扇。退出它之后 PowerfulTop 才会接管，在此之前只做监控。";
 "Authorization was cancelled." = "已取消授权。";
 "Auto" = "自动";
 "CPU" = "CPU";
 "CPU Average" = "CPU 平均温度";
 "Constant RPM" = "固定转速";
-"Controlled by PowerTop" = "由 PowerTop 控制";
+"Controlled by PowerfulTop" = "由 PowerfulTop 控制";
 "Controlled by macOS" = "由系统控制";
 "Controlling fans needs a small helper that runs as root. macOS asks for an administrator password once." = "控制风扇需要安装一个以 root 运行的小组件，macOS 会请求一次管理员密码。";
 "Could not connect to the fan helper." = "无法连接风扇控制组件。";
 "Custom" = "自定义";
 "Fan %d" = "风扇 %d";
 "Fans" = "风扇";
-"Fans return to macOS control when PowerTop quits, the Mac sleeps, or the CPU or GPU reaches %.0f°C." = "PowerTop 退出、Mac 睡眠，或 CPU/GPU 达到 %.0f°C 时，风扇会自动交还系统控制。";
+"Fans return to macOS control when PowerfulTop quits, the Mac sleeps, or the CPU or GPU reaches %.0f°C." = "PowerfulTop 退出、Mac 睡眠，或 CPU/GPU 达到 %.0f°C 时，风扇会自动交还系统控制。";
 "Follow Temperature" = "跟随温度";
 "Full Blast" = "全速";
 "Full speed at %.0f°C" = "%.0f°C 时全速";
 "GPU" = "GPU";
 "Install Fan Helper" = "安装风扇控制组件";
-"PowerTop must be code-signed to control fans." = "PowerTop 需要代码签名才能控制风扇。";
-"PowerTop was updated, so the fan helper must be authorized again." = "PowerTop 已更新，需要重新授权风扇控制组件。";
+"PowerfulTop must be code-signed to control fans." = "PowerfulTop 需要代码签名才能控制风扇。";
+"PowerfulTop was updated, so the fan helper must be authorized again." = "PowerfulTop 已更新，需要重新授权风扇控制组件。";
 "Sensor" = "传感器";
 "Start ramping at %.0f°C" = "%.0f°C 开始提速";
 "Target Speed" = "目标转速";
@@ -194,10 +194,10 @@
 "Settings" = "设置";
 "System Power" = "系统功耗";
 "Temperatures" = "温度";
-"The helper runs as root only to write fan speeds. It accepts requests from this exact PowerTop build and hands fans back to macOS whenever PowerTop stops checking in." = "该组件以 root 运行，仅用于写入风扇转速；只接受当前这个 PowerTop 版本的请求，PowerTop 停止响应时会自动把风扇交还系统。";
+"The helper runs as root only to write fan speeds. It accepts requests from this exact PowerfulTop build and hands fans back to macOS whenever PowerfulTop stops checking in." = "该组件以 root 运行，仅用于写入风扇转速；只接受当前这个 PowerfulTop 版本的请求，PowerfulTop 停止响应时会自动把风扇交还系统。";
 "Uninstall" = "卸载";
 "Voltage" = "电压";
-"macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerTop is closed or the Mac sleeps." = "充电上限（80–100%）由 macOS 在固件层执行，PowerTop 关闭或 Mac 睡眠时依然有效。";
+"macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerfulTop is closed or the Mac sleeps." = "充电上限（80–100%）由 macOS 在固件层执行，PowerfulTop 关闭或 Mac 睡眠时依然有效。";
 "AlDente is currently managing the charge limit. Change it in AlDente, or quit AlDente to use the macOS setting." = "当前由 AlDente 管理充电上限。请在 AlDente 中调整，或退出 AlDente 后使用系统设置。";
 
 // System monitor
@@ -238,7 +238,7 @@
 "Item Spacing" = "菜单项间距";
 "Layout" = "布局";
 "Main Icon" = "主图标样式";
-"Nothing selected; a small icon stays in the menu bar so PowerTop can still be opened." = "未选择任何项；菜单栏会保留一个小图标，以便仍能打开 PowerTop。";
+"Nothing selected; a small icon stays in the menu bar so PowerfulTop can still be opened." = "未选择任何项；菜单栏会保留一个小图标，以便仍能打开 PowerfulTop。";
 "Percentage" = "百分比";
 "Reset" = "重置";
 "Selected Items" = "已选菜单项";
@@ -247,7 +247,7 @@
 "Update Interval" = "菜单更新间隔";
 
 // Menu bar icon styles
-"PowerTop Icon" = "PowerTop 图标";
+"PowerfulTop Icon" = "PowerfulTop 图标";
 "Ring" = "圆环";
 "Simple" = "简约";
 "iOS Native" = "iOS 原生";

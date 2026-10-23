@@ -163,7 +163,7 @@ enum FanHelperError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .missingHelper: return String(localized: "The fan helper is missing from the app bundle.")
-        case .unsignedApp: return String(localized: "PowerTop must be code-signed to control fans.")
+        case .unsignedApp: return String(localized: "PowerfulTop must be code-signed to control fans.")
         case .cancelled: return String(localized: "Authorization was cancelled.")
         case .connectionFailed: return String(localized: "Could not connect to the fan helper.")
         case .installFailed(let message): return message

@@ -1,4 +1,4 @@
-/* PowerTop - English Localization */
+/* PowerfulTop - English Localization */
 
 // Power Source Description
 "AC Charging" = "AC Charging";
@@ -37,7 +37,7 @@
 "Quit" = "Quit";
 
 // Detail Window
-"PowerTop Details" = "PowerTop Details";
+"PowerfulTop Details" = "PowerfulTop Details";
 
 // Detail - Power Section
 "Charger Load Rate" = "Charger Load Rate";
@@ -119,34 +119,34 @@
 "Updated at %@" = "Updated at %@";
 
 // Hardware availability
-"Built-in battery not detected. PowerTop requires a MacBook." = "Built-in battery not detected. PowerTop requires a MacBook.";
+"Built-in battery not detected. PowerfulTop requires a MacBook." = "Built-in battery not detected. PowerfulTop requires a MacBook.";
 
 // Detail - Tabs
 "Status" = "Status";
 
 // Fans & Temperatures
 "%@ avg · %@ max" = "%@ avg · %@ max";
-"Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerTop take over; until then PowerTop only monitors." = "Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerTop take over; until then PowerTop only monitors.";
+"Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerfulTop take over; until then PowerfulTop only monitors." = "Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerfulTop take over; until then PowerfulTop only monitors.";
 "Authorization was cancelled." = "Authorization was cancelled.";
 "Auto" = "Auto";
 "CPU" = "CPU";
 "CPU Average" = "CPU Average";
 "Constant RPM" = "Constant RPM";
-"Controlled by PowerTop" = "Controlled by PowerTop";
+"Controlled by PowerfulTop" = "Controlled by PowerfulTop";
 "Controlled by macOS" = "Controlled by macOS";
 "Controlling fans needs a small helper that runs as root. macOS asks for an administrator password once." = "Controlling fans needs a small helper that runs as root. macOS asks for an administrator password once.";
 "Could not connect to the fan helper." = "Could not connect to the fan helper.";
 "Custom" = "Custom";
 "Fan %d" = "Fan %d";
 "Fans" = "Fans";
-"Fans return to macOS control when PowerTop quits, the Mac sleeps, or the CPU or GPU reaches %.0f°C." = "Fans return to macOS control when PowerTop quits, the Mac sleeps, or the CPU or GPU reaches %.0f°C.";
+"Fans return to macOS control when PowerfulTop quits, the Mac sleeps, or the CPU or GPU reaches %.0f°C." = "Fans return to macOS control when PowerfulTop quits, the Mac sleeps, or the CPU or GPU reaches %.0f°C.";
 "Follow Temperature" = "Follow Temperature";
 "Full Blast" = "Full Blast";
 "Full speed at %.0f°C" = "Full speed at %.0f°C";
 "GPU" = "GPU";
 "Install Fan Helper" = "Install Fan Helper";
-"PowerTop must be code-signed to control fans." = "PowerTop must be code-signed to control fans.";
-"PowerTop was updated, so the fan helper must be authorized again." = "PowerTop was updated, so the fan helper must be authorized again.";
+"PowerfulTop must be code-signed to control fans." = "PowerfulTop must be code-signed to control fans.";
+"PowerfulTop was updated, so the fan helper must be authorized again." = "PowerfulTop was updated, so the fan helper must be authorized again.";
 "Sensor" = "Sensor";
 "Start ramping at %.0f°C" = "Start ramping at %.0f°C";
 "Target Speed" = "Target Speed";
@@ -194,10 +194,10 @@
 "Settings" = "Settings";
 "System Power" = "System Power";
 "Temperatures" = "Temperatures";
-"The helper runs as root only to write fan speeds. It accepts requests from this exact PowerTop build and hands fans back to macOS whenever PowerTop stops checking in." = "The helper runs as root only to write fan speeds. It accepts requests from this exact PowerTop build and hands fans back to macOS whenever PowerTop stops checking in.";
+"The helper runs as root only to write fan speeds. It accepts requests from this exact PowerfulTop build and hands fans back to macOS whenever PowerfulTop stops checking in." = "The helper runs as root only to write fan speeds. It accepts requests from this exact PowerfulTop build and hands fans back to macOS whenever PowerfulTop stops checking in.";
 "Uninstall" = "Uninstall";
 "Voltage" = "Voltage";
-"macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerTop is closed or the Mac sleeps." = "macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerTop is closed or the Mac sleeps.";
+"macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerfulTop is closed or the Mac sleeps." = "macOS enforces the limit (80–100%) in firmware, so it keeps working while PowerfulTop is closed or the Mac sleeps.";
 "AlDente is currently managing the charge limit. Change it in AlDente, or quit AlDente to use the macOS setting." = "AlDente is currently managing the charge limit. Change it in AlDente, or quit AlDente to use the macOS setting.";
 
 // System monitor
@@ -238,7 +238,7 @@
 "Item Spacing" = "Item Spacing";
 "Layout" = "Layout";
 "Main Icon" = "Main Icon";
-"Nothing selected; a small icon stays in the menu bar so PowerTop can still be opened." = "Nothing selected; a small icon stays in the menu bar so PowerTop can still be opened.";
+"Nothing selected; a small icon stays in the menu bar so PowerfulTop can still be opened." = "Nothing selected; a small icon stays in the menu bar so PowerfulTop can still be opened.";
 "Percentage" = "Percentage";
 "Reset" = "Reset";
 "Selected Items" = "Selected Items";
@@ -247,7 +247,7 @@
 "Update Interval" = "Update Interval";
 
 // Menu bar icon styles
-"PowerTop Icon" = "PowerTop Icon";
+"PowerfulTop Icon" = "PowerfulTop Icon";
 "Ring" = "Ring";
 "Simple" = "Simple";
 "iOS Native" = "iOS Native";

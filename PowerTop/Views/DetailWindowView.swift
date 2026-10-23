@@ -129,7 +129,7 @@ struct DetailWindowView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.largeTitle)
                 .foregroundStyle(.orange)
-            Text(String(localized: "Built-in battery not detected. PowerTop requires a MacBook."))
+            Text(String(localized: "Built-in battery not detected. PowerfulTop requires a MacBook."))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

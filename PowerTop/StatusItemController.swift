@@ -239,7 +239,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
         if detailWindow == nil {
             let hosting = NSHostingController(rootView: DetailWindowView(monitor: monitor, thermal: thermal, system: system, history: history))
             let window = NSWindow(contentViewController: hosting)
-            window.title = String(localized: "PowerTop Details")
+            window.title = String(localized: "PowerfulTop Details")
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.setContentSize(NSSize(width: DetailWindowView.preferredWidth, height: DetailWindowView.preferredHeight))
             window.contentMinSize = NSSize(width: DetailWindowView.minimumWidth, height: 480)

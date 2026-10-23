@@ -114,7 +114,7 @@ func groupSensorKeys(_ keys: [String]) -> [SensorGroup: [String]] {
 }
 
 /// Manual fan state only counts as another tool's when our helper's marker is absent; otherwise a
-/// single failed request would make PowerTop back off from its own control and let the watchdog fire.
+/// single failed request would make PowerfulTop back off from its own control and let the watchdog fire.
 func isForeignFanControl(snapshot: ThermalSnapshot, helperHoldsFans: Bool, otherToolRunning: Bool) -> Bool {
     if otherToolRunning { return true }
     guard snapshot.anyFanManual || snapshot.diagnosticUnlocked else { return false }

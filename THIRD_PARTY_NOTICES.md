@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-PowerTop is released under the MIT License (see [LICENSE](LICENSE)). It includes code or
+PowerfulTop is released under the MIT License (see [LICENSE](LICENSE)). It includes code or
 implementation techniques from the open-source projects below; their license notices are
 reproduced here as their licenses require.
 

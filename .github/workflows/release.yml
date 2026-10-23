@@ -68,8 +68,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          APP="build/PowerTop.app"
-          BINARY="$APP/Contents/MacOS/PowerTop"
+          APP="build/PowerfulTop.app"
+          BINARY="$APP/Contents/MacOS/PowerfulTop"
           ARCHS="$(lipo -archs "$BINARY")"
           if [[ "$ARCHS" != "arm64" ]]; then
             echo "Expected an arm64-only executable; got: $ARCHS" >&2
@@ -85,20 +85,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          DMG_ROOT="$RUNNER_TEMP/PowerTop-dmg-root"
+          DMG_ROOT="$RUNNER_TEMP/PowerfulTop-dmg-root"
           RELEASE_DIR="$GITHUB_WORKSPACE/build/release"
-          DMG_NAME="PowerTop-${RELEASE_TAG}-arm64.dmg"
+          DMG_NAME="PowerfulTop-${RELEASE_TAG}-arm64.dmg"
           DMG_PATH="$RELEASE_DIR/$DMG_NAME"
-          ZIP_PATH="$RELEASE_DIR/PowerTop.zip"
-          CHECKSUM_PATH="$RELEASE_DIR/PowerTop-${RELEASE_TAG}-SHA256SUMS.txt"
+          ZIP_PATH="$RELEASE_DIR/PowerfulTop.zip"
+          CHECKSUM_PATH="$RELEASE_DIR/PowerfulTop-${RELEASE_TAG}-SHA256SUMS.txt"
 
           mkdir -p "$DMG_ROOT" "$RELEASE_DIR"
-          ditto "build/PowerTop.app" "$DMG_ROOT/PowerTop.app"
-          ditto -c -k --sequesterRsrc --keepParent "build/PowerTop.app" "$ZIP_PATH"
+          ditto "build/PowerfulTop.app" "$DMG_ROOT/PowerfulTop.app"
+          ditto -c -k --sequesterRsrc --keepParent "build/PowerfulTop.app" "$ZIP_PATH"
           ln -s /Applications "$DMG_ROOT/Applications"
 
           hdiutil create \
-            -volname "PowerTop $RELEASE_VERSION" \
+            -volname "PowerfulTop $RELEASE_VERSION" \
             -srcfolder "$DMG_ROOT" \
             -format UDZO \
             -ov \
@@ -107,7 +107,7 @@ jobs:
           hdiutil verify "$DMG_PATH"
           (
             cd "$RELEASE_DIR"
-            shasum -a 256 "$DMG_NAME" "PowerTop.zip" > "$(basename "$CHECKSUM_PATH")"
+            shasum -a 256 "$DMG_NAME" "PowerfulTop.zip" > "$(basename "$CHECKSUM_PATH")"
           )
 
           echo "dmg_path=$DMG_PATH" >> "$GITHUB_OUTPUT"
@@ -118,7 +118,7 @@ jobs:
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v7
         with:
-          name: PowerTop-${{ env.RELEASE_TAG }}-arm64
+          name: PowerfulTop-${{ env.RELEASE_TAG }}-arm64
           path: |
             ${{ steps.package.outputs.dmg_path }}
             ${{ steps.package.outputs.zip_path }}
@@ -152,5 +152,5 @@ jobs:
           {
             echo "### PowerTop $RELEASE_TAG"
             echo
-            echo "Published \`${{ steps.package.outputs.dmg_name }}\`, \`PowerTop.zip\`, and SHA-256 checksums."
+            echo "Published \`${{ steps.package.outputs.dmg_name }}\`, \`PowerfulTop.zip\`, and SHA-256 checksums."
           } >> "$GITHUB_STEP_SUMMARY"
