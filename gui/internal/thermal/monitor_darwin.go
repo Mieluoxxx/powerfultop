@@ -278,13 +278,15 @@ func (m *Monitor) refresh() {
 		elapsed = now.Sub(last).Seconds()
 	}
 	next.Temperatures = SmoothTemperatures(previous, next.Temperatures, elapsed)
-	conflict := IsForeignFanControl(next, exists(EngagedMarkerPath), isOtherFanToolRunning())
+	tool := otherFanTool()
+	conflict := IsForeignFanControl(next, exists(EngagedMarkerPath), tool != "")
 
 	m.mu.Lock()
 	m.lastRefresh = now
 	m.snap.Fans, m.snap.Temperatures = next.Fans, next.Temperatures
 	m.snap.DiagnosticUnlocked, m.snap.DisplayPowerW = next.DiagnosticUnlocked, next.DisplayPowerW
 	m.snap.ConflictDetected = conflict
+	m.snap.ConflictingTool = tool
 	m.mu.Unlock()
 	m.applyControl()
 	m.notify()
@@ -379,5 +381,6 @@ func readSnapshot(smc SMC, sensorKeys map[SensorGroup][]string) Snapshot {
 
 // MonitorWithSnapshot returns a monitor that never polls and shows s, for previews and view tests.
 func MonitorWithSnapshot(s Snapshot) *Monitor {
-	return &Monitor{helper: NewHelperClient(""), snap: s}
+	// Snapshot derives Controlling from the engagement, so a preview of PowerfulTop in control needs it.
+	return &Monitor{helper: NewHelperClient(""), snap: s, weEngaged: s.Controlling}
 }

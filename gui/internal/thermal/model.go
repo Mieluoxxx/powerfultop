@@ -97,6 +97,8 @@ type Snapshot struct {
 	Temperatures map[SensorGroup]TemperatureSummary
 	// DiagnosticUnlocked is Ftst = 1: something has put the SMC into diagnostic (manual fan) mode.
 	DiagnosticUnlocked bool
+	// ConflictingTool names the fan tool that runs, "" when the conflict shows only in the fans' state.
+	ConflictingTool string
 	// DisplayPowerW is SMC PDBR, built-in display power; it tracks brightness from 0.2 W to about 7 W on an M4 Max.
 	DisplayPowerW *float64
 

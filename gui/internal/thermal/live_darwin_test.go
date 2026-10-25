@@ -25,5 +25,5 @@ func TestReadSMCLive(t *testing.T) {
 			t.Errorf("fan range: %+v", f)
 		}
 	}
-	t.Logf("fans %+v cpu %+v diag %v display %v other tool %v", s.Fans, cpu, s.DiagnosticUnlocked, s.DisplayPowerW, isOtherFanToolRunning())
+	t.Logf("fans %+v cpu %+v diag %v display %v other tool %v", s.Fans, cpu, s.DiagnosticUnlocked, s.DisplayPowerW, otherFanTool())
 }

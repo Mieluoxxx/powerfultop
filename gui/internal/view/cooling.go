@@ -121,14 +121,65 @@ func ControlledText(s thermal.Snapshot) string {
 	return L("Controlled by macOS", "由系统控制")
 }
 
-// FanPresetControl is the Auto / Full Blast / Custom switch, shared by the page and the popover.
+// FanPresetControl is the Auto / Full Blast / Custom switch, shared by the page and the popover: equal
+// segments across the width, each with an icon. While another tool holds the fans a choice would
+// only be stored, not applied, so the control is disabled then.
 func FanPresetControl(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot) ui.Element {
+	t := c.Theme()
 	preset := presetOf(s.Mode)
-	e := ui.Segmented(c, &preset, L("Auto", "自动"), L("Full Blast", "全速"), L("Custom", "自定义")).Label(L("Fans", "风扇"))
-	if e.Changed() {
+	locked := s.ConflictDetected && !s.Controlling
+	segments := []struct{ icon, label string }{
+		{"fan", L("Auto", "自动")},
+		{"zap", L("Full Blast", "全速")},
+		{"sliders-horizontal", L("Custom", "自定义")},
+	}
+	seg := ui.SegmentedBase(c, &preset, len(segments))
+	track := seg.Track.Label(L("Fans", "风扇")).Gap(2).Padding(2).Radius(9).Background(t.Text.Alpha(0.06)).Disabled(locked)
+	if locked {
+		track.Opacity(0.5)
+	}
+	track.Children(func() {
+		for i, sg := range segments {
+			chosen := i == preset
+			e := seg.Segment(i).Label(sg.label).Grow(1).Width(0).PaddingY(5).Radius(7)
+			if chosen {
+				e.Background(CardSurface(c)).Border(1, CardBorder(c))
+			}
+			e.Children(func() {
+				ui.Row(c).Gap(5).Center().Children(func() {
+					color := t.TextMuted
+					if chosen {
+						color = t.Text
+					}
+					ui.Icon(c, icons.Get(sg.icon)).Size(12, 12).TextColor(color)
+					text := ui.Text(c, sg.label).FontSize(12).TextColor(color).NoWrap()
+					if chosen {
+						text.FontWeight(600)
+					}
+				})
+			})
+		}
+	})
+	if !locked && seg.Track.Changed() {
 		m.SelectPreset(preset)
 	}
-	return e
+	return track
+}
+
+// FanConflictBanner says another tool holds the fans, naming it when it is known.
+func FanConflictBanner(c *ui.Context, s thermal.Snapshot) {
+	text := L("Another fan tool is in control", "其他风扇工具正在控制")
+	if s.ConflictingTool != "" {
+		text = Lf("%s is running, so PowerfulTop leaves the fans alone", "%s 正在运行，PowerfulTop 暂不接管风扇", s.ConflictingTool)
+	}
+	col := Orange.Color(c)
+	ui.Row(c).Gap(6).AlignItems(ui.Center).Padding(6, 8).Radius(7).Background(col.Alpha(0.12)).
+		Tooltip(L("Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerfulTop take over; until then PowerfulTop only monitors.",
+			"检测到其他风扇工具（如 Macs Fan Control）正在控制风扇。退出它之后 PowerfulTop 才会接管，在此之前只做监控。")).
+		Children(func() {
+			ui.Icon(c, icons.Get("triangle-alert")).Size(12, 12).TextColor(col).Shrink(0)
+			ui.Text(c, text).FontSize(11).TextColor(c.Theme().Text.Alpha(0.85))
+		})
 }
 
 // FanControlCard mirrors Macs Fan Control: Auto hands fans to macOS; Custom is a constant RPM or a temperature ramp.
@@ -255,9 +306,7 @@ func (s *CoolingState) setDraft(rpm float64, apply func()) {
 func fanStatusNotes(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot) {
 	switch {
 	case s.ConflictDetected && !s.Controlling:
-		Status(c, "triangle-alert", Orange, L("Another fan tool is in control", "其他风扇工具正在控制"),
-			L("Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerfulTop take over; until then PowerfulTop only monitors.",
-				"检测到其他风扇工具（如 Macs Fan Control）正在控制风扇。退出它之后 PowerfulTop 才会接管，在此之前只做监控。"))
+		FanConflictBanner(c, s)
 	case !s.Mode.IsAutomatic() && s.HelperStatus != thermal.HelperReady:
 		FanHelperInstallButton(c, m, s)
 	case s.Mode.IsAutomatic() && allFansResting(s):
@@ -346,14 +395,20 @@ func FanSection(c *ui.Context, m *thermal.Monitor) {
 	t := c.Theme()
 	ui.Column(c).Gap(8).Children(func() {
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-			ui.Icon(c, icons.Get("fan")).Size(13, 13).TextColor(Teal.Color(c))
-			ui.Text(c, thermal.FormatRPM(s.MaxActualRPM())).FontSize(13).Bold().FontFeatures("tnum").NoWrap()
-			ui.Text(c, ControlledText(s)).FontSize(11).TextColor(t.TextMuted).SingleLine().Shrink(1)
+			ui.Icon(c, icons.Get("fan")).Size(14, 14).TextColor(Teal.Color(c))
+			ui.Text(c, thermal.FormatRPM(s.MaxActualRPM())).FontSize(14).Bold().FontFeatures("tnum").NoWrap().Grow(1)
+			// Who drives the fans, as a pill: tinted while PowerfulTop does.
+			pill, pillText := t.Text.Alpha(0.07), t.TextMuted
+			if s.Controlling {
+				pill, pillText = Teal.Color(c).Alpha(0.16), Teal.Color(c)
+			}
+			ui.Text(c, ControlledText(s)).FontSize(10).FontWeight(500).TextColor(pillText).
+				Padding(2, 7).Radius(8).Background(pill).NoWrap()
 		})
 		FanPresetControl(c, m, s)
 		switch {
 		case s.ConflictDetected && !s.Controlling:
-			Status(c, "triangle-alert", Orange, L("Another fan tool is in control", "其他风扇工具正在控制"), "")
+			FanConflictBanner(c, s)
 		case !s.Mode.IsAutomatic() && s.HelperStatus != thermal.HelperReady:
 			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 				if ui.Button(c, HelperActionText(s.HelperStatus)).Disabled(s.Installing).Clicked() {
@@ -369,6 +424,8 @@ func FanSection(c *ui.Context, m *thermal.Monitor) {
 			Status(c, "gauge", Gray, Lf("Holding %.0f RPM", "保持 %.0f RPM", s.Mode.RPM), "")
 		case s.Mode.Kind == thermal.ModeSensor:
 			Status(c, "thermometer", Gray, Lf("%s ramp %.0f–%.0f°C", "%s %.0f–%.0f°C 提速", GroupTitle(s.Mode.Group), s.Mode.LowerC, s.Mode.UpperC), "")
+		case s.Mode.IsAutomatic() && allFansResting(s):
+			Status(c, "moon", Gray, L("Fans are resting", "风扇已停转"), "")
 		}
 	})
 }

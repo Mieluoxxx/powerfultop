@@ -49,5 +49,8 @@ var LegacyHelpers = []legacyHelper{{
 	EngagedMarkerPath: "/Library/Application Support/PowerfulTop.mygo/fan-helper.engaged",
 }}
 
-// conflictingBundleIDs drive fans themselves; pre-rename builds run their own helper and would fight over the fans.
-var conflictingBundleIDs = []string{"com.crystalidea.macsfancontrol", "com.kdolphin.PowerTop"}
+// conflictingTools drive fans themselves; pre-rename builds run their own helper and would fight over the fans.
+var conflictingTools = []struct{ BundleID, Name string }{
+	{"com.crystalidea.macsfancontrol", "Macs Fan Control"},
+	{"com.kdolphin.PowerTop", "PowerTop"},
+}

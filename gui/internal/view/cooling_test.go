@@ -96,3 +96,25 @@ func TestHelperErrorText(t *testing.T) {
 		t.Error("sentinel errors read as the Swift app's messages")
 	}
 }
+
+func TestFanSectionLocksWhileAnotherToolRuns(t *testing.T) {
+	fans := []thermal.FanReading{{MinRPM: 2317, MaxRPM: 7826, Mode: 3}}
+	m := thermal.MonitorWithSnapshot(thermal.Snapshot{Fans: fans, Available: true, ConflictDetected: true, ConflictingTool: "Macs Fan Control"})
+	tt := ui.NewTester(func(c *ui.Context) { FanSection(c, m) }, PopoverWidth, 200)
+	if !tt.HasText("Macs Fan Control is running, so PowerfulTop leaves the fans alone") {
+		t.Errorf("texts %q", tt.Texts())
+	}
+	_ = tt.Click("Full Blast")
+	if m.Snapshot().Mode.Kind != thermal.ModeAutomatic {
+		t.Error("a locked control must not change the mode")
+	}
+
+	free := thermal.MonitorWithSnapshot(thermal.Snapshot{Fans: fans, Available: true})
+	tt = ui.NewTester(func(c *ui.Context) { FanSection(c, free) }, PopoverWidth, 200)
+	if err := tt.Click("Full Blast"); err != nil {
+		t.Fatal(err)
+	}
+	if free.Snapshot().Mode.Kind != thermal.ModeFullBlast {
+		t.Errorf("mode %v after choosing Full Blast", free.Snapshot().Mode.Kind)
+	}
+}

@@ -18,8 +18,8 @@ var (
 	autoreleasePoolPop  func(pool uintptr)
 )
 
-// isOtherFanToolRunning asks NSRunningApplication, which is callable from any thread.
-func isOtherFanToolRunning() bool {
+// otherFanTool names a running fan tool, "" when none runs; NSRunningApplication is callable from any thread.
+func otherFanTool() string {
 	poolOnce.Do(func() {
 		lib, err := purego.Dlopen("/usr/lib/libobjc.A.dylib", purego.RTLD_NOW|purego.RTLD_GLOBAL)
 		if err != nil {
@@ -33,7 +33,7 @@ func isOtherFanToolRunning() bool {
 		purego.RegisterLibFunc(&autoreleasePoolPop, lib, "objc_autoreleasePoolPop")
 	})
 	if autoreleasePoolPush == nil || loadSecurity() != nil {
-		return false
+		return ""
 	}
 	// A pool belongs to the thread that pushed it, so the goroutine must not move until it pops.
 	runtime.LockOSThread()
@@ -44,13 +44,13 @@ func isOtherFanToolRunning() bool {
 	class := objc.ID(objc.GetClass("NSRunningApplication"))
 	selector := objc.RegisterName("runningApplicationsWithBundleIdentifier:")
 	count := objc.RegisterName("count")
-	for _, id := range conflictingBundleIDs {
-		name := macos.CFString(id)
-		apps := class.Send(selector, objc.ID(name))
-		cfRelease(name)
+	for _, tool := range conflictingTools {
+		id := macos.CFString(tool.BundleID)
+		apps := class.Send(selector, objc.ID(id))
+		cfRelease(id)
 		if apps != 0 && objc.Send[uint](apps, count) > 0 {
-			return true
+			return tool.Name
 		}
 	}
-	return false
+	return ""
 }
