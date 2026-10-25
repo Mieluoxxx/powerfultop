@@ -36,6 +36,7 @@ func (nullItems) readItems([]int32) []rawItem      { return nil }
 func (nullItems) overflowButton([]appRef) *Rect    { return nil }
 func (nullItems) positions() map[string]float64    { return nil }
 func (nullItems) setPosition(string, float64) bool { return false }
+func (nullItems) reloadMenuBar()                     {}
 func (nullItems) requestLayoutAccess() bool        { return false }
 func (nullItems) commandDrag(Point, Point)         {}
 func (nullItems) ownPID() int32                    { return 0 }

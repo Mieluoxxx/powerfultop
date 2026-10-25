@@ -99,3 +99,29 @@ func (p Preferences) Data(key string) ([]byte, bool) {
 	b, ok := v.([]byte)
 	return b, ok
 }
+
+// Keys lists the domain's keys for the current user on any host, where UserDefaults writes.
+func (p Preferences) Keys() []string {
+	if p.domain == "" || load() != nil || kCFPreferencesCurrentUser == 0 {
+		return nil
+	}
+	d := CFString(p.domain)
+	defer cfRelease(d)
+	list := cfPreferencesCopyKeyList(d, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+	if list == 0 {
+		return nil
+	}
+	defer cfRelease(list)
+	value, err := FromCF(list)
+	if err != nil {
+		return nil
+	}
+	items, _ := value.([]any)
+	keys := make([]string, 0, len(items))
+	for _, item := range items {
+		if s, ok := item.(string); ok {
+			keys = append(keys, s)
+		}
+	}
+	return keys
+}

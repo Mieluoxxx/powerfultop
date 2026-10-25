@@ -35,6 +35,10 @@ var (
 	cfPreferencesAppSynchronize  func(app uintptr) bool
 	cfBundleGetMainBundle        func() uintptr
 	cfBundleGetIdentifier        func(bundle uintptr) uintptr
+	cfPreferencesCopyKeyList     func(app, user, host uintptr) uintptr
+
+	kCFPreferencesCurrentUser uintptr
+	kCFPreferencesAnyHost     uintptr
 )
 
 // kCFPropertyListXMLFormat_v1_0: CF objects cross into Go as XML, which saves wrapping every CF type.
@@ -69,6 +73,16 @@ func load() error {
 		purego.RegisterLibFunc(&cfPreferencesAppSynchronize, cf, "CFPreferencesAppSynchronize")
 		purego.RegisterLibFunc(&cfBundleGetMainBundle, cf, "CFBundleGetMainBundle")
 		purego.RegisterLibFunc(&cfBundleGetIdentifier, cf, "CFBundleGetIdentifier")
+		purego.RegisterLibFunc(&cfPreferencesCopyKeyList, cf, "CFPreferencesCopyKeyList")
+		// These are CFStringRef globals, so the symbol is the address of the pointer.
+		for name, dst := range map[string]*uintptr{
+			"kCFPreferencesCurrentUser": &kCFPreferencesCurrentUser,
+			"kCFPreferencesAnyHost":     &kCFPreferencesAnyHost,
+		} {
+			if sym, err := purego.Dlsym(cf, name); err == nil {
+				*dst = **(**uintptr)(unsafe.Pointer(&sym))
+			}
+		}
 	})
 	return loadErr
 }

@@ -14,6 +14,9 @@ func TestPreferencesRoundTrip(t *testing.T) {
 	if err := p.Set("value", want); err != nil {
 		t.Fatal(err)
 	}
+	if keys := p.Keys(); len(keys) != 1 || keys[0] != "value" {
+		t.Errorf("keys %v", keys)
+	}
 	got, ok := p.Value("value")
 	if !ok || !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v %v", got, ok)

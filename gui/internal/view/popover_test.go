@@ -1,0 +1,60 @@
+package view
+
+import (
+	"testing"
+
+	"github.com/egoist/mygo/ui"
+
+	"powerfultop/internal/display"
+	"powerfultop/internal/power"
+	"powerfultop/internal/system"
+	"powerfultop/internal/thermal"
+)
+
+func intp(v int) *int { return &v }
+
+func TestPopoverSections(t *testing.T) {
+	mem := system.MemoryStats{TotalBytes: 128 << 30, AppBytes: 40 << 30, Pressure: system.PressureNormal}
+	d := PopoverData{
+		Available: true,
+		Power: power.Data{
+			SystemPowerW: 11.07, BatteryPercent: 85, IsOnAC: true, ACAdapterWattage: 65, ConnectionPhase: power.PhaseOnAC,
+			BatteryHealthPercent: intp(99), CycleCount: intp(74),
+		},
+		Thermal: thermal.Snapshot{Temperatures: map[thermal.SensorGroup]thermal.TemperatureSummary{
+			thermal.GroupCPU: {AverageC: 39, MaximumC: 45, SensorCount: 4},
+		}},
+		System:   system.Snapshot{Memory: &mem},
+		Displays: []display.Brightness{{ID: 1, Name: "Built-in Retina Display", BuiltIn: true, Level: 0.6}},
+		Version:  "1.4.0",
+	}
+	var opened []PageID
+	charge := 0
+	a := PopoverActions{
+		OpenDetails:             func(p PageID) { opened = append(opened, p) },
+		OpenChargeLimitSettings: func() { charge++ },
+	}
+	tt := ui.NewTester(func(c *ui.Context) { Popover(c, d, a) }, PopoverWidth, 700)
+	for _, want := range []string{"85%", "Charger", "65 W", "System", "11.1 W", "CPU", "39°C", "Memory", "Built-in Retina Display", "99%", "Health", "74", "Charge Limit", "Details"} {
+		if !tt.HasText(want) {
+			t.Errorf("missing %q in %q", want, tt.Texts())
+		}
+	}
+	if err := tt.Click("Details"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tt.Click("Charge Limit"); err != nil {
+		t.Fatal(err)
+	}
+	if len(opened) != 1 || charge != 1 {
+		t.Errorf("opened %v charge %d", opened, charge)
+	}
+}
+
+func TestPopoverOnBattery(t *testing.T) {
+	d := PopoverData{Available: true, Power: power.Data{SystemPowerW: 9.75, BatteryPowerW: 9.75, BatteryPercent: 15}}
+	tt := ui.NewTester(func(c *ui.Context) { Popover(c, d, PopoverActions{}) }, PopoverWidth, 600)
+	if !tt.HasText("Battery") || tt.HasText("Charger") || tt.HasText("Charge Limit") {
+		t.Errorf("texts %q", tt.Texts())
+	}
+}

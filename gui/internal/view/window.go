@@ -64,7 +64,7 @@ func Details(c *ui.Context, pages []WindowPage, s *DetailsState) {
 			current = p
 		}
 	}
-	ui.Row(c).Fill().Background(t.Background).Children(func() {
+	ui.Row(c).Fill().AlignItems(ui.Stretch).Background(t.Background).Children(func() {
 		sidebar(c, pages, current.ID, s)
 		ui.Box(c).Width(1).Background(CardBorder(c))
 		if !s.Available {

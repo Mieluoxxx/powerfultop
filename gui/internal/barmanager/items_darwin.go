@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
@@ -298,6 +300,33 @@ func (d *darwinItems) setPosition(key string, value float64) bool {
 		return false
 	}
 	return d.positions()[key] == value
+}
+
+// reloadMenuBar restarts MenuBarAgent, which launchd starts again at once, and waits until the new
+// one has laid the bar out from the layout file.
+func (d *darwinItems) reloadMenuBar() {
+	old := d.menuBarAgentPID()
+	if old == 0 || syscall.Kill(int(old), syscall.SIGTERM) != nil {
+		return
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		time.Sleep(100 * time.Millisecond)
+		if pid := d.menuBarAgentPID(); pid != 0 && pid != old {
+			break
+		}
+	}
+	// Status items register with the new agent a moment after it starts.
+	time.Sleep(time.Second)
+}
+
+func (d *darwinItems) menuBarAgentPID() int32 {
+	for _, app := range d.runningApps() {
+		if app.BundleID == menuBarAgentID {
+			return app.PID
+		}
+	}
+	return 0
 }
 
 // requestLayoutAccess asks the user to pick the file; their choice is what lets this app past the

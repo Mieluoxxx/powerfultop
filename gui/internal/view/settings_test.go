@@ -24,6 +24,9 @@ func TestSettingsPage(t *testing.T) {
 			t.Errorf("missing %q in %q", want, tt.Texts())
 		}
 	}
+	if r, ok := tt.Find("Launch at Login"); !ok || r.W == 0 {
+		t.Error("the switch needs a visible label")
+	}
 	if err := tt.Click("Launch at Login"); err != nil {
 		t.Fatal(err)
 	}

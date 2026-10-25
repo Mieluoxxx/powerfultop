@@ -12,6 +12,10 @@ type fakeItems struct {
 	pos       map[string]float64
 	drags     [][2]Point
 	setCalls  int
+	reloads   int
+	onReload  func(*fakeItems)
+	// applies makes layout-file writes reach the bar at once, moving FineTune left of the separator.
+	applies bool
 	isTrusted bool
 }
 
@@ -44,13 +48,28 @@ func (f *fakeItems) setPosition(key string, v float64) bool {
 	defer f.mu.Unlock()
 	f.setCalls++
 	f.pos[key] = v
+	if f.applies {
+		f.moveFineTuneLeft()
+	}
 	return true
+}
+func (f *fakeItems) reloadMenuBar() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.reloads++
+	if f.onReload != nil {
+		f.onReload(f)
+	}
 }
 func (f *fakeItems) commandDrag(start, end Point) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.drags = append(f.drags, [2]Point{start, end})
-	// FineTune lands left of the separator.
+	f.moveFineTuneLeft()
+}
+
+// moveFineTuneLeft puts FineTune left of the separator; callers hold f.mu.
+func (f *fakeItems) moveFineTuneLeft() {
 	for i := range f.raw {
 		if f.raw[i].PID == 2 {
 			f.raw[i].Frame.X = 690
@@ -123,6 +142,9 @@ func TestStoreMovesThroughLayoutFile(t *testing.T) {
 	if p.setCalls != 1 || len(p.drags) != 0 {
 		t.Fatalf("file moves don't drag: set %d drags %d", p.setCalls, len(p.drags))
 	}
+	if p.reloads != 1 {
+		t.Errorf("a write the bar ignores reloads the bar once, got %d", p.reloads)
+	}
 	if got := p.positions()["status:com.finetuneapp.FineTune::Item-0"]; got <= 928 {
 		t.Errorf("hidden lands left of the separator: %v", got)
 	}
@@ -151,5 +173,22 @@ func TestStoreFallsBackToDrag(t *testing.T) {
 	}
 	if s.Snapshot().Error != NoError {
 		t.Errorf("landed: %v", s.Snapshot().Error)
+	}
+}
+
+func TestStoreSkipsReloadWhenTheBarApplies(t *testing.T) {
+	p := &fakeItems{raw: expandedRaw(), isTrusted: true, applies: true, pos: map[string]float64{
+		"status:PowerfulTop::PowerfulTop.MenuBarSection.separator": 928,
+		"status:PowerfulTop::PowerfulTop.MenuBarSection.spacer0":   832,
+		"status:PowerfulTop::PowerfulTop.MenuBarSection.toggle":    805,
+		"status:com.finetuneapp.FineTune::Item-0":                  512,
+	}}
+	s, _ := newTestStore(p)
+	s.SetVisible(true)
+	defer s.SetVisible(false)
+	waitFor(t, "items", func() bool { return s.Snapshot().HasLayoutAccess && len(s.Snapshot().Items) > 0 })
+	s.move("com.finetuneapp.FineTune#0", Hidden, "")
+	if p.reloads != 0 || s.Snapshot().Error != NoError {
+		t.Errorf("reloads %d err %v", p.reloads, s.Snapshot().Error)
 	}
 }

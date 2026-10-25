@@ -40,6 +40,8 @@ type itemPlatform interface {
 	setPosition(key string, value float64) bool
 	requestLayoutAccess() bool
 	commandDrag(start, end Point)
+	// reloadMenuBar restarts MenuBarAgent so it reads the layout file again.
+	reloadMenuBar()
 	ownPID() int32
 	appIcon(path string) []byte
 }
@@ -280,7 +282,13 @@ func (s *ItemStore) move(id string, section Section, before string) {
 			target = PositionRightOf(file.toggle, existing)
 		}
 		if s.p.setPosition(item.LayoutKey, target) {
-			time.Sleep(settleDelay)
+			if s.landedOnBar(id, section) {
+				s.setError(NoError)
+				return
+			}
+			// MenuBarAgent reads the file through its own app-group domain, so a write by path only
+			// reaches it when its cache happens to miss; a restarted agent reads the file afresh.
+			s.p.reloadMenuBar()
 			s.scan()
 			moved, _ := find(s.Snapshot().Items, id)
 			s.setErrorUnless(moved.Section == section)
@@ -308,6 +316,22 @@ func (s *ItemStore) move(id string, section Section, before string) {
 		}
 	}
 	s.setErrorUnless(landed)
+}
+
+// landedOnBar reports whether the bar itself shows the item in section: after a layout-file write
+// the scan sorts by the file, which says nothing about whether MenuBarAgent applied it. An item the
+// bar doesn't show can't be checked, so it counts as not landed.
+func (s *ItemStore) landedOnBar(id string, section Section) bool {
+	time.Sleep(settleDelay)
+	s.scan()
+	moved, ok := find(s.Snapshot().Items, id)
+	s.mu.Lock()
+	frames := s.frames
+	s.mu.Unlock()
+	if !ok || !moved.Reachable || frames == nil {
+		return false
+	}
+	return SectionOf(moved.Frame, frames.separator, frames.toggle) == section
 }
 
 func (s *ItemStore) setError(e StoreError) {

@@ -46,10 +46,19 @@ type SettingsActions struct {
 func SettingsPage(c *ui.Context, d SettingsData, a SettingsActions) {
 	ui.Column(c).Gap(16).MaxWidth(560).Children(func() {
 		Card(c, L("General", "通用"), "settings", Gray, func() {
-			on := d.LaunchAtLogin
-			if ui.Switch(c.Key("login"), &on).Label(L("Launch at Login", "开机启动")).Changed() && a.SetLaunchAtLogin != nil {
-				a.SetLaunchAtLogin(on)
-			}
+			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+				label := L("Launch at Login", "开机启动")
+				// Clicking the label toggles, as a labeled switch does in System Settings.
+				ui.Text(c, label).FontSize(12).Grow(1).OnClick(func() {
+					if a.SetLaunchAtLogin != nil {
+						a.SetLaunchAtLogin(!d.LaunchAtLogin)
+					}
+				})
+				on := d.LaunchAtLogin
+				if ui.Switch(c.Key("login"), &on).Label(label).Changed() && a.SetLaunchAtLogin != nil {
+					a.SetLaunchAtLogin(on)
+				}
+			})
 			if d.LaunchAtLoginError != "" {
 				Status(c, "octagon-x", Red, d.LaunchAtLoginError, "")
 			}
@@ -108,9 +117,8 @@ func SettingsPage(c *ui.Context, d SettingsData, a SettingsActions) {
 			}
 			if d.Serial != "" {
 				ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-					ui.Row(c).Grow(1).Children(func() {
-						Row(c, L("Battery Serial Number", "电池序列号"), d.Serial, "", false)
-					})
+					ui.Text(c, L("Battery Serial Number", "电池序列号")).FontSize(12).TextColor(c.Theme().TextMuted).NoWrap().Grow(1)
+					ui.Text(c, d.Serial).FontSize(12).FontWeight(500).FontFeatures("tnum").SingleLine()
 					copy := ui.ButtonBase(c).Padding(4).Radius(5).Label(L("Copy", "复制")).
 						Tooltip(L("Copy serial number. Device info is shown locally only and is not uploaded.",
 							"复制序列号。设备信息仅在本地显示，不会上传。")).
