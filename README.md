@@ -29,6 +29,7 @@ It gives you clear, real-time power information directly in the menu bar and a s
 - **Charger load** — Know your adapter's wattage and how much of it is being used.
 - **Battery overview** — Quick view of battery level, health, temperature, and cycle count.
 - **Estimated battery time** — Time to empty or full in the popover and detail view; respects macOS charge limits (80/85/90/95%) and third-party apps like AlDente.
+- **Charge limit** — Set the macOS charge limit (80/85/90/95/100%) right on the Battery page, without visiting System Settings. It is the same setting, enforced by firmware, so it holds while PowerfulTop is closed or the Mac sleeps; no admin password needed.
 - **Detailed information** — Auto-detected cell topology (e.g. 3S2P), series-group voltage, parallel cell currents, charging status, and lifetime stats.
 - **Menu bar manager (macOS 27)** — Bartender-style hiding: ⌘-drag icons left of the separator and toggle them with one click; hiding itself uses the macOS 27 menu bar's own overflow and needs no permission. A layout editor in the style of Ice and Thaw lists every app's icon in its row and moves them by drag and drop; it needs Accessibility access, and moves icons without the pointer once you allow the menu bar layout file. Off by default; turn it on under Details › Menu Bar Manager.
 

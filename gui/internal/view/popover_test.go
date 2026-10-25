@@ -29,11 +29,7 @@ func TestPopoverSections(t *testing.T) {
 		Version:  "1.4.0",
 	}
 	var opened []PageID
-	charge := 0
-	a := PopoverActions{
-		OpenDetails:             func(p PageID) { opened = append(opened, p) },
-		OpenChargeLimitSettings: func() { charge++ },
-	}
+	a := PopoverActions{OpenDetails: func(p PageID) { opened = append(opened, p) }}
 	tt := ui.NewTester(func(c *ui.Context) { Popover(c, d, a) }, PopoverWidth, 700)
 	for _, want := range []string{"85%", "Charger", "65 W", "System", "11.1 W", "CPU", "39°C", "Memory", "Built-in Retina Display", "99%", "Health", "74", "Charge Limit", "Details"} {
 		if !tt.HasText(want) {
@@ -50,8 +46,8 @@ func TestPopoverSections(t *testing.T) {
 	if err := tt.Click("Charge Limit"); err != nil {
 		t.Fatal(err)
 	}
-	if len(opened) != 1 || charge != 1 {
-		t.Errorf("opened %v charge %d", opened, charge)
+	if len(opened) != 2 || opened[1] != PageBattery {
+		t.Errorf("opened %v, want the charge limit row to open the Battery page", opened)
 	}
 }
 

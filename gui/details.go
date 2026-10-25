@@ -69,6 +69,13 @@ func (a *app) applyPageEffects() {
 		a.sampling = sampling
 		a.system.SetProcessSamplingActive(sampling)
 	}
+	// The limit can change in System Settings or AlDente, so it is reread whenever the page comes up.
+	if shown := a.detailsOpen && selected == view.PageBattery; shown != a.batteryShown {
+		a.batteryShown = shown
+		if shown {
+			a.chargeLimit.Refresh()
+		}
+	}
 	if visible := a.detailsOpen && selected == view.PageMenuBarManager; visible != a.storeVisible {
 		a.storeVisible = visible
 		a.store.SetVisible(visible)
@@ -96,13 +103,13 @@ func (a *app) detailsView(c *ui.Context) {
 			view.SystemPage(c, sys, cpuTemp, &a.history, width)
 		}},
 		{ID: view.PageCooling, Title: view.L("Cooling", "散热"), Icon: "fan",
-			// Cooling hosts the fan controls and the update button, so a stale helper is flagged there.
+			// Cooling hosts the fan controls and the helper card, so a stale helper is flagged there.
 			Attention: th.HelperStatus == thermal.HelperNeedsUpdate, Hint: helperHint,
 			Body: func(c *ui.Context, width float32) {
 				view.CoolingPage(c, a.thermal, &a.history, &a.coolingState, width)
 			}},
 		{ID: view.PageBattery, Title: view.L("Battery", "电池"), Icon: "battery-full", Body: func(c *ui.Context, width float32) {
-			view.BatteryPage(c, p, width)
+			view.BatteryPage(c, p, a.chargeLimit, width)
 		}},
 		{ID: view.PageMenuBar, Title: view.L("Menu Bar", "菜单栏"), Icon: "panel-top", Body: func(c *ui.Context, width float32) {
 			view.MenuBarPage(c, a.menuSettings, menuBarContext(p, a.power.Available(), th, sys), &a.menuBarState, width)
@@ -111,29 +118,17 @@ func (a *app) detailsView(c *ui.Context) {
 			view.MenuBarManagerPage(c, a.bar, a.store, &a.managerState, width)
 		}},
 		{ID: view.PageSettings, Title: view.L("Settings", "设置"), Icon: "settings", Body: func(c *ui.Context, _ float32) {
-			view.SettingsPage(c, a.settingsData(p, th), a.settingsActions())
+			view.SettingsPage(c, a.settingsData(p), a.settingsActions())
 		}},
 	}
 	view.Details(c, pages, &a.detailsState)
 }
 
-func (a *app) settingsData(p power.Data, th thermal.Snapshot) view.SettingsData {
+func (a *app) settingsData(p power.Data) view.SettingsData {
 	d := view.SettingsData{
-		LaunchAtLogin:        mygo.App.OpenAtLogin(),
-		LaunchAtLoginError:   a.loginError,
-		ChargeLimitText:      p.ChargeLimitText(),
-		ChargeLimitByAlDente: p.ChargeLimitSource == power.ChargeLimitAlDente,
-		HasFans:              th.HasFans(),
-		Version:              mygo.App.Version(),
-	}
-	switch th.HelperStatus {
-	case thermal.HelperNeedsUpdate:
-		d.HelperStatus = view.HelperNeedsUpdate
-	case thermal.HelperReady:
-		d.HelperStatus = view.HelperReady
-	}
-	if th.LastError != nil {
-		d.HelperError = view.HelperErrorText(th.LastError)
+		LaunchAtLogin:      mygo.App.OpenAtLogin(),
+		LaunchAtLoginError: a.loginError,
+		Version:            mygo.App.Version(),
 	}
 	if p.DeviceName != nil {
 		d.ChipName = *p.DeviceName
@@ -149,10 +144,7 @@ func (a *app) settingsData(p power.Data, th thermal.Snapshot) view.SettingsData 
 
 func (a *app) settingsActions() view.SettingsActions {
 	return view.SettingsActions{
-		SetLaunchAtLogin:        a.setLaunchAtLogin,
-		OpenChargeLimitSettings: func() { _ = mygo.Shell.OpenExternal(power.MacOSChargeLimitSettingsURL) },
-		InstallHelper:           a.thermal.InstallHelper,
-		UninstallHelper:         a.thermal.UninstallHelper,
-		CopySerial:              mygo.Clipboard.WriteText,
+		SetLaunchAtLogin: a.setLaunchAtLogin,
+		CopySerial:       mygo.Clipboard.WriteText,
 	}
 }

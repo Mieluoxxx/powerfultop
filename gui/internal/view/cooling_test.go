@@ -44,7 +44,8 @@ func renderCooling(t *testing.T, s thermal.Snapshot) *ui.Tester {
 func TestCoolingPageAutomatic(t *testing.T) {
 	tt := renderCooling(t, coolingSnapshot(thermal.Automatic, thermal.HelperReady))
 	for _, want := range []string{"Temperatures", "52.3°C", "CPU Average", "52.3°C avg · 78.0°C max", "Fans", "2500 RPM",
-		"Controlled by macOS", "Fan 1", "2400 / 7826 RPM", "Auto", "Full Blast", "Custom", "Fan Speed"} {
+		"Controlled by macOS", "Fan 1", "2400 / 7826 RPM", "Auto", "Full Blast", "Custom", "Fan Speed",
+		"Fan Helper", "Installed", "Uninstall"} {
 		if !tt.HasText(want) {
 			t.Errorf("missing %q in %q", want, tt.Texts())
 		}

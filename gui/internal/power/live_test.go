@@ -52,3 +52,18 @@ func ptrIntToFloat(v *int) *float64 {
 	f := float64(*v)
 	return &f
 }
+
+// Reads the native charge limit through PowerUIAgent, the path the Battery page writes through.
+func TestPowerUILive(t *testing.T) {
+	s, err := (&powerUI{}).read()
+	if errors.Is(err, errPowerUIUnavailable) {
+		t.Skip("PowerUI charge limit unavailable")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.supported && (len(s.limits) == 0 || s.limits[len(s.limits)-1] != 100) {
+		t.Errorf("implausible limits: %+v", s)
+	}
+	t.Logf("%+v", s)
+}

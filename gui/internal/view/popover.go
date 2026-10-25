@@ -32,11 +32,10 @@ type PopoverData struct {
 
 // PopoverActions are what the popover's controls do.
 type PopoverActions struct {
-	OpenDetails             func(PageID)
-	OpenChargeLimitSettings func()
-	SetBrightness           func(id uint32, level float64)
-	SetLaunchAtLogin        func(bool)
-	Quit                    func()
+	OpenDetails      func(PageID)
+	SetBrightness    func(id uint32, level float64)
+	SetLaunchAtLogin func(bool)
+	Quit             func()
 }
 
 // BatteryTemperatureC prefers the battery's own reading; some machines drop it, and the SMC pack
@@ -270,7 +269,7 @@ func popoverStats(c *ui.Context, p power.Data, temp float64, hasTemp bool) {
 func popoverChargeLimit(c *ui.Context, p power.Data, a PopoverActions) {
 	t := c.Theme()
 	row := ui.ButtonBase(c).AlignSelf(ui.Stretch).Label(L("Charge Limit", "充电上限")).
-		Tooltip(L("Adjust the charge limit (80–100%) in System Settings", "在系统设置中调整充电上限（80–100%）")).
+		Tooltip(L("Adjust the charge limit on the Battery page", "在电池页调整充电上限")).
 		Children(func() {
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Grow(1).Children(func() {
 				ui.Icon(c, icons.Get("battery-charging")).Size(12, 12).TextColor(Green.Color(c))
@@ -279,8 +278,8 @@ func popoverChargeLimit(c *ui.Context, p power.Data, a PopoverActions) {
 				ui.Icon(c, icons.Get("chevron-right")).Size(9, 9).TextColor(t.TextMuted.Alpha(0.6))
 			})
 		})
-	if row.Clicked() && a.OpenChargeLimitSettings != nil {
-		a.OpenChargeLimitSettings()
+	if row.Clicked() && a.OpenDetails != nil {
+		a.OpenDetails(PageBattery)
 	}
 }
 

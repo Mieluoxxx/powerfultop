@@ -9,7 +9,6 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"powerfultop/internal/macos"
-	"powerfultop/internal/power"
 	"powerfultop/internal/view"
 )
 
@@ -99,6 +98,7 @@ func (a *app) togglePopover() {
 		return
 	}
 	a.panelHeight = 0
+	a.chargeLimit.Refresh()
 	panel := mygo.NewFlyout(mygo.FlyoutOptions{
 		Tray:      a.tray,
 		Placement: mygo.PlacementBottom,
@@ -161,10 +161,9 @@ func (a *app) popoverView(c *ui.Context) {
 			}
 			a.openDetails(page)
 		},
-		OpenChargeLimitSettings: func() { _ = mygo.Shell.OpenExternal(power.MacOSChargeLimitSettingsURL) },
-		SetBrightness:           a.displays.SetLevel,
-		SetLaunchAtLogin:        a.setLaunchAtLogin,
-		Quit:                    mygo.App.Quit,
+		SetBrightness:    a.displays.SetLevel,
+		SetLaunchAtLogin: a.setLaunchAtLogin,
+		Quit:             mygo.App.Quit,
 	})
 	// Flyouts have a fixed size; follow the content's height as NSPopover's fitting size does.
 	if h := int(root.Bounds().H + 0.5); h > 0 && h != a.panelHeight {

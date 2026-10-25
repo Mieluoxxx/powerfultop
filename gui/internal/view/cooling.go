@@ -55,6 +55,9 @@ func CoolingPage(c *ui.Context, m *thermal.Monitor, h *history.History, state *C
 					h.Series(history.FanRPM), &[2]float64{0, top}, L("Collecting data…", "正在收集数据…"))
 			}
 		})
+		if s.HasFans() {
+			ui.Grid(c).Columns(columns).Gap(16).Children(func() { FanHelperCard(c, m) })
+		}
 	})
 }
 
@@ -456,7 +459,7 @@ func FanSection(c *ui.Context, m *thermal.Monitor) {
 	})
 }
 
-// FanHelperCard is the Settings page's helper card: status, install / update and uninstall.
+// FanHelperCard is the Cooling page's helper card: status, install / update and uninstall.
 func FanHelperCard(c *ui.Context, m *thermal.Monitor) {
 	s := m.Snapshot()
 	if !s.HasFans() {

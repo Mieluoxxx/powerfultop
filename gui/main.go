@@ -28,6 +28,7 @@ import (
 type app struct {
 	prefs        macos.Preferences
 	power        *power.Monitor
+	chargeLimit  *power.ChargeLimiter
 	thermal      *thermal.Monitor
 	system       *system.Monitor
 	displays     *display.Controller
@@ -54,6 +55,7 @@ type app struct {
 	managerState  view.ManagerPageState
 	sampling      bool
 	storeVisible  bool
+	batteryShown  bool
 	displaysShown bool
 }
 
@@ -62,6 +64,7 @@ func newApp() *app {
 	migrateLegacyDefaults(a.prefs, macos.DomainPreferences(legacyBundleID))
 	clearStaleStatusItemVisibility(a.prefs)
 	a.power = power.NewMonitor()
+	a.chargeLimit = power.NewChargeLimiter()
 	resources, _ := mygo.App.Path(mygo.PathResources)
 	a.thermal = thermal.NewMonitor(filepath.Join(resources, thermal.BundledHelperName))
 	a.system = system.NewMonitor()
@@ -79,12 +82,13 @@ func newApp() *app {
 
 func (a *app) ready() {
 	a.power.Start()
+	a.chargeLimit.Refresh()
 	a.thermal.Start()
 	a.system.Start()
 	a.displays.Start()
 	a.setupTray()
 
-	for _, onChange := range []func(func()){a.power.OnChange, a.thermal.OnChange, a.system.OnChange, a.displays.OnChange, a.bar.OnChange, a.store.OnChange} {
+	for _, onChange := range []func(func()){a.power.OnChange, a.chargeLimit.OnChange, a.thermal.OnChange, a.system.OnChange, a.displays.OnChange, a.bar.OnChange, a.store.OnChange} {
 		onChange(a.invalidate)
 	}
 	a.menuSettings.OnChange(func() {

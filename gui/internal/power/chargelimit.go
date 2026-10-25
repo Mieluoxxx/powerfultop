@@ -32,10 +32,6 @@ type ResolvedChargeLimit struct {
 
 var FullCharge = ResolvedChargeLimit{Percent: 100, Source: ChargeLimitNone}
 
-// MacOSChargeLimitSettingsURL is System Settings › Battery › Charging, where macOS 26.4+ exposes
-// the native 80–100% limit.
-const MacOSChargeLimitSettingsURL = "x-apple.systempreferences:com.apple.Battery-Settings.extension"
-
 const optimizedChargingPauseReason = 0x0100_0000
 
 // ResolveChargeLimit returns the effective charge target for time-to-full estimates.
@@ -110,6 +106,12 @@ var powerdLimitCache struct {
 }
 
 const powerdLimitLifetime = 30 * time.Second
+
+func invalidateMacOSChargeLimit() {
+	powerdLimitCache.Lock()
+	defer powerdLimitCache.Unlock()
+	powerdLimitCache.readAt = time.Time{}
+}
 
 func readMacOSChargeLimit() *int {
 	powerdLimitCache.Lock()

@@ -2,22 +2,24 @@ package view
 
 import (
 	"fmt"
+	"slices"
 
-	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
-	"powerfultop/internal/icons"
 	"powerfultop/internal/power"
 )
 
-// BatteryPage is the depth the overview leaves out: capacity history, charger negotiation, cells
-// and lifetime statistics.
-func BatteryPage(c *ui.Context, d power.Data, width float32) {
+// BatteryPage is the depth the overview leaves out: capacity history, the charge limit, charger
+// negotiation, cells and lifetime statistics.
+func BatteryPage(c *ui.Context, d power.Data, limit *power.ChargeLimiter, width float32) {
 	columns := 1
 	if width >= 760 {
 		columns = 2
 	}
-	cards := []MasonryItem{{ID: "health", Weight: 10, View: func() { batteryHealthCard(c, d) }}}
+	cards := []MasonryItem{
+		{ID: "health", Weight: 10, View: func() { batteryHealthCard(c, d) }},
+		{ID: "chargeLimit", Weight: 6, View: func() { ChargeLimitCard(c, d, limit) }},
+	}
 	if d.HasSettledAC() {
 		cards = append(cards, MasonryItem{ID: "charger", Weight: 11, View: func() { batteryChargerCard(c, d) }})
 	}
@@ -45,17 +47,6 @@ func batteryHealthCard(c *ui.Context, d power.Data) {
 		capacityRow(c, d, L("Current Full Charge", "当前满充电量"), full, health)
 		capacityRow(c, d, L("Calibrated Full Charge", "系统标定满电量"), d.NominalChargeCapacityMAH, health)
 		capacityRow(c, d, L("Remaining Charge", "剩余电量"), d.RemainingCapacityMAH, BatteryLevelTint(d))
-		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-			ui.Column(c).Grow(1).Children(func() {
-				Row(c, L("Charge Limit", "充电上限"), d.ChargeLimitText(), "", false)
-			})
-			ui.ButtonBase(c).Label(L("Charge Limit", "充电上限")).
-				Tooltip(L("Adjust the charge limit (80–100%) in System Settings", "在系统设置中调整充电上限（80–100%）")).
-				OnClick(func() { _ = mygo.Shell.OpenExternal(power.MacOSChargeLimitSettingsURL) }).
-				Children(func() {
-					ui.Icon(c, icons.Get("square-arrow-out-up-right")).Size(12, 12).TextColor(c.Theme().TextMuted)
-				})
-		})
 		if d.DailyMinSoc != nil && d.DailyMaxSoc != nil {
 			Row(c, L("Optimized Charging Range", "优化充电保持范围"), fmt.Sprintf("%d%% – %d%%", *d.DailyMinSoc, *d.DailyMaxSoc), "", false)
 		}
@@ -76,6 +67,54 @@ func batteryHealthCard(c *ui.Context, d power.Data) {
 		if d.AtCriticalLevel != nil {
 			Row(c, L("Critical Low Battery", "临界低电量"), yesNo(*d.AtCriticalLevel), "", false)
 		}
+	})
+}
+
+// ChargeLimitCard edits the macOS charge limit itself, so System Settings and PowerfulTop always agree.
+func ChargeLimitCard(c *ui.Context, d power.Data, limit *power.ChargeLimiter) {
+	s := limit.State()
+	Card(c, L("Charge Limit", "充电上限"), "battery-charging", Green, func() {
+		if !s.Supported {
+			Row(c, L("Charge Limit", "充电上限"), d.ChargeLimitText(), "", true)
+			if s.Loaded {
+				Note(c, L("This Mac has no built-in charge limit; it needs macOS 26.4 or later on Apple silicon.",
+					"此 Mac 不支持系统充电上限，需要 Apple 芯片并运行 macOS 26.4 或更高版本。"))
+			}
+			if s.Err != nil {
+				Status(c, "octagon-x", Red, L("Could not read the charge limit", "无法读取充电上限"), s.Err.Error())
+			}
+			return
+		}
+		caption := Lf("Charging stops at %d%%", "充到 %d%% 停止", s.Percent)
+		value := fmt.Sprintf("%d%%", s.Percent)
+		if s.Percent >= 100 {
+			caption = L("Charges to 100%", "不限制，充满至 100%")
+			value = L("Off", "关闭")
+		}
+		ui.Row(c).Gap(8).AlignItems(ui.End).Children(func() {
+			ui.Column(c).Grow(1).Children(func() { Hero(c, value, "", caption, 0) })
+			if s.Pending {
+				ui.Spinner(c)
+			}
+		})
+		selected := slices.Index(s.Choices, s.Percent)
+		segments := make([]segment, len(s.Choices))
+		for i, choice := range s.Choices {
+			segments[i] = segment{label: fmt.Sprintf("%d%%", choice)}
+		}
+		if e := segmented(c, L("Charge Limit", "充电上限"), &selected, segments, true, s.Pending); !s.Pending && e.Changed() {
+			limit.Set(s.Choices[selected])
+		}
+		switch {
+		case s.Err != nil:
+			Status(c, "octagon-x", Red, L("Could not change the charge limit", "无法修改充电上限"), s.Err.Error())
+		case s.AlDenteRunning:
+			Status(c, "triangle-alert", Orange, L("AlDente is running and may override this limit", "AlDente 正在运行，可能会改写这里的上限"),
+				L("Quit AlDente, or turn off its charge limit, so it doesn't fight over charging.",
+					"请退出 AlDente 或关闭它的充电限制，避免两边争抢充电控制。"))
+		}
+		Note(c, L("This is the charge limit in System Settings › Battery. macOS enforces it in firmware, so it keeps working while PowerfulTop is closed or the Mac sleeps.",
+			"即系统设置 › 电池中的充电上限，由 macOS 在固件层执行，PowerfulTop 关闭或 Mac 睡眠时依然有效。"))
 	})
 }
 
