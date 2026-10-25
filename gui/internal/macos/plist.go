@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -171,4 +172,77 @@ func String(dict map[string]any, key string) (string, bool) {
 func Dict(dict map[string]any, key string) (map[string]any, bool) {
 	v, ok := dict[key].(map[string]any)
 	return v, ok
+}
+
+// EncodePlist writes Go values as an XML property list: maps with string keys, slices, strings,
+// integers, floats, bools, []byte and time.Time.
+func EncodePlist(value any) ([]byte, error) {
+	var b bytes.Buffer
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<plist version="1.0">`)
+	if err := encode(&b, value); err != nil {
+		return nil, err
+	}
+	b.WriteString("</plist>")
+	return b.Bytes(), nil
+}
+
+func encode(b *bytes.Buffer, value any) error {
+	escape := func(s string) {
+		_ = xml.EscapeText(b, []byte(s))
+	}
+	switch v := value.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(v))
+		for k := range v {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		b.WriteString("<dict>")
+		for _, k := range keys {
+			b.WriteString("<key>")
+			escape(k)
+			b.WriteString("</key>")
+			if err := encode(b, v[k]); err != nil {
+				return err
+			}
+		}
+		b.WriteString("</dict>")
+	case []any:
+		b.WriteString("<array>")
+		for _, item := range v {
+			if err := encode(b, item); err != nil {
+				return err
+			}
+		}
+		b.WriteString("</array>")
+	case []string:
+		items := make([]any, len(v))
+		for i, s := range v {
+			items[i] = s
+		}
+		return encode(b, items)
+	case string:
+		b.WriteString("<string>")
+		escape(v)
+		b.WriteString("</string>")
+	case int:
+		fmt.Fprintf(b, "<integer>%d</integer>", v)
+	case int64:
+		fmt.Fprintf(b, "<integer>%d</integer>", v)
+	case float64:
+		fmt.Fprintf(b, "<real>%s</real>", strconv.FormatFloat(v, 'g', -1, 64))
+	case bool:
+		if v {
+			b.WriteString("<true/>")
+		} else {
+			b.WriteString("<false/>")
+		}
+	case []byte:
+		fmt.Fprintf(b, "<data>%s</data>", base64.StdEncoding.EncodeToString(v))
+	case time.Time:
+		fmt.Fprintf(b, "<date>%s</date>", v.UTC().Format(time.RFC3339))
+	default:
+		return fmt.Errorf("plist: can't encode %T", value)
+	}
+	return nil
 }

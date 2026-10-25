@@ -26,6 +26,15 @@ var (
 	cfDataGetLength          func(data uintptr) int
 	cfDataGetBytePtr         func(data uintptr) *byte
 	cfRelease                func(object uintptr)
+
+	cfPropertyListCreateWithData func(allocator, data uintptr, options uint, format, err uintptr) uintptr
+	cfDataCreate                 func(allocator uintptr, bytes []byte, length int) uintptr
+	cfStringCreateWithCString    func(allocator uintptr, s string, encoding uint32) uintptr
+	cfPreferencesCopyAppValue    func(key, app uintptr) uintptr
+	cfPreferencesSetAppValue     func(key, value, app uintptr)
+	cfPreferencesAppSynchronize  func(app uintptr) bool
+	cfBundleGetMainBundle        func() uintptr
+	cfBundleGetIdentifier        func(bundle uintptr) uintptr
 )
 
 // kCFPropertyListXMLFormat_v1_0: CF objects cross into Go as XML, which saves wrapping every CF type.
@@ -52,6 +61,14 @@ func load() error {
 		purego.RegisterLibFunc(&cfDataGetLength, cf, "CFDataGetLength")
 		purego.RegisterLibFunc(&cfDataGetBytePtr, cf, "CFDataGetBytePtr")
 		purego.RegisterLibFunc(&cfRelease, cf, "CFRelease")
+		purego.RegisterLibFunc(&cfPropertyListCreateWithData, cf, "CFPropertyListCreateWithData")
+		purego.RegisterLibFunc(&cfDataCreate, cf, "CFDataCreate")
+		purego.RegisterLibFunc(&cfStringCreateWithCString, cf, "CFStringCreateWithCString")
+		purego.RegisterLibFunc(&cfPreferencesCopyAppValue, cf, "CFPreferencesCopyAppValue")
+		purego.RegisterLibFunc(&cfPreferencesSetAppValue, cf, "CFPreferencesSetAppValue")
+		purego.RegisterLibFunc(&cfPreferencesAppSynchronize, cf, "CFPreferencesAppSynchronize")
+		purego.RegisterLibFunc(&cfBundleGetMainBundle, cf, "CFBundleGetMainBundle")
+		purego.RegisterLibFunc(&cfBundleGetIdentifier, cf, "CFBundleGetIdentifier")
 	})
 	return loadErr
 }
@@ -89,13 +106,7 @@ func properties(service uint32) (map[string]any, error) {
 		return nil, fmt.Errorf("IORegistryEntryCreateCFProperties: %#x", kr)
 	}
 	defer cfRelease(dict)
-	data := cfPropertyListCreateData(0, dict, xmlPropertyListFormat, 0, 0)
-	if data == 0 {
-		return nil, errors.New("CFPropertyListCreateData failed")
-	}
-	defer cfRelease(data)
-	xml := unsafe.Slice(cfDataGetBytePtr(data), cfDataGetLength(data))
-	value, err := ParsePlist(xml)
+	value, err := FromCF(dict)
 	if err != nil {
 		return nil, err
 	}
@@ -104,4 +115,66 @@ func properties(service uint32) (map[string]any, error) {
 		return nil, errors.New("registry properties are not a dictionary")
 	}
 	return dictValue, nil
+}
+
+// FromCF converts any property-list CF object (dictionary, array, string, number, boolean, data,
+// date) to Go values, as ParsePlist returns them. It does not release ref.
+func FromCF(ref uintptr) (any, error) {
+	if err := load(); err != nil {
+		return nil, err
+	}
+	data := cfPropertyListCreateData(0, ref, xmlPropertyListFormat, 0, 0)
+	if data == 0 {
+		return nil, errors.New("CFPropertyListCreateData failed")
+	}
+	defer cfRelease(data)
+	return ParsePlist(unsafe.Slice(cfDataGetBytePtr(data), cfDataGetLength(data)))
+}
+
+// ToCF converts Go values to a CF property-list object, which the caller releases.
+func ToCF(value any) (uintptr, error) {
+	if err := load(); err != nil {
+		return 0, err
+	}
+	xml, err := EncodePlist(value)
+	if err != nil {
+		return 0, err
+	}
+	data := cfDataCreate(0, xml, len(xml))
+	if data == 0 {
+		return 0, errors.New("CFDataCreate failed")
+	}
+	defer cfRelease(data)
+	ref := cfPropertyListCreateWithData(0, data, 0, 0, 0)
+	if ref == 0 {
+		return 0, errors.New("CFPropertyListCreateWithData failed")
+	}
+	return ref, nil
+}
+
+// CFString returns a CFString the caller releases.
+func CFString(s string) uintptr {
+	if load() != nil {
+		return 0
+	}
+	const utf8 = 0x08000100 // kCFStringEncodingUTF8
+	return cfStringCreateWithCString(0, s, utf8)
+}
+
+// MainBundleID is the running app's bundle identifier, "" outside a bundle (as in tests).
+func MainBundleID() string {
+	if load() != nil {
+		return ""
+	}
+	bundle := cfBundleGetMainBundle()
+	if bundle == 0 {
+		return ""
+	}
+	id := cfBundleGetIdentifier(bundle)
+	if id == 0 {
+		return ""
+	}
+	value, _ := FromCF(id)
+	s, _ := value.(string)
+	return s
 }

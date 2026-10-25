@@ -56,3 +56,21 @@ func TestParsePlist(t *testing.T) {
 		t.Errorf("Raw = %v", v)
 	}
 }
+
+func TestEncodeRoundTrip(t *testing.T) {
+	in := map[string]any{
+		"name": "a < b", "count": int64(-3), "ratio": 0.5, "on": true,
+		"raw": []byte{9, 8}, "list": []any{"x", int64(1)}, "nested": map[string]any{"k": false},
+	}
+	xml, err := EncodePlist(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := ParsePlist(xml)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, xml)
+	}
+	if !reflect.DeepEqual(in, out) {
+		t.Errorf("round trip changed the value:\n in %v\nout %v", in, out)
+	}
+}
