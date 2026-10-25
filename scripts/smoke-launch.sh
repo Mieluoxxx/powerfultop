@@ -7,15 +7,15 @@ APP="$ROOT/build/PowerfulTop.app"
 BIN="$APP/Contents/MacOS/PowerfulTop"
 
 cd "$ROOT"
-bash build.sh >/tmp/powertop-smoke-build.log 2>&1
+bash build.sh >/tmp/powerfultop-smoke-build.log 2>&1
 
 killall PowerfulTop >/dev/null 2>&1 || true
 sleep 0.2
 
 set +e
-"$BIN" --smoke-launch >/tmp/powertop-smoke-launch.log 2>&1
+"$BIN" --smoke-launch >/tmp/powerfultop-smoke-launch.log 2>&1
 status=$?
 set -e
 
-cat /tmp/powertop-smoke-launch.log >&2 || true
+cat /tmp/powerfultop-smoke-launch.log >&2 || true
 exit "$status"

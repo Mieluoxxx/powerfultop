@@ -51,8 +51,8 @@ jobs:
           fi
 
           VERSION="${RELEASE_TAG#v}"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" PowerTop/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $GITHUB_RUN_NUMBER" PowerTop/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" PowerfulTop/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $GITHUB_RUN_NUMBER" PowerfulTop/Info.plist
 
           echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "Bundle version: $VERSION ($GITHUB_RUN_NUMBER)"
@@ -144,13 +144,13 @@ jobs:
               "$ZIP_PATH" \
               "$CHECKSUM_PATH" \
               --verify-tag \
-              --title "PowerTop $RELEASE_TAG" \
+              --title "PowerfulTop $RELEASE_TAG" \
               --notes "Automated ARM64 build. The application is ad-hoc signed and is not Apple-notarized." \
               --generate-notes
           fi
 
           {
-            echo "### PowerTop $RELEASE_TAG"
+            echo "### PowerfulTop $RELEASE_TAG"
             echo
             echo "Published \`${{ steps.package.outputs.dmg_name }}\`, \`PowerfulTop.zip\`, and SHA-256 checksums."
           } >> "$GITHUB_STEP_SUMMARY"

@@ -7,7 +7,7 @@ reproduced here as their licenses require.
 ## MonitorControl
 
 - Project: https://github.com/MonitorControl/MonitorControl
-- Used in: `PowerTop/Services/DisplayController.swift`, `PowerTop/Models/DisplayBrightness.swift`
+- Used in: `PowerfulTop/Services/DisplayController.swift`, `PowerfulTop/Models/DisplayBrightness.swift`
 - What: DisplayServices brightness calls, DDC/CI framing over `IOAVService`, matching
   `IOAVService` instances to displays by EDID UUID, and DDC retry timings.
 
@@ -38,7 +38,7 @@ SOFTWARE.
 ## macos-smc-fan
 
 - Project: https://github.com/agoodkind/macos-smc-fan
-- Used in: `Helper/main.swift`, `PowerTop/Services/ThermalMonitor.swift`, `PowerTop/Models/Thermal.swift`
+- Used in: `Helper/main.swift`, `PowerfulTop/Services/ThermalMonitor.swift`, `PowerfulTop/Models/Thermal.swift`
 - What: the `Ftst` unlock sequence and the `FnMd` / `FnTg` handoff for manual fan control on
   Apple silicon, reimplemented from the project's documented research. The project's full legal
   notice is at https://github.com/agoodkind/macos-smc-fan/blob/main/LICENSE.md.
@@ -58,7 +58,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## Stats
 
 - Project: https://github.com/exelban/stats
-- Used in: `PowerTop/Views/SystemPage.swift`
+- Used in: `PowerfulTop/Views/SystemPage.swift`
 - What: layout of the CPU and memory monitoring page (rings, usage breakdown, top processes).
 
 ```

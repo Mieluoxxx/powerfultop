@@ -22,11 +22,11 @@ mkdir -p "$BUILD_DIR"
     -framework IOKit \
     -parse-as-library \
     -Onone \
-    -o "$BUILD_DIR/PowerTopRegressionTests" \
-    "$PROJECT_DIR"/PowerTop/Models/*.swift \
-    "$PROJECT_DIR"/PowerTop/Utilities/*.swift \
+    -o "$BUILD_DIR/PowerfulTopRegressionTests" \
+    "$PROJECT_DIR"/PowerfulTop/Models/*.swift \
+    "$PROJECT_DIR"/PowerfulTop/Utilities/*.swift \
     "$PROJECT_DIR"/Tests/*.swift
 
-"$BUILD_DIR/PowerTopRegressionTests"
+"$BUILD_DIR/PowerfulTopRegressionTests"
 
 python3 -I "$PROJECT_DIR/scripts/check-localization.py" "$PROJECT_DIR"

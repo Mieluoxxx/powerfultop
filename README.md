@@ -56,7 +56,7 @@ Download the latest `PowerfulTop.zip` from the [Releases](https://github.com/kDo
 
 ```bash
 git clone https://github.com/kDolphin/PowerTop.git
-cd PowerTop
+cd PowerfulTop
 bash build.sh
 open build/PowerfulTop.app
 ```

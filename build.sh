@@ -25,7 +25,7 @@ mkdir -p "$BUILD_DIR"
 # Compile Swift sources
 echo "Compiling..."
 # Glob instead of listing files so new sources can't be forgotten.
-SWIFT_FILES=("$PROJECT_DIR"/PowerTop/*.swift "$PROJECT_DIR"/PowerTop/*/*.swift)
+SWIFT_FILES=("$PROJECT_DIR"/PowerfulTop/*.swift "$PROJECT_DIR"/PowerfulTop/*/*.swift)
 
 "$SWIFTC" \
     -target arm64-apple-macosx14.0 \
@@ -58,19 +58,19 @@ echo "Compiling fan helper..."
     -O \
     -o "$APP_BUNDLE/Contents/MacOS/PowerfulTopFanHelper" \
     "$PROJECT_DIR"/Helper/*.swift \
-    "$PROJECT_DIR/PowerTop/Utilities/SMC.swift" \
-    "$PROJECT_DIR/PowerTop/Models/Thermal.swift"
+    "$PROJECT_DIR/PowerfulTop/Utilities/SMC.swift" \
+    "$PROJECT_DIR/PowerfulTop/Models/Thermal.swift"
 
 # Copy Info.plist
-cp "$PROJECT_DIR/PowerTop/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
+cp "$PROJECT_DIR/PowerfulTop/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 
 # Copy Assets
-cp -R "$PROJECT_DIR/PowerTop/Assets.xcassets" "$APP_BUNDLE/Contents/Resources/Assets.xcassets"
+cp -R "$PROJECT_DIR/PowerfulTop/Assets.xcassets" "$APP_BUNDLE/Contents/Resources/Assets.xcassets"
 
 # Compile app icon using iconutil
 ICONSET_DIR=$(mktemp -d)/AppIcon.iconset
 mkdir -p "$ICONSET_DIR"
-ICONSET_SRC="$PROJECT_DIR/PowerTop/Assets.xcassets/AppIcon.appiconset"
+ICONSET_SRC="$PROJECT_DIR/PowerfulTop/Assets.xcassets/AppIcon.appiconset"
 for f in icon_16x16.png icon_16x16@2x.png icon_32x32.png icon_32x32@2x.png \
          icon_128x128.png icon_128x128@2x.png icon_256x256.png icon_256x256@2x.png \
          icon_512x512.png icon_512x512@2x.png; do
@@ -84,9 +84,9 @@ cp "$PROJECT_DIR/LICENSE" "$PROJECT_DIR/THIRD_PARTY_NOTICES.md" "$APP_BUNDLE/Con
 
 # Copy localization resources
 for lproj in en.lproj zh-Hans.lproj; do
-    if [ -d "$PROJECT_DIR/PowerTop/$lproj" ]; then
+    if [ -d "$PROJECT_DIR/PowerfulTop/$lproj" ]; then
         mkdir -p "$APP_BUNDLE/Contents/Resources/$lproj"
-        cp "$PROJECT_DIR/PowerTop/$lproj/"*.strings "$APP_BUNDLE/Contents/Resources/$lproj/" 2>/dev/null || true
+        cp "$PROJECT_DIR/PowerfulTop/$lproj/"*.strings "$APP_BUNDLE/Contents/Resources/$lproj/" 2>/dev/null || true
     fi
 done
 

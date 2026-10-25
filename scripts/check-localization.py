@@ -8,11 +8,11 @@ import re
 import sys
 
 root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else ".")
-source = "".join(p.read_text() for p in (root / "PowerTop").rglob("*.swift"))
+source = "".join(p.read_text() for p in (root / "PowerfulTop").rglob("*.swift"))
 used = set(re.findall(r'String\(localized: "((?:[^"\\]|\\.)*)"\)', source))
 
 failed = False
-for strings in sorted((root / "PowerTop").glob("*.lproj/Localizable.strings")):
+for strings in sorted((root / "PowerfulTop").glob("*.lproj/Localizable.strings")):
     key_list = re.findall(r'^"((?:[^"\\]|\\.)*)"\s*=', strings.read_text(), re.M)
     keys = set(key_list)
     duplicates = sorted({key for key in key_list if key_list.count(key) > 1})

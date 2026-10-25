@@ -56,7 +56,7 @@ macOS 从来不会直接告诉你「现在系统正在消耗多少瓦」。Power
 
 ```bash
 git clone https://github.com/kDolphin/PowerTop.git
-cd PowerTop
+cd PowerfulTop
 bash build.sh
 open build/PowerfulTop.app
 ```
