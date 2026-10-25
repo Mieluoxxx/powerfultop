@@ -7,6 +7,13 @@ import (
 
 func f(v float64) *float64 { return &v }
 
+// fromRegistry parses without touching pmset, AlDente or the battery pack service.
+func fromRegistry(props map[string]any) Data {
+	return dataFromRegistry(props, nil, nil, time.Unix(0, 0),
+		func(_, _ *int) ResolvedChargeLimit { return FullCharge },
+		func(map[string]any, time.Time) *string { return nil })
+}
+
 // Cases mirror testPowerFlowUsesIOKitDischargeSign in the Swift regression tests.
 func TestResolveFlowUsesIOKitDischargeSign(t *testing.T) {
 	cases := []struct {
@@ -42,7 +49,7 @@ func TestSnapshotFromRegistry(t *testing.T) {
 			"BatteryPower":  int64(37141),
 		},
 	}
-	s := snapshot(props, time.Unix(0, 0))
+	s := SnapshotOf(fromRegistry(props))
 	if s.Percent != 85 || !s.OnAC || !s.Charging || s.AdapterW != 96 {
 		t.Errorf("fields: %+v", s)
 	}
@@ -51,7 +58,7 @@ func TestSnapshotFromRegistry(t *testing.T) {
 	}
 
 	props["ExternalConnected"] = false
-	if s := snapshot(props, time.Unix(0, 0)); s.ACInputW != 0 || s.AdapterW != 0 {
+	if s := SnapshotOf(fromRegistry(props)); s.ACInputW != 0 || s.AdapterW != 0 {
 		t.Errorf("stale charger fields must be ignored on battery: %+v", s)
 	}
 }

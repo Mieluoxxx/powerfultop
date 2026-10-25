@@ -5,8 +5,6 @@ import (
 	"errors"
 	"math"
 	"time"
-
-	"powerfultop/internal/macos"
 )
 
 // BatteryFlowThresholdW is the battery flow below which a reading is noise, not charge or discharge.
@@ -72,66 +70,24 @@ func ResolveFlow(onAC bool, acInputW float64, systemLoadW, ioBatteryW, ioAmperag
 	return Flow{SystemW: systemW, BatteryW: batteryW}
 }
 
-// Read takes one snapshot of the built-in battery.
+// Read takes one compact snapshot of the built-in battery; the Monitor gives the full Data.
 func Read() (Snapshot, error) {
-	services, err := macos.ServiceProperties("AppleSmartBattery")
-	if err != nil {
-		return Snapshot{}, err
-	}
-	if len(services) == 0 {
+	d, ok := ReadData()
+	if !ok {
 		return Snapshot{}, ErrNoBattery
 	}
-	return snapshot(services[0], time.Now()), nil
+	return SnapshotOf(d), nil
 }
 
-func snapshot(props map[string]any, now time.Time) Snapshot {
-	onAC, _ := macos.Bool(props, "ExternalConnected")
-	charging, _ := macos.Bool(props, "IsCharging")
-	full, _ := macos.Bool(props, "FullyCharged")
-	current, _ := macos.Int(props, "CurrentCapacity")
-	maxCapacity, ok := macos.Int(props, "MaxCapacity")
-	if !ok {
-		maxCapacity = 100
+// SnapshotOf condenses Data; charger fields stay zero while unplugged, where they go stale.
+func SnapshotOf(d Data) Snapshot {
+	s := Snapshot{
+		Percent: d.BatteryPercent, OnAC: d.IsOnAC, Charging: d.IsCharging, FullyCharged: d.FullyCharged,
+		SystemW: d.SystemPowerW, BatteryW: d.BatteryPowerW, ACInputW: d.ACInputW, Time: d.Timestamp,
 	}
-	percent := 0
-	if maxCapacity > 0 {
-		percent = int(current * 100 / maxCapacity)
+	if d.IsOnAC {
+		s.AdapterW = d.ACAdapterWattage
 	}
-
-	s := Snapshot{Percent: percent, OnAC: onAC, Charging: charging, FullyCharged: full, Time: now}
-	if adapter, ok := macos.Dict(props, "AdapterDetails"); ok && onAC {
-		watts, _ := macos.Int(adapter, "Watts")
-		s.AdapterW = int(watts)
-	}
-
-	var amperageW *float64
-	amperage, hasAmperage := macos.Int(props, "Amperage")
-	voltage, hasVoltage := macos.Int(props, "Voltage")
-	if hasAmperage && hasVoltage && amperage != 0 && voltage > 0 {
-		amperageW = ptr(float64(amperage) * float64(voltage) / 1e6)
-	}
-
-	telemetry, ok := macos.Dict(props, "PowerTelemetryData")
-	if !ok {
-		flow := ResolveFlow(onAC, 0, nil, nil, amperageW, nil)
-		s.SystemW, s.BatteryW = flow.SystemW, flow.BatteryW
-		return s
-	}
-	systemLoad, _ := macos.Int(telemetry, "SystemLoad")
-	systemPowerIn, _ := macos.Int(telemetry, "SystemPowerIn")
-	batteryPower, _ := macos.Int(telemetry, "BatteryPower")
-	// SystemPowerIn goes stale after unplugging; ExternalConnected is authoritative.
-	if onAC {
-		s.ACInputW = float64(systemPowerIn) / 1000
-	}
-	var systemInputW *float64
-	sysVoltage, okV := macos.Int(telemetry, "SystemVoltageIn")
-	sysCurrent, okC := macos.Int(telemetry, "SystemCurrentIn")
-	if okV && okC && sysVoltage > 0 && sysCurrent > 0 {
-		systemInputW = ptr(float64(sysVoltage) * float64(sysCurrent) / 1e6)
-	}
-	flow := ResolveFlow(onAC, s.ACInputW, ptr(float64(systemLoad)/1000), ptr(float64(batteryPower)/1000), amperageW, systemInputW)
-	s.SystemW, s.BatteryW = flow.SystemW, flow.BatteryW
 	return s
 }
 

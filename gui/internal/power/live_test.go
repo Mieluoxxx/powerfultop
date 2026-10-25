@@ -21,3 +21,34 @@ func TestReadLive(t *testing.T) {
 	}
 	t.Logf("%+v", s)
 }
+
+func TestReadDataLive(t *testing.T) {
+	d, ok := ReadData()
+	if !ok {
+		t.Skip("no built-in battery")
+	}
+	if d.DesignCapacityMAH == nil || d.CycleCount == nil || d.BatteryVoltageMV == nil {
+		t.Errorf("missing core fields: %+v", d)
+	}
+	if d.HasCellData() && d.CellTopologyDescription() == "" {
+		t.Error("cells without a topology")
+	}
+	t.Logf("state=%s health=%v limit=%s cells=%q date=%v est=%q",
+		d.PowerSourceDescription(), deref(ptrIntToFloat(d.BatteryHealthPercent)), d.ChargeLimitText(),
+		d.CellTopologyDescription(), d.BatteryManufactureDate, d.EstimatedTimeRemainingText())
+
+	m := NewMonitor()
+	m.Start()
+	defer m.Stop()
+	if !m.Available() || m.Snapshot().BatteryPercent != d.BatteryPercent {
+		t.Errorf("monitor snapshot %+v", m.Snapshot())
+	}
+}
+
+func ptrIntToFloat(v *int) *float64 {
+	if v == nil {
+		return nil
+	}
+	f := float64(*v)
+	return &f
+}
