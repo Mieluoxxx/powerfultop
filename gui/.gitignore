@@ -3,3 +3,5 @@
 mygo_windows_*.syso
 /.agents/
 /resources/darwin-arm64/bin/
+/resources/LICENSE
+/resources/THIRD_PARTY_NOTICES.md

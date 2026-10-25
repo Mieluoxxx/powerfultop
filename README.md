@@ -7,7 +7,7 @@
 A clean, lightweight menu bar app that shows you exactly how much power your MacBook is using.
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.7-blue" />
+  <img src="https://img.shields.io/badge/version-2.0.0-blue" />
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue" />
   <img src="https://img.shields.io/badge/architecture-Apple%20Silicon-green" />
   <img src="https://img.shields.io/badge/license-MIT-orange" />
@@ -30,7 +30,7 @@ It gives you clear, real-time power information directly in the menu bar and a s
 - **Battery overview** — Quick view of battery level, health, temperature, and cycle count.
 - **Estimated battery time** — Time to empty or full in the popover and detail view; respects macOS charge limits (80/85/90/95%) and third-party apps like AlDente.
 - **Detailed information** — Auto-detected cell topology (e.g. 3S2P), series-group voltage, parallel cell currents, charging status, and lifetime stats.
-- **Menu bar manager (macOS 27)** — Bartender-style hiding: ⌘-drag icons left of the separator and toggle them with one click. Built on the macOS 27 menu bar's own overflow, so it needs no Screen Recording or Accessibility access. Off by default; turn it on under Details › Menu Bar Manager.
+- **Menu bar manager (macOS 27)** — Bartender-style hiding: ⌘-drag icons left of the separator and toggle them with one click; hiding itself uses the macOS 27 menu bar's own overflow and needs no permission. A layout editor in the style of Ice and Thaw lists every app's icon in its row and moves them by drag and drop; it needs Accessibility access, and moves icons without the pointer once you allow the menu bar layout file. Off by default; turn it on under Details › Menu Bar Manager.
 
 Everything updates live and stays accurate even when you plug in or unplug your charger.
 
@@ -41,7 +41,7 @@ Everything updates live and stays accurate even when you plug in or unplug your 
 - Like seeing when the battery is helping supply power
 - Want a simple, beautiful way to monitor battery health and charging behavior
 
-It's a small, native app that does one thing well — no bloat, no subscriptions.
+It's a small, native app that does one thing well — no bloat, no subscriptions. Since 2.0 it is written in Go, with its windows drawn by [MyGo](https://github.com/egoist/mygo)'s native UI.
 
 ## Installation
 
@@ -54,6 +54,8 @@ Download the latest `PowerfulTop.zip` from the [Releases](https://github.com/kDo
 3. First launch: right-click the app → **Open** (the app is not signed)
 
 ### Build from Source
+
+Requires Go 1.27.3 or later (`go` fetches the right toolchain on its own).
 
 ```bash
 git clone https://github.com/kDolphin/PowerTop.git
@@ -71,7 +73,7 @@ open build/PowerfulTop.app
 
 1. Open PowerfulTop — the icon appears in your menu bar.
 2. Click the icon to open the popover with the power flow diagram and current readings.
-3. Turn on **Show Power in Menu Bar** at the bottom if you want the wattage always visible.
+3. Choose what the menu bar shows under **Details › Menu Bar**.
 4. Click **Details** for a full breakdown of power and battery information.
 
 ## Screenshots

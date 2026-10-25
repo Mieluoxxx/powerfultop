@@ -1,11 +1,16 @@
 {
   "name": "PowerfulTop",
-  "identifier": "io.github.mieluoxxx.PowerfulTop.mygo",
-  "version": "1.4.0",
+  "identifier": "io.github.mieluoxxx.PowerfulTop",
+  "version": "2.0.0",
   "out": "build",
-  "i18n": { "dir": "locales", "source": "en" },
+  "i18n": {
+    "dir": "locales",
+    "source": "en"
+  },
   "macos": {
     "minimumSystemVersion": "14.0",
-    "infoPlist": { "LSUIElement": true }
+    "infoPlist": {
+      "LSUIElement": true
+    }
   }
 }

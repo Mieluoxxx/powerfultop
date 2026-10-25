@@ -34,136 +34,18 @@ type Messages struct{ locale string }
 // source language.
 func In(locale string) Messages { return Messages{locale} }
 
-// StatusACCharging says "AC Charging"
-// in the language the app shows.
-func StatusACCharging() string { return In(i18n.Locale()).StatusACCharging() }
-
-// StatusACCharging says "AC Charging"
-// in the language of msgs.
-func (msgs Messages) StatusACCharging() string {
-	return Catalog.Format(msgs.locale, "statusACCharging", nil)
-}
-
-// StatusBatteryDischarging says "Battery Discharging"
-// in the language the app shows.
-func StatusBatteryDischarging() string { return In(i18n.Locale()).StatusBatteryDischarging() }
-
-// StatusBatteryDischarging says "Battery Discharging"
-// in the language of msgs.
-func (msgs Messages) StatusBatteryDischarging() string {
-	return Catalog.Format(msgs.locale, "statusBatteryDischarging", nil)
-}
-
-// StatusACPowered says "AC Powered"
-// in the language the app shows.
-func StatusACPowered() string { return In(i18n.Locale()).StatusACPowered() }
-
-// StatusACPowered says "AC Powered"
-// in the language of msgs.
-func (msgs Messages) StatusACPowered() string {
-	return Catalog.Format(msgs.locale, "statusACPowered", nil)
-}
-
-// StatusFullyCharged says "Battery Fully Charged"
-// in the language the app shows.
-func StatusFullyCharged() string { return In(i18n.Locale()).StatusFullyCharged() }
-
-// StatusFullyCharged says "Battery Fully Charged"
-// in the language of msgs.
-func (msgs Messages) StatusFullyCharged() string {
-	return Catalog.Format(msgs.locale, "statusFullyCharged", nil)
-}
-
-// FlowSystem says "System"
-// in the language the app shows.
-func FlowSystem() string { return In(i18n.Locale()).FlowSystem() }
-
-// FlowSystem says "System"
-// in the language of msgs.
-func (msgs Messages) FlowSystem() string {
-	return Catalog.Format(msgs.locale, "flowSystem", nil)
-}
-
-// FlowCharger says "Charger"
-// in the language the app shows.
-func FlowCharger() string { return In(i18n.Locale()).FlowCharger() }
-
-// FlowCharger says "Charger"
-// in the language of msgs.
-func (msgs Messages) FlowCharger() string {
-	return Catalog.Format(msgs.locale, "flowCharger", nil)
-}
-
-// FlowBattery says "Battery"
-// in the language the app shows.
-func FlowBattery() string { return In(i18n.Locale()).FlowBattery() }
-
-// FlowBattery says "Battery"
-// in the language of msgs.
-func (msgs Messages) FlowBattery() string {
-	return Catalog.Format(msgs.locale, "flowBattery", nil)
-}
-
-// AdapterRating says "{watts} W adapter"
+// AppName says "PowerfulTop"
 // in the language the app shows.
 //
-// The connected charger's rated power, under the charger reading.
-func AdapterRating(watts int) string { return In(i18n.Locale()).AdapterRating(watts) }
+// The app's name. Pages say their own text through view.L; this catalog
+// declares the app's languages so MyGo's controls follow them.
+func AppName() string { return In(i18n.Locale()).AppName() }
 
-// AdapterRating says "{watts} W adapter"
+// AppName says "PowerfulTop"
 // in the language of msgs.
 //
-// The connected charger's rated power, under the charger reading.
-func (msgs Messages) AdapterRating(watts int) string {
-	return Catalog.Format(msgs.locale, "adapterRating", map[string]any{"watts": watts})
-}
-
-// BatteryCharging says "Charging {watts}"
-// in the language the app shows.
-func BatteryCharging(watts string) string { return In(i18n.Locale()).BatteryCharging(watts) }
-
-// BatteryCharging says "Charging {watts}"
-// in the language of msgs.
-func (msgs Messages) BatteryCharging(watts string) string {
-	return Catalog.Format(msgs.locale, "batteryCharging", map[string]any{"watts": watts})
-}
-
-// BatteryDischarging says "Discharging {watts}"
-// in the language the app shows.
-func BatteryDischarging(watts string) string { return In(i18n.Locale()).BatteryDischarging(watts) }
-
-// BatteryDischarging says "Discharging {watts}"
-// in the language of msgs.
-func (msgs Messages) BatteryDischarging(watts string) string {
-	return Catalog.Format(msgs.locale, "batteryDischarging", map[string]any{"watts": watts})
-}
-
-// BatteryIdle says "Idle"
-// in the language the app shows.
-func BatteryIdle() string { return In(i18n.Locale()).BatteryIdle() }
-
-// BatteryIdle says "Idle"
-// in the language of msgs.
-func (msgs Messages) BatteryIdle() string {
-	return Catalog.Format(msgs.locale, "batteryIdle", nil)
-}
-
-// Quit says "Quit"
-// in the language the app shows.
-func Quit() string { return In(i18n.Locale()).Quit() }
-
-// Quit says "Quit"
-// in the language of msgs.
-func (msgs Messages) Quit() string {
-	return Catalog.Format(msgs.locale, "quit", nil)
-}
-
-// NoBattery says "Built-in battery not detected. PowerfulTop requires a MacBook."
-// in the language the app shows.
-func NoBattery() string { return In(i18n.Locale()).NoBattery() }
-
-// NoBattery says "Built-in battery not detected. PowerfulTop requires a MacBook."
-// in the language of msgs.
-func (msgs Messages) NoBattery() string {
-	return Catalog.Format(msgs.locale, "noBattery", nil)
+// The app's name. Pages say their own text through view.L; this catalog
+// declares the app's languages so MyGo's controls follow them.
+func (msgs Messages) AppName() string {
+	return Catalog.Format(msgs.locale, "appName", nil)
 }

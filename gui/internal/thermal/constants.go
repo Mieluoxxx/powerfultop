@@ -2,13 +2,13 @@ package thermal
 
 import "time"
 
-// Helper identity and paths. The Go helper uses names of its own so it never collides with the
-// Swift app's installed helper while both builds exist; the cut-over switches them here only.
+// Helper identity and paths. They are the Swift app's: its installed helper then reads as
+// "needs authorization", and installing replaces it in place, engaged marker included.
 const (
-	HelperLabel           = "io.github.mieluoxxx.PowerfulTop.mygo.FanHelper"
+	HelperLabel           = "io.github.mieluoxxx.PowerfulTop.FanHelper"
 	HelperInstalledPath   = "/Library/PrivilegedHelperTools/" + HelperLabel
 	HelperDaemonPath      = "/Library/LaunchDaemons/" + HelperLabel + ".plist"
-	HelperSupportDir      = "/Library/Application Support/PowerfulTop.mygo"
+	HelperSupportDir      = "/Library/Application Support/PowerfulTop"
 	ClientRequirementPath = HelperSupportDir + "/fan-helper-client.req"
 	// Present while our helper holds the fans; survives a helper crash so the next start can restore.
 	EngagedMarkerPath = HelperSupportDir + "/fan-helper.engaged"
@@ -33,13 +33,20 @@ type legacyHelper struct {
 }
 
 // LegacyHelpers are removed on install; their engaged marker moves to ours so the new helper
-// restores automatic control as soon as it starts. The cut-over adds the Swift app's helper here.
+// restores automatic control as soon as it starts.
 var LegacyHelpers = []legacyHelper{{
 	Label:             "com.kdolphin.PowerTop.FanHelper",
 	InstalledPath:     "/Library/PrivilegedHelperTools/com.kdolphin.PowerTop.FanHelper",
 	DaemonPath:        "/Library/LaunchDaemons/com.kdolphin.PowerTop.FanHelper.plist",
 	SupportDir:        "/Library/Application Support/PowerTop",
 	EngagedMarkerPath: "/Library/Application Support/PowerTop/fan-helper.engaged",
+}, {
+	// Development builds of the Go port ran under names of their own beside the Swift app.
+	Label:             "io.github.mieluoxxx.PowerfulTop.mygo.FanHelper",
+	InstalledPath:     "/Library/PrivilegedHelperTools/io.github.mieluoxxx.PowerfulTop.mygo.FanHelper",
+	DaemonPath:        "/Library/LaunchDaemons/io.github.mieluoxxx.PowerfulTop.mygo.FanHelper.plist",
+	SupportDir:        "/Library/Application Support/PowerfulTop.mygo",
+	EngagedMarkerPath: "/Library/Application Support/PowerfulTop.mygo/fan-helper.engaged",
 }}
 
 // conflictingBundleIDs drive fans themselves; pre-rename builds run their own helper and would fight over the fans.

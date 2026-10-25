@@ -1,5 +1,5 @@
 #!/bin/bash
-# Fails if PowerfulTop shows a content window at launch (the "flash").
+# Fails if PowerfulTop shows a content window at launch.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

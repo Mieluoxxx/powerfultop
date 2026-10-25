@@ -1,34 +1,36 @@
-# PowerfulTop on MyGo
+# PowerfulTop (Go)
 
-The Go port of PowerfulTop, drawn with [MyGo](https://github.com/egoist/mygo)'s native UI. It
-replaces the Swift app in `../PowerfulTop` stage by stage; until the last stage both live in the
-repository and run side by side.
+The app, written in Go and drawn with [MyGo](https://github.com/egoist/mygo)'s native UI. Build and
+test it from the repository root with `bash build.sh` and `bash test.sh`, or from here:
 
 ```sh
 go tool mygo dev     # development build with live reload
 go test ./...        # views and parsers, without a window
-go tool mygo build   # build/darwin-arm64/PowerfulTop.app and a .dmg
 ```
 
-## Stages
+## Layout
 
-1. **Skeleton** (done): an accessory app whose menu bar item shows live system power and opens a
-   popover of native UI. IOKit is read through purego (`internal/macos`), so no cgo.
-2. **Power data**: the rest of PowerData — telemetry details, cell topology, charge limit, time
-   estimates — and the popover at parity with the Swift one.
-3. **Details window**: sidebar and pages, charts with `ui/chart`.
-4. **Thermal and fans**: SMC reads; the root fan helper stays the Swift binary for now, bundled
-   under Resources and installed as today.
-5. **Menu bar manager**: own NSStatusItems through purego/objc for the separator and spacers, and
-   the macOS 27 layout file.
-6. **Cut-over**: switch to the shipping bundle identifier and remove the Swift app.
+- `main.go`, `tray.go`, `details.go`, `context.go`: the app — monitors, the menu bar item and its
+  popover, the details window, and what connects them.
+- `internal/macos`: macOS APIs MyGo doesn't wrap, through purego (no cgo): the IOKit registry,
+  CF ↔ Go conversion over XML property lists, cfprefsd preferences, and a global click monitor.
+- `internal/power`, `internal/thermal`, `internal/system`, `internal/display`: the monitors, each
+  with `Start`/`Stop`/`Snapshot`/`OnChange`.
+- `internal/menubar`: the menu bar label, rendered to a template PNG since trays can't show
+  attributed titles.
+- `internal/barmanager`: the macOS 27 menu bar manager and its layout editor.
+- `internal/view`: the dashboard components and every page; text goes through `view.L(en, zh)`.
+- `internal/icons`: Lucide icons standing in for SF Symbols.
+- `cmd/fanhelper`: the root fan helper, built by `scripts/build-helper.sh` into `resources/`.
 
 ## Notes
 
-- The bundle identifier is `io.github.mieluoxxx.PowerfulTop.mygo` until the cut-over. macOS 27
-  silently keeps a status item off the menu bar when another app registered under the same
-  identifier has a different signature, which the Swift build does on a development Mac.
-- MyGo quits when the last window closes, so the app registers `App.OnWindowAllClosed`: the
-  popover is its only window.
+- Preferences use the Swift app's domain and keys, so settings carry over.
+- macOS 27 silently keeps a status item off the menu bar when another app registered under the
+  same bundle identifier has a different signature; run a development copy under a different
+  `identifier` in `mygo.json` while an installed build exists.
+- MyGo quits when the last window closes, so the app registers `App.OnWindowAllClosed`.
 - The popover closes through `internal/macos.ClickMonitor`: since macOS 14 an accessory app isn't
   activated when its popover opens, so AppKit's transient dismissal never fires.
+- MenuBarAgent doesn't always notice writes to its layout file; the layout editor checks the bar
+  after each move and restarts the agent when the write didn't take.

@@ -7,15 +7,15 @@ import (
 )
 
 type fakeItems struct {
-	mu        sync.Mutex
-	raw       []rawItem
-	pos       map[string]float64
-	drags     [][2]Point
-	setCalls  int
-	reloads   int
-	onReload  func(*fakeItems)
+	mu       sync.Mutex
+	raw      []rawItem
+	pos      map[string]float64
+	drags    [][2]Point
+	setCalls int
+	reloads  int
+	onReload func(*fakeItems)
 	// applies makes layout-file writes reach the bar at once, moving FineTune left of the separator.
-	applies bool
+	applies   bool
 	isTrusted bool
 }
 

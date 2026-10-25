@@ -7,7 +7,7 @@
 一个简洁轻量的菜单栏应用，实时显示你的 MacBook 正在消耗多少功率。
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.7-blue" />
+  <img src="https://img.shields.io/badge/version-2.0.0-blue" />
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue" />
   <img src="https://img.shields.io/badge/architecture-Apple%20Silicon-green" />
   <img src="https://img.shields.io/badge/license-MIT-orange" />
@@ -30,7 +30,7 @@ macOS 从来不会直接告诉你「现在系统正在消耗多少瓦」。Power
 - **电池概览** — 快速查看电量、健康度、温度和循环次数。
 - **预估剩余时间** — 在 Popover 和详细参数中估算可用时间；支持 macOS 充电上限（80/85/90/95%）及 AlDente 等第三方工具。
 - **详细参数窗口** — 自动识别电芯拓扑（如 3S2P）、串联组电压、并联节电流、充电状态与生命周期统计。
-- **菜单栏管理（macOS 27）** — 类似 Bartender 的图标隐藏：按住 ⌘ 把图标拖到分隔符左侧，一键隐藏或显示。基于 macOS 27 菜单栏自带的溢出机制，无需屏幕录制或辅助功能权限。默认关闭，可在「详细参数 › 菜单栏管理」中开启。
+- **菜单栏管理（macOS 27）** — 类似 Bartender 的图标隐藏：按住 ⌘ 把图标拖到分隔符左侧，一键隐藏或显示；隐藏功能基于 macOS 27 菜单栏自带的溢出机制，无需任何权限。参考 Ice 和 Thaw 的布局编辑器会按行列出所有 app 的图标，拖放即可移动；它需要辅助功能权限，授权菜单栏布局文件后移动图标还无需移动鼠标。默认关闭，可在「详细参数 › 菜单栏管理」中开启。
 
 数据实时更新，即使在插拔电源的瞬间也能保持准确可靠。
 
@@ -41,7 +41,7 @@ macOS 从来不会直接告诉你「现在系统正在消耗多少瓦」。Power
 - 想看到电池什么时候在帮忙供电
 - 希望有一个简单漂亮的方式查看电池健康和充电行为
 
-它是一个小巧的原生 Mac 应用，只做好一件事 —— 没有多余功能，没有订阅。
+它是一个小巧的原生 Mac 应用，只做好一件事 —— 没有多余功能，没有订阅。自 2.0 起改用 Go 编写，窗口界面由 [MyGo](https://github.com/egoist/mygo) 的原生 UI 绘制。
 
 ## 安装方式
 
@@ -54,6 +54,8 @@ macOS 从来不会直接告诉你「现在系统正在消耗多少瓦」。Power
 3. 首次启动：右键点击应用 → **打开**（应用未签名）
 
 ### 从源码构建
+
+需要 Go 1.27.3 或更高版本（`go` 会自动下载所需的工具链）。
 
 ```bash
 git clone https://github.com/kDolphin/PowerTop.git
@@ -71,7 +73,7 @@ open build/PowerfulTop.app
 
 1. 打开 PowerfulTop，图标会出现在菜单栏。
 2. 点击图标即可看到功率流向图和当前各项数据。
-3. 在弹窗底部开启「菜单栏显示功率」，即可让功率数值常驻菜单栏。
+3. 在「详细参数 › 菜单栏」中选择菜单栏显示的内容。
 4. 点击「详细参数」可查看完整的功率和电池信息。
 
 ## 截图展示

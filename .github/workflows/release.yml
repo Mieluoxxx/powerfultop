@@ -51,13 +51,19 @@ jobs:
           fi
 
           VERSION="${RELEASE_TAG#v}"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" PowerfulTop/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $GITHUB_RUN_NUMBER" PowerfulTop/Info.plist
+          jq --arg v "$VERSION" '.version = $v' gui/mygo.json > "$RUNNER_TEMP/mygo.json"
+          mv "$RUNNER_TEMP/mygo.json" gui/mygo.json
 
           echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "Bundle version: $VERSION ($GITHUB_RUN_NUMBER)"
+          echo "Bundle version: $VERSION"
 
-      - name: Run regression tests
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: gui/go.mod
+          cache-dependency-path: gui/go.sum
+
+      - name: Run tests
         run: bash test.sh
 
       - name: Build application

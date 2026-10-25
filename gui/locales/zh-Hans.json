@@ -1,16 +1,4 @@
 {
   "@@locale": "zh-Hans",
-  "statusACCharging": "AC 充电中",
-  "statusBatteryDischarging": "电池放电",
-  "statusACPowered": "AC 供电",
-  "statusFullyCharged": "电池已充满",
-  "flowSystem": "系统",
-  "flowCharger": "充电器",
-  "flowBattery": "电池",
-  "adapterRating": "{watts} W 适配器",
-  "batteryCharging": "充电 {watts}",
-  "batteryDischarging": "放电 {watts}",
-  "batteryIdle": "空闲",
-  "quit": "退出",
-  "noBattery": "未检测到内置电池。PowerfulTop 仅支持 MacBook。"
+  "appName": "PowerfulTop"
 }
