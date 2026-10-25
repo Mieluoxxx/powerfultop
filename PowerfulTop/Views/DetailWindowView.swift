@@ -102,17 +102,25 @@ struct DetailWindowView: View {
                 Button {
                     page = item
                 } label: {
-                    Label(item.title, systemImage: item.icon)
-                        .font(.system(size: 13, weight: page == item ? .semibold : .regular))
-                        .foregroundStyle(page == item ? Color.accentColor : Color.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            page == item ? Color.accentColor.opacity(0.14) : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
-                        .contentShape(Rectangle())
+                    HStack(spacing: 6) {
+                        Label(item.title, systemImage: item.icon)
+                        Spacer(minLength: 0)
+                        if needsAttention(item) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .help(String(localized: "The fan helper needs to be authorized again."))
+                        }
+                    }
+                    .font(.system(size: 13, weight: page == item ? .semibold : .regular))
+                    .foregroundStyle(page == item ? Color.accentColor : Color.primary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        page == item ? Color.accentColor.opacity(0.14) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    )
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -128,6 +136,11 @@ struct DetailWindowView: View {
         .frame(width: 190)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Color.primary.opacity(0.025))
+    }
+
+    /// Cooling hosts the fan controls and the update button, so a stale helper is flagged there.
+    private func needsAttention(_ item: Page) -> Bool {
+        item == .cooling && thermal.helperStatus == .needsUpdate
     }
 
     private var unavailableState: some View {

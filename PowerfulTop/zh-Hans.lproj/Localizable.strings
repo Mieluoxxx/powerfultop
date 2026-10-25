@@ -312,3 +312,4 @@
 "Using the menu bar layout file: icons move without the pointer, even behind the notch." = "已使用菜单栏布局文件：移动图标无需移动鼠标，被刘海遮住的图标也能移动。";
 "Allow the menu bar layout file for reliable sorting and pointer-free moves." = "授权菜单栏布局文件后，分区判断更准确，移动图标也不用移动鼠标。";
 "Allow…" = "授权…";
+"The fan helper needs to be authorized again." = "风扇驱动需要重新授权。";
