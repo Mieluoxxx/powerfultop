@@ -99,7 +99,7 @@ func Hero(c *ui.Context, value, rated, caption string, size float32) {
 		ui.Row(c).Gap(4).AlignItems(ui.End).Children(func() {
 			ui.Text(c, value).FontSize(size).Bold().FontFeatures("tnum").NoWrap()
 			if rated != "" {
-				ui.Text(c, "/ "+rated).FontSize(size*0.5).TextColor(t.TextMuted).FontFeatures("tnum").NoWrap()
+				ui.Text(c, "/ "+rated).FontSize(size * 0.5).TextColor(t.TextMuted).FontFeatures("tnum").NoWrap()
 			}
 		})
 		if caption != "" {
