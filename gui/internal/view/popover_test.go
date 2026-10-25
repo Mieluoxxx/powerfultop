@@ -19,7 +19,7 @@ func TestPopoverSections(t *testing.T) {
 		Available: true,
 		Power: power.Data{
 			SystemPowerW: 11.07, BatteryPercent: 85, IsOnAC: true, ACAdapterWattage: 65, ConnectionPhase: power.PhaseOnAC,
-			BatteryHealthPercent: intp(99), CycleCount: intp(74),
+			BatteryHealthPercent: intp(99), CycleCount: intp(74), ChargeLimitPercent: 77,
 		},
 		Thermal: thermal.Snapshot{Temperatures: map[thermal.SensorGroup]thermal.TemperatureSummary{
 			thermal.GroupCPU: {AverageC: 39, MaximumC: 45, SensorCount: 4},
@@ -39,6 +39,10 @@ func TestPopoverSections(t *testing.T) {
 		if !tt.HasText(want) {
 			t.Errorf("missing %q in %q", want, tt.Texts())
 		}
+	}
+	// The charge limit row spans the popover like the rows above it: its value sits at the right edge.
+	if r, ok := tt.Find(d.Power.ChargeLimitText()); !ok || r.X+r.W < PopoverWidth-40 {
+		t.Errorf("charge limit value %q at %+v, want it at the right edge", d.Power.ChargeLimitText(), r)
 	}
 	if err := tt.Click("Details"); err != nil {
 		t.Fatal(err)

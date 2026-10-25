@@ -272,7 +272,7 @@ func popoverChargeLimit(c *ui.Context, p power.Data, a PopoverActions) {
 	row := ui.ButtonBase(c).AlignSelf(ui.Stretch).Label(L("Charge Limit", "充电上限")).
 		Tooltip(L("Adjust the charge limit (80–100%) in System Settings", "在系统设置中调整充电上限（80–100%）")).
 		Children(func() {
-			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+			ui.Row(c).Gap(6).AlignItems(ui.Center).Grow(1).Children(func() {
 				ui.Icon(c, icons.Get("battery-charging")).Size(12, 12).TextColor(Green.Color(c))
 				ui.Text(c, L("Charge Limit", "充电上限")).FontSize(12).TextColor(t.TextMuted).Grow(1)
 				ui.Text(c, p.ChargeLimitText()).FontSize(12).FontWeight(500).NoWrap()
