@@ -30,6 +30,7 @@ It gives you clear, real-time power information directly in the menu bar and a s
 - **Battery overview** — Quick view of battery level, health, temperature, and cycle count.
 - **Estimated battery time** — Time to empty or full in the popover and detail view; respects macOS charge limits (80/85/90/95%) and third-party apps like AlDente.
 - **Detailed information** — Auto-detected cell topology (e.g. 3S2P), series-group voltage, parallel cell currents, charging status, and lifetime stats.
+- **Menu bar manager (macOS 27)** — Bartender-style hiding: ⌘-drag icons left of the separator and toggle them with one click. Built on the macOS 27 menu bar's own overflow, so it needs no Screen Recording or Accessibility access. Off by default; turn it on under Details › Menu Bar Manager.
 
 Everything updates live and stays accurate even when you plug in or unplug your charger.
 

@@ -29,6 +29,9 @@ struct RegressionTests {
         testMemoryAndProcessParsing()
         testDDCFraming()
         testLegacyDefaultsMigration()
+        testMenuBarCollapseGeometry()
+        testMenuBarLayoutSections()
+        testMenuBarPreferredPositions()
 
         guard failures == 0 else {
             fputs("\(failures) regression test(s) failed\n", stderr)
@@ -684,6 +687,62 @@ struct RegressionTests {
             remainingCapacityMAH: 5_000,
             fullChargeCapacityMAH: 5_000
         )
+    }
+
+    private static func testMenuBarCollapseGeometry() {
+        typealias Geometry = MenuBarCollapseGeometry
+        let notched = Geometry.Display(width: 1512, statusWidth: 663.5)
+        let external = Geometry.Display(width: 1920)
+
+        expectEqual(Geometry.unitLength(displays: [notched, external]), 433, "notched display sets the unit under its cliff")
+        expectEqual(Geometry.activeSpacers(unit: 433, displays: [notched, external]), 4, "spacers cover the widest display")
+        expect(433 * 5 >= external.width, "separator plus spacers span the external bar")
+
+        let wide = Geometry.Display(width: 2056)
+        expectEqual(Geometry.unitLength(displays: [wide]), 964, "unnotched cliff is half the width")
+        expectEqual(Geometry.activeSpacers(unit: 964, displays: [wide]), 2, "three units cover 2056 pt")
+
+        expectEqual(Geometry.unitLength(displays: [Geometry.Display(width: 300)]), Geometry.minimumUnit, "unit never drops below the minimum")
+        expectEqual(Geometry.unitLength(displays: []), Geometry.minimumUnit, "no displays falls back to the minimum")
+        expectEqual(Geometry.activeSpacers(unit: 433, displays: []), 0, "no displays need no spacers")
+        expectEqual(Geometry.activeSpacers(unit: 433, displays: [notched, Geometry.Display(width: 6016)]), Geometry.spacerCount, "spacers are capped at the registered count")
+    }
+
+    private static func testMenuBarLayoutSections() {
+        // Frames measured on macOS 27.0.1 with the bar expanded.
+        let separator = CGRect(x: 723, y: -1076.5, width: 26, height: 24)
+        let toggle = CGRect(x: 843, y: -1076.5, width: 28.5, height: 24)
+        func section(_ frame: CGRect) -> MenuBarSection { MenuBarLayout.section(of: frame, separator: separator, toggle: toggle) }
+
+        expectEqual(section(CGRect(x: 870, y: -1076.5, width: 40, height: 24)), .shown, "item right of the chevron is shown")
+        // After a hide the dropped item overlaps the separator, which slid right to make room.
+        let slidSeparator = CGRect(x: 761, y: -1076.5, width: 26, height: 24)
+        expectEqual(MenuBarLayout.section(of: CGRect(x: 723, y: -1076.5, width: 40, height: 24), separator: slidSeparator, toggle: toggle), .hidden, "item overlapping the separator edge is hidden")
+        expectEqual(section(CGRect(x: 300, y: -1076.5, width: 218, height: 24)), .hidden, "item left of the separator is hidden")
+        expectEqual(section(CGRect(x: -1, y: 970, width: 28, height: 24)), .absent, "parked item is absent")
+
+        expectEqual(MenuBarLayout.dropPoint(for: .shown, separator: separator, toggle: toggle), CGPoint(x: 875.5, y: -1064.5), "shown drop lands just right of the chevron")
+        expectEqual(MenuBarLayout.dropPoint(for: .hidden, separator: separator, toggle: toggle), CGPoint(x: 715, y: -1064.5), "hidden drop lands just left of the separator")
+        expectNil(MenuBarLayout.dropPoint(for: .absent, separator: separator, toggle: toggle), "absent items have no drop point")
+    }
+
+    private static func testMenuBarPreferredPositions() {
+        let parsed = MenuBarLayout.parseKey("status:com.tencent.qq::Item-0")
+        expectEqual(parsed?.owner, "com.tencent.qq", "owner is the part before ::")
+        expectEqual(parsed?.name, "Item-0", "name is the autosave name")
+        expectEqual(MenuBarLayout.parseKey("status:eu.exelban.Stats::CPU_mini")?.name, "CPU_mini", "named items keep their autosave name")
+        expectNil(MenuBarLayout.parseKey("module:Clock"), "Apple modules aren't status items")
+
+        // Measured layout: toggle 805, spacers 832...912, separator 928.
+        let edge = 832.0
+        expectEqual(MenuBarLayout.section(position: 1000, blockEdge: edge), .hidden, "left of the block is hidden")
+        expectEqual(MenuBarLayout.section(position: 512, blockEdge: edge), .shown, "right of the block is shown")
+
+        let existing: [Double] = [0, 512, 550, 805, 832, 928, 1000]
+        expectEqual(MenuBarLayout.position(leftOf: 928, existing: existing), 964, "hide lands between separator and the next icon")
+        expectEqual(MenuBarLayout.position(leftOf: 1000, existing: existing), 1016, "leftmost anchor extends past the end")
+        expectEqual(MenuBarLayout.position(rightOf: 805, existing: existing), 677.5, "show lands between chevron and the next icon")
+        expectEqual(MenuBarLayout.position(rightOf: 0, existing: existing), 0, "never right of the clock")
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) {

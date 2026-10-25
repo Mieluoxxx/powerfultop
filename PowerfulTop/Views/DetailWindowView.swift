@@ -5,9 +5,10 @@ struct DetailWindowView: View {
     static let preferredWidth: CGFloat = 1000
     static let preferredHeight: CGFloat = 720
     static let minimumWidth: CGFloat = 760
+    static let pageKey = "dashboardPage"
 
     enum Page: String, CaseIterable, Identifiable {
-        case overview, system, cooling, battery, menuBar, settings
+        case overview, system, cooling, battery, menuBar, menuBarManager, settings
         var id: String { rawValue }
 
         var title: String {
@@ -17,6 +18,7 @@ struct DetailWindowView: View {
             case .cooling: return String(localized: "Cooling")
             case .battery: return String(localized: "Battery")
             case .menuBar: return String(localized: "Menu Bar")
+            case .menuBarManager: return String(localized: "Menu Bar Manager")
             case .settings: return String(localized: "Settings")
             }
         }
@@ -28,6 +30,7 @@ struct DetailWindowView: View {
             case .cooling: return "fan"
             case .battery: return "battery.75percent"
             case .menuBar: return "menubar.rectangle"
+            case .menuBarManager: return "menubar.arrow.up.rectangle"
             case .settings: return "gearshape"
             }
         }
@@ -37,7 +40,8 @@ struct DetailWindowView: View {
     let thermal: ThermalMonitor
     let system: SystemMonitor
     let history: HistoryRecorder
-    @AppStorage("dashboardPage") private var page: Page = .overview
+    let menuBarManager: MenuBarManager
+    @AppStorage(DetailWindowView.pageKey) private var page: Page = .overview
 
     var body: some View {
         HStack(spacing: 0) {
@@ -84,6 +88,8 @@ struct DetailWindowView: View {
                 BatteryPage(monitor: monitor, columnCount: width >= 760 ? 2 : 1)
             case .menuBar:
                 MenuBarPage(monitor: monitor, thermal: thermal, system: system)
+            case .menuBarManager:
+                MenuBarManagerPage(manager: menuBarManager)
             case .settings:
                 SettingsPage(monitor: monitor, thermal: thermal)
             }

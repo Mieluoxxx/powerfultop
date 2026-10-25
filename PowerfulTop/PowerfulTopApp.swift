@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let thermal = ThermalMonitor()
     let system = SystemMonitor()
     let displays = DisplayController()
+    let menuBarManager = MenuBarManager()
     private(set) lazy var history = HistoryRecorder(monitor: monitor, thermal: thermal, system: system)
     private var didStart = false
     private var statusItemController: StatusItemController?
@@ -20,7 +21,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         system.start()
         displays.start()
         history.start()
-        statusItemController = StatusItemController(monitor: monitor, thermal: thermal, system: system, displays: displays, history: history)
+        let controller = StatusItemController(monitor: monitor, thermal: thermal, system: system, displays: displays, history: history, menuBarManager: menuBarManager)
+        statusItemController = controller
+        menuBarManager.openSettings = { [weak controller] in controller?.openDetails(page: .menuBarManager) }
+        // After our own item: the manager's items are new to the menu bar and land left of it.
+        menuBarManager.start()
         if CommandLine.arguments.contains("--smoke-launch") {
             scheduleSmokeLaunchCheck()
         }
@@ -66,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             history.stop()
             system.stop()
             displays.shutdown()
+            menuBarManager.shutdown()
             thermal.shutdown()
             statusItemController?.invalidate()
             statusItemController = nil

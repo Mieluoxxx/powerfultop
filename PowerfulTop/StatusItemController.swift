@@ -9,6 +9,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     private let system: SystemMonitor
     private let displays: DisplayController
     private let history: HistoryRecorder
+    private let menuBarManager: MenuBarManager
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
     private var detailWindow: NSWindow?
@@ -20,12 +21,13 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
     private var localClickMonitor: Any?
     private var globalClickMonitor: Any?
 
-    init(monitor: PowerMonitor, thermal: ThermalMonitor, system: SystemMonitor, displays: DisplayController, history: HistoryRecorder) {
+    init(monitor: PowerMonitor, thermal: ThermalMonitor, system: SystemMonitor, displays: DisplayController, history: HistoryRecorder, menuBarManager: MenuBarManager) {
         self.monitor = monitor
         self.thermal = thermal
         self.system = system
         self.displays = displays
         self.history = history
+        self.menuBarManager = menuBarManager
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
         configureStatusItem()
@@ -49,6 +51,11 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
         guard let button = statusItem.button else { return }
         button.imagePosition = .imageLeading
         button.font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        if #available(macOS 27, *) {
+            // The menu bar opens the popover itself, so it also works from the « overflow menu.
+            statusItem.expandedInterfaceDelegate = self
+            return
+        }
         // Mouse-down + deferred show: a mouse-up on a transient popover is otherwise
         // treated as an outside click and the panel flashes closed immediately.
         button.sendAction(on: [.leftMouseDown])
@@ -217,7 +224,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
         }
         if let button = statusItem.button, let buttonWindow = button.window {
             let buttonRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
-            if buttonRect.contains(point) {
+            // The button action toggles the popover itself; the macOS 27 menu bar ignores a second click.
+            if buttonRect.contains(point), !Self.usesExpandedInterface {
                 return
             }
         }
@@ -233,11 +241,19 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
         popover.contentSize = next
     }
 
-    func openDetails() {
+    private static var usesExpandedInterface: Bool {
+        if #available(macOS 27, *) { return true }
+        return false
+    }
+
+    func openDetails(page: DetailWindowView.Page? = nil) {
+        if let page {
+            UserDefaults.standard.set(page.rawValue, forKey: DetailWindowView.pageKey)
+        }
         popover.performClose(nil)
         NSApp.activate(ignoringOtherApps: true)
         if detailWindow == nil {
-            let hosting = NSHostingController(rootView: DetailWindowView(monitor: monitor, thermal: thermal, system: system, history: history))
+            let hosting = NSHostingController(rootView: DetailWindowView(monitor: monitor, thermal: thermal, system: system, history: history, menuBarManager: menuBarManager))
             let window = NSWindow(contentViewController: hosting)
             window.title = String(localized: "PowerfulTop Details")
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
@@ -260,6 +276,27 @@ final class StatusItemController: NSObject, NSPopoverDelegate, NSWindowDelegate 
         displays.active = false
         stopDismissMonitors()
         statusItem.button?.highlight(false)
+        // Closing first keeps AppKit from closing the popover again without a close reason.
+        if #available(macOS 27, *) {
+            statusItem.expandedInterfaceSession?.cancel()
+        }
+    }
+}
+
+@available(macOS 27, *)
+extension StatusItemController: @preconcurrency NSStatusItemExpandedInterfaceDelegate {
+    func statusItem(_ statusItem: NSStatusItem, didBegin expandedInterfaceSession: NSStatusItemExpandedInterfaceSession) {
+        // Deferred for the same reason as the click path: the click's mouse-up would close a transient popover.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.statusItem.expandedInterfaceSession != nil, !self.popover.isShown else { return }
+            self.showPopover()
+        }
+    }
+
+    func statusItemDidEndExpandedInterfaceSession(_ statusItem: NSStatusItem, animated: Bool) {
+        popover.animates = animated
+        popover.performClose(nil)
+        popover.animates = true
     }
 }
 
