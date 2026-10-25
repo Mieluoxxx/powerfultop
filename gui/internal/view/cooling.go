@@ -121,27 +121,28 @@ func ControlledText(s thermal.Snapshot) string {
 	return L("Controlled by macOS", "由系统控制")
 }
 
-// FanPresetControl is the Auto / Full Blast / Custom switch, shared by the page and the popover: equal
-// segments across the width, each with an icon. While another tool holds the fans a choice would
-// only be stored, not applied, so the control is disabled then.
-func FanPresetControl(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot) ui.Element {
+// segment is one choice of a segmented control; icon may be empty.
+type segment struct{ icon, label string }
+
+// segmented is the fan controls' segmented look: a tinted track whose chosen segment is raised
+// like a card. fill spreads equal segments across the width; otherwise each fits its content.
+// It reports a new choice in *selected, never while disabled.
+func segmented(c *ui.Context, label string, selected *int, segments []segment, fill, disabled bool) ui.Element {
 	t := c.Theme()
-	preset := presetOf(s.Mode)
-	locked := s.ConflictDetected && !s.Controlling
-	segments := []struct{ icon, label string }{
-		{"fan", L("Auto", "自动")},
-		{"zap", L("Full Blast", "全速")},
-		{"sliders-horizontal", L("Custom", "自定义")},
-	}
-	seg := ui.SegmentedBase(c, &preset, len(segments))
-	track := seg.Track.Label(L("Fans", "风扇")).Gap(2).Padding(2).Radius(9).Background(t.Text.Alpha(0.06)).Disabled(locked)
-	if locked {
+	seg := ui.SegmentedBase(c, selected, len(segments))
+	track := seg.Track.Label(label).Gap(2).Padding(2).Radius(9).Background(t.Text.Alpha(0.06)).Disabled(disabled)
+	if disabled {
 		track.Opacity(0.5)
 	}
 	track.Children(func() {
 		for i, sg := range segments {
-			chosen := i == preset
-			e := seg.Segment(i).Label(sg.label).Grow(1).Width(0).PaddingY(5).Radius(7)
+			chosen := i == *selected
+			e := seg.Segment(i).Label(sg.label).PaddingY(5).Radius(7)
+			if fill {
+				e.Grow(1).Width(0)
+			} else {
+				e.PaddingX(12)
+			}
 			if chosen {
 				e.Background(CardSurface(c)).Border(1, CardBorder(c))
 			}
@@ -151,7 +152,9 @@ func FanPresetControl(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot) ui.
 					if chosen {
 						color = t.Text
 					}
-					ui.Icon(c, icons.Get(sg.icon)).Size(12, 12).TextColor(color)
+					if sg.icon != "" {
+						ui.Icon(c, icons.Get(sg.icon)).Size(12, 12).TextColor(color)
+					}
 					text := ui.Text(c, sg.label).FontSize(12).TextColor(color).NoWrap()
 					if chosen {
 						text.FontWeight(600)
@@ -160,10 +163,23 @@ func FanPresetControl(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot) ui.
 			})
 		}
 	})
-	if !locked && seg.Track.Changed() {
+	return track
+}
+
+// FanPresetControl is the Auto / Full Blast / Custom switch, shared by the page and the popover.
+// While another tool holds the fans a choice would only be stored, not applied, so it is disabled then.
+func FanPresetControl(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot) ui.Element {
+	preset := presetOf(s.Mode)
+	locked := s.ConflictDetected && !s.Controlling
+	e := segmented(c, L("Fans", "风扇"), &preset, []segment{
+		{"fan", L("Auto", "自动")},
+		{"zap", L("Full Blast", "全速")},
+		{"sliders-horizontal", L("Custom", "自定义")},
+	}, true, locked)
+	if !locked && e.Changed() {
 		m.SelectPreset(preset)
 	}
-	return track
+	return e
 }
 
 // FanConflictBanner says another tool holds the fans, naming it when it is known.
@@ -203,12 +219,22 @@ func FanControlCard(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot, state
 	})
 }
 
+// customControls sit in an inset panel under the preset switch, so the two rows of segments read
+// as a choice and its settings rather than two equal switches.
 func customControls(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot, state *CoolingState) {
+	ui.Column(c).Gap(10).Padding(10).Radius(10).Background(c.Theme().Text.Alpha(0.035)).Children(func() {
+		customControlsBody(c, m, s, state)
+	})
+}
+
+func customControlsBody(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot, state *CoolingState) {
 	kind := 0
 	if s.Mode.Kind == thermal.ModeSensor {
 		kind = 1
 	}
-	if ui.Segmented(c, &kind, L("Constant RPM", "固定转速"), L("Follow Temperature", "跟随温度")).Changed() {
+	locked := s.ConflictDetected && !s.Controlling
+	kinds := []segment{{"gauge", L("Constant RPM", "固定转速")}, {"thermometer", L("Follow Temperature", "跟随温度")}}
+	if e := segmented(c, L("Custom Mode", "自定义方式"), &kind, kinds, true, locked); !locked && e.Changed() {
 		if kind == 1 {
 			m.SetMode(lastOrDefault(s.LastCustomMode, thermal.ModeSensor, thermal.DefaultSensor))
 		} else {
@@ -232,7 +258,7 @@ func customControls(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot, state
 		}
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			ui.Text(c, L("Sensor", "传感器")).FontSize(12).TextColor(c.Theme().TextMuted).Grow(1)
-			if ui.Segmented(c, &group, "CPU", "GPU").Label(L("Sensor", "传感器")).Changed() {
+			if e := segmented(c, L("Sensor", "传感器"), &group, []segment{{"", "CPU"}, {"", "GPU"}}, false, locked); !locked && e.Changed() {
 				mode.Group = []thermal.SensorGroup{thermal.GroupCPU, thermal.GroupGPU}[group]
 				m.SetMode(mode)
 			}
