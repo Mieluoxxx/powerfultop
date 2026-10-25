@@ -1,0 +1,22 @@
+{
+  "@@locale": "en",
+  "statusACCharging": "AC Charging",
+  "statusBatteryDischarging": "Battery Discharging",
+  "statusACPowered": "AC Powered",
+  "statusFullyCharged": "Battery Fully Charged",
+  "flowSystem": "System",
+  "flowCharger": "Charger",
+  "flowBattery": "Battery",
+  "adapterRating": "{watts} W adapter",
+  "@adapterRating": {
+    "description": "The connected charger's rated power, under the charger reading.",
+    "placeholders": { "watts": { "type": "int", "example": "96" } }
+  },
+  "batteryCharging": "Charging {watts}",
+  "@batteryCharging": { "placeholders": { "watts": { "type": "String", "example": "12.3 W" } } },
+  "batteryDischarging": "Discharging {watts}",
+  "@batteryDischarging": { "placeholders": { "watts": { "type": "String", "example": "9.8 W" } } },
+  "batteryIdle": "Idle",
+  "quit": "Quit",
+  "noBattery": "Built-in battery not detected. PowerfulTop requires a MacBook."
+}
