@@ -144,16 +144,13 @@ func contains(r mygo.Rectangle, p mygo.Point) bool {
 
 func (a *app) popoverView(c *ui.Context) {
 	d := view.PopoverData{
-		Power:              a.power.Snapshot(),
-		Available:          a.power.Available(),
-		Thermal:            a.thermal.Snapshot(),
-		Fans:               a.thermal,
-		System:             a.system.Snapshot(),
-		Displays:           a.displays.Snapshot(),
-		ChargeLimit:        a.chargeLimit,
-		LaunchAtLogin:      mygo.App.OpenAtLogin(),
-		LaunchAtLoginError: a.loginError,
-		Version:            mygo.App.Version(),
+		Power:       a.power.Snapshot(),
+		Available:   a.power.Available(),
+		Thermal:     a.thermal.Snapshot(),
+		Fans:        a.thermal,
+		System:      a.system.Snapshot(),
+		Displays:    a.displays.Snapshot(),
+		ChargeLimit: a.chargeLimit,
 	}
 	root := view.Popover(c, d, view.PopoverActions{
 		OpenDetails: func(page view.PageID) {
@@ -162,9 +159,8 @@ func (a *app) popoverView(c *ui.Context) {
 			}
 			a.openDetails(page)
 		},
-		SetBrightness:    a.displays.SetLevel,
-		SetLaunchAtLogin: a.setLaunchAtLogin,
-		Quit:             mygo.App.Quit,
+		SetBrightness: a.displays.SetLevel,
+		Quit:          mygo.App.Quit,
 	})
 	// Flyouts have a fixed size; follow the content's height as NSPopover's fitting size does.
 	if h := int(root.Bounds().H + 0.5); h > 0 && h != a.panelHeight {

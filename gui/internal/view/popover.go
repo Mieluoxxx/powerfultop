@@ -27,18 +27,13 @@ type PopoverData struct {
 	Displays []display.Brightness
 	// ChargeLimit edits the macOS charge limit in place; nil leaves a row that opens the Battery page.
 	ChargeLimit *power.ChargeLimiter
-
-	LaunchAtLogin      bool
-	LaunchAtLoginError string
-	Version            string
 }
 
 // PopoverActions are what the popover's controls do.
 type PopoverActions struct {
-	OpenDetails      func(PageID)
-	SetBrightness    func(id uint32, level float64)
-	SetLaunchAtLogin func(bool)
-	Quit             func()
+	OpenDetails   func(PageID)
+	SetBrightness func(id uint32, level float64)
+	Quit          func()
 }
 
 // BatteryTemperatureC prefers the battery's own reading; some machines drop it, and the SMC pack
@@ -90,7 +85,7 @@ func Popover(c *ui.Context, d PopoverData, a PopoverActions) ui.Element {
 			section(8, 10, func() { popoverChargeLimit(c, d.Power, d.ChargeLimit, a) })
 		}
 		divider()
-		ui.Column(c).Padding(6, 10).Children(func() { popoverFooter(c, d, a) })
+		ui.Column(c).Padding(6, 10).Children(func() { popoverFooter(c, a) })
 	})
 }
 
@@ -325,45 +320,30 @@ func popoverChargeLimitControl(c *ui.Context, s power.ChargeLimitState, limit *p
 	})
 }
 
-func popoverFooter(c *ui.Context, d PopoverData, a PopoverActions) {
+func popoverFooter(c *ui.Context, a PopoverActions) {
 	t := c.Theme()
-	ui.Column(c).Gap(4).Children(func() {
-		ui.Row(c).Gap(2).AlignItems(ui.Center).Children(func() {
-			details := ui.ButtonBase(c).Label(L("Details", "详细参数")).Padding(4, 6).Radius(5).Children(func() {
-				ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
-					ui.Text(c, L("Details", "详细参数")).FontSize(12).TextColor(t.TextMuted)
-					ui.Icon(c, icons.Get("chevron-right")).Size(9, 9).TextColor(t.TextMuted)
-				})
+	ui.Row(c).Gap(2).AlignItems(ui.Center).Children(func() {
+		details := ui.ButtonBase(c).Label(L("Details", "详细参数")).Padding(4, 6).Radius(5).Children(func() {
+			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, L("Details", "详细参数")).FontSize(12).TextColor(t.TextMuted)
+				ui.Icon(c, icons.Get("chevron-right")).Size(9, 9).TextColor(t.TextMuted)
 			})
-			if details.Clicked() && a.OpenDetails != nil {
-				a.OpenDetails("")
-			}
-			ui.Spacer(c)
-			gear := ui.ButtonBase(c).Label(L("Settings", "设置")).Padding(4, 6).Radius(5).Children(func() {
-				ui.Icon(c, icons.Get("settings")).Size(13, 13).TextColor(t.TextMuted)
-			})
-			gear.Menu(func(m *ui.Menu) {
-				if m.Item(L("Launch at Login", "开机启动")).Checked(d.LaunchAtLogin).Chosen() && a.SetLaunchAtLogin != nil {
-					a.SetLaunchAtLogin(!d.LaunchAtLogin)
-				}
-				if m.Item(L("Customize Menu Bar…", "自定义菜单栏…")).Chosen() && a.OpenDetails != nil {
-					a.OpenDetails(PageMenuBar)
-				}
-				m.Separator()
-				m.Item("v" + d.Version).Disabled(true)
-				if m.Item(L("Quit", "退出")).Chosen() && a.Quit != nil {
-					a.Quit()
-				}
-			})
-			quit := ui.ButtonBase(c).Label(L("Quit", "退出")).Tooltip(L("Quit", "退出")).Padding(4, 6).Radius(5).Children(func() {
-				ui.Icon(c, icons.Get("power")).Size(13, 13).TextColor(t.TextMuted)
-			})
-			if quit.Clicked() && a.Quit != nil {
-				a.Quit()
-			}
 		})
-		if d.LaunchAtLoginError != "" {
-			ui.Text(c, d.LaunchAtLoginError).FontSize(10).TextColor(Red.Color(c)).PaddingX(6)
+		if details.Clicked() && a.OpenDetails != nil {
+			a.OpenDetails("")
+		}
+		ui.Spacer(c)
+		gear := ui.ButtonBase(c).Label(L("Settings", "设置")).Tooltip(L("Settings", "设置")).Padding(4, 6).Radius(5).Children(func() {
+			ui.Icon(c, icons.Get("settings")).Size(13, 13).TextColor(t.TextMuted)
+		})
+		if gear.Clicked() && a.OpenDetails != nil {
+			a.OpenDetails(PageSettings)
+		}
+		quit := ui.ButtonBase(c).Label(L("Quit", "退出")).Tooltip(L("Quit", "退出")).Padding(4, 6).Radius(5).Children(func() {
+			ui.Icon(c, icons.Get("power")).Size(13, 13).TextColor(t.TextMuted)
+		})
+		if quit.Clicked() && a.Quit != nil {
+			a.Quit()
 		}
 	})
 }

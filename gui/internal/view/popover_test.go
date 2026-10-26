@@ -26,7 +26,6 @@ func TestPopoverSections(t *testing.T) {
 		}},
 		System:   system.Snapshot{Memory: &mem},
 		Displays: []display.Brightness{{ID: 1, Name: "Built-in Retina Display", BuiltIn: true, Level: 0.6}},
-		Version:  "1.4.0",
 	}
 	var opened []PageID
 	a := PopoverActions{OpenDetails: func(p PageID) { opened = append(opened, p) }}
@@ -48,6 +47,12 @@ func TestPopoverSections(t *testing.T) {
 	}
 	if len(opened) != 2 || opened[1] != PageBattery {
 		t.Errorf("opened %v, want the charge limit row to open the Battery page", opened)
+	}
+	if err := tt.Click("Settings"); err != nil {
+		t.Fatal(err)
+	}
+	if len(opened) != 3 || opened[2] != PageSettings {
+		t.Errorf("opened %v, want the gear to open the Settings page", opened)
 	}
 }
 
