@@ -14,14 +14,12 @@ import (
 var (
 	cgOnce sync.Once
 
-	cgWindowListCopyWindowInfo func(option, relativeTo uint32) uintptr
-	cgWindowLevelForKey        func(key int32) int32
-	cgEventCreate              func(source uintptr) uintptr
-	cgEventGetLocation         func(event uintptr) nsPoint
-	cgEventCreateMouseEvent    func(source uintptr, typ uint32, at nsPoint, button uint32) uintptr
-	cgEventSetFlags            func(event uintptr, flags uint64)
-	cgEventPost                func(tap uint32, event uintptr)
-	cgWarpMouseCursorPosition  func(at nsPoint) int32
+	cgEventCreate             func(source uintptr) uintptr
+	cgEventGetLocation        func(event uintptr) nsPoint
+	cgEventCreateMouseEvent   func(source uintptr, typ uint32, at nsPoint, button uint32) uintptr
+	cgEventSetFlags           func(event uintptr, flags uint64)
+	cgEventPost               func(tap uint32, event uintptr)
+	cgWarpMouseCursorPosition func(at nsPoint) int32
 
 	cfRelease                    func(ref uintptr)
 	cfArrayGetCount              func(array uintptr) int
@@ -40,8 +38,6 @@ func loadCG() {
 		if err != nil {
 			panic(err)
 		}
-		purego.RegisterLibFunc(&cgWindowListCopyWindowInfo, cg, "CGWindowListCopyWindowInfo")
-		purego.RegisterLibFunc(&cgWindowLevelForKey, cg, "CGWindowLevelForKey")
 		purego.RegisterLibFunc(&cgEventCreate, cg, "CGEventCreate")
 		purego.RegisterLibFunc(&cgEventGetLocation, cg, "CGEventGetLocation")
 		purego.RegisterLibFunc(&cgEventCreateMouseEvent, cg, "CGEventCreateMouseEvent")
@@ -54,33 +50,6 @@ func loadCG() {
 		purego.RegisterLibFunc(&cfDataCreate, cf, "CFDataCreate")
 		purego.RegisterLibFunc(&cfPropertyListCreateWithData, cf, "CFPropertyListCreateWithData")
 	})
-}
-
-// popUpMenuOpen reports an open menu of any app. Window levels and bounds are readable without
-// Screen Recording access.
-func popUpMenuOpen() bool {
-	loadCG()
-	const onScreenOnly, excludeDesktopElements = 1 << 0, 1 << 4
-	const popUpMenuWindowLevelKey = 11
-	list := cgWindowListCopyWindowInfo(onScreenOnly|excludeDesktopElements, 0)
-	if list == 0 {
-		return false
-	}
-	defer cfRelease(list)
-	value, err := macos.FromCF(list)
-	if err != nil {
-		return false
-	}
-	menuLevel := int64(cgWindowLevelForKey(popUpMenuWindowLevelKey))
-	windows, _ := value.([]any)
-	for _, w := range windows {
-		if dict, ok := w.(map[string]any); ok {
-			if layer, ok := macos.Int(dict, "kCGWindowLayer"); ok && layer == menuLevel {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // commandDrag ⌘-drags from start to end as a user would, then puts the pointer back.

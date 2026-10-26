@@ -3,8 +3,11 @@
 package barmanager
 
 import (
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -13,16 +16,36 @@ import (
 	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/i18n"
 
 	"powerfultop/internal/macos"
 )
 
-// NewItemStore lists items for the layout editor of m; it re-opens a layout-file grant saved on an
-// earlier launch.
-func NewItemStore(m *Manager) *ItemStore {
-	p := &darwinItems{onMain: m.onMain}
+// NewItemStore lists items for the layout editor; ownStatusItem is the autosave name of the app's
+// own status item. It re-opens a layout-file grant saved on an earlier launch.
+func NewItemStore(ownStatusItem string) *ItemStore {
+	p := &darwinItems{onMain: mygo.RunOnMain}
 	p.restoreLayoutAccess()
-	return newItemStore(m, p)
+	return newItemStore(p, majorVersion() >= 27, ownStatusItem)
+}
+
+func (d *darwinItems) ownPID() int32 { return int32(os.Getpid()) }
+
+func majorVersion() int {
+	version, err := syscall.Sysctl("kern.osproductversion")
+	if err != nil {
+		return 0
+	}
+	major, _ := strconv.Atoi(strings.SplitN(version, ".", 2)[0])
+	return major
+}
+
+// tr picks the text for the language the app shows; this package can't use view.L, which imports it.
+func tr(en, zh string) string {
+	if strings.HasPrefix(i18n.Locale(), "zh") {
+		return zh
+	}
+	return en
 }
 
 const (
@@ -89,8 +112,6 @@ func (d *darwinItems) requestTrust() bool {
 	defer cfRelease(options)
 	return axIsProcessTrustedWithOptions(options)
 }
-
-func (d *darwinItems) ownPID() int32 { return int32(os.Getpid()) }
 
 func (d *darwinItems) runningApps() []appRef {
 	var apps []appRef
@@ -220,22 +241,30 @@ func (d *darwinItems) readItems(pids []int32) []rawItem {
 
 // overflowButton finds the system « button: MenuBarAgent's only button among its status groups,
 // present while the bar overflows.
-func (d *darwinItems) overflowButton(apps []appRef) *Rect {
+// barAnchors reads MenuBarAgent's items: its AXButton is the « button, and most of its items (Control
+// Center, the clock) sit on the bar, so the row they share is the bar's.
+func (d *darwinItems) barAnchors(apps []appRef) barAnchors {
 	loadAX()
+	var anchors barAnchors
 	for _, app := range apps {
 		if app.BundleID != menuBarAgentID {
 			continue
 		}
-		var frame *Rect
+		rows := map[int][]Rect{}
 		extrasChildren(app.PID, func(_ int, element uintptr) {
-			if frame == nil && stringAttribute(element, "AXRole") == "AXButton" {
-				f := frameOf(element)
-				frame = &f
+			f := frameOf(element)
+			if anchors.overflow == nil && stringAttribute(element, "AXRole") == "AXButton" {
+				anchors.overflow = &f
 			}
+			rows[int(math.Round(f.MidY()))] = append(rows[int(math.Round(f.MidY()))], f)
 		})
-		return frame
+		for _, frames := range rows {
+			if anchors.row == nil || len(frames) > len(rows[int(math.Round(anchors.row.MidY()))]) {
+				anchors.row = &frames[0]
+			}
+		}
 	}
-	return nil
+	return anchors
 }
 
 func (d *darwinItems) commandDrag(start, end Point) { commandDrag(start, end) }

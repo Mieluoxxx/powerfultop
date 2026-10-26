@@ -20,10 +20,11 @@ const (
 
 // StoreSnapshot is what the layout editor shows; safe to read from any goroutine.
 type StoreSnapshot struct {
-	Items   []Item
-	Trusted bool
-	// Crowded: the bar being read can't fit the separator, so no item can be placed.
-	Crowded         bool
+	// Supported is false before macOS 27, whose single menu bar and layout file the editor relies on.
+	Supported bool
+	// Items run left to right as in the bar.
+	Items           []Item
+	Trusted         bool
 	HasLayoutAccess bool
 	Moving          bool
 	Error           StoreError
@@ -34,7 +35,7 @@ type itemPlatform interface {
 	requestTrust() bool
 	runningApps() []appRef
 	readItems(pids []int32) []rawItem
-	overflowButton(apps []appRef) *Rect
+	barAnchors(apps []appRef) barAnchors
 	// positions is nil without access to the layout file.
 	positions() map[string]float64
 	setPosition(key string, value float64) bool
@@ -48,24 +49,21 @@ type itemPlatform interface {
 
 const (
 	pollInterval = 3 * time.Second
-	// The bar needs a moment to lay out after expanding or after a drop.
+	// The bar needs a moment to lay out after a drop.
 	settleDelay = 400 * time.Millisecond
 )
 
 // ItemStore lists every app's menu bar items for the layout editor. Items come from
 // Accessibility; their order comes from the macOS 27 layout file when the user has granted it,
-// which also moves them without the pointer. Otherwise they are classified by on-screen frames
-// and moved with the ⌘-drag a user would do, which only reaches items the active bar shows.
+// which also moves them without the pointer. Otherwise they are ordered by on-screen frames and
+// moved with the ⌘-drag a user would do, which only reaches items the active bar shows.
 type ItemStore struct {
-	manager *Manager
 	p       itemPlatform
+	ownName string
 
 	mu        sync.Mutex
 	snap      StoreSnapshot
-	frames    *frameAnchors
-	file      *fileAnchors
 	visible   bool
-	holdsBar  bool
 	stop      chan struct{}
 	listeners []func()
 	icons     map[string][]byte
@@ -74,8 +72,8 @@ type ItemStore struct {
 	work sync.Mutex
 }
 
-func newItemStore(m *Manager, p itemPlatform) *ItemStore {
-	return &ItemStore{manager: m, p: p, icons: map[string][]byte{}}
+func newItemStore(p itemPlatform, supported bool, ownName string) *ItemStore {
+	return &ItemStore{p: p, ownName: ownName, snap: StoreSnapshot{Supported: supported}, icons: map[string][]byte{}}
 }
 
 func (s *ItemStore) Snapshot() StoreSnapshot {
@@ -114,7 +112,7 @@ func (s *ItemStore) Icon(item Item) []byte {
 // Safe from any goroutine.
 func (s *ItemStore) SetVisible(visible bool) {
 	s.mu.Lock()
-	if visible == s.visible {
+	if visible == s.visible || !s.snap.Supported {
 		s.mu.Unlock()
 		return
 	}
@@ -131,7 +129,7 @@ func (s *ItemStore) SetVisible(visible bool) {
 	s.mu.Unlock()
 
 	if !visible {
-		go s.releaseBar()
+		s.update(func(snap *StoreSnapshot) { snap.Items = nil })
 		return
 	}
 	go func() {
@@ -146,7 +144,7 @@ func (s *ItemStore) SetVisible(visible bool) {
 	}()
 }
 
-// Refresh rescans now, e.g. after the manager was switched on.
+// Refresh rescans now.
 func (s *ItemStore) Refresh() { go s.refresh() }
 
 func (s *ItemStore) refresh() {
@@ -154,57 +152,28 @@ func (s *ItemStore) refresh() {
 	defer s.work.Unlock()
 	trusted := s.p.trusted()
 	s.update(func(snap *StoreSnapshot) { snap.Trusted = trusted })
-
 	s.mu.Lock()
-	wantsBar := s.visible && trusted && s.manager.Snapshot().Enabled
-	holds := s.holdsBar
+	visible := s.visible
 	s.mu.Unlock()
-	if wantsBar && !holds {
-		s.manager.onMain(s.manager.BeginEditing)
-		s.mu.Lock()
-		s.holdsBar = true
-		s.mu.Unlock()
-		time.Sleep(settleDelay)
-	} else if !wantsBar && holds {
-		s.releaseBarLocked()
-	}
-	if !wantsBar {
+	if !visible || !trusted {
 		s.update(func(snap *StoreSnapshot) { snap.Items = nil })
 		return
 	}
 	s.scan()
 }
 
-func (s *ItemStore) releaseBar() {
-	s.work.Lock()
-	defer s.work.Unlock()
-	s.releaseBarLocked()
-}
-
-func (s *ItemStore) releaseBarLocked() {
-	s.mu.Lock()
-	holds := s.holdsBar
-	s.holdsBar = false
-	s.mu.Unlock()
-	if holds {
-		s.manager.onMain(s.manager.EndEditing)
-	}
-	s.update(func(snap *StoreSnapshot) { snap.Items = nil })
-}
-
 func (s *ItemStore) scan() {
 	all := s.p.runningApps()
-	overflow := s.p.overflowButton(all)
+	bar := s.p.barAnchors(all)
 	apps := withoutAgent(all)
 	pids := make([]int32, len(apps))
 	for i, a := range apps {
 		pids[i] = a.PID
 	}
-	raw := s.p.readItems(pids)
 	positions := s.p.positions()
-	result := classify(apps, raw, overflow, positions, s.p.ownPID())
+	items := classify(apps, s.p.readItems(pids), bar, positions, ownItem{s.p.ownPID(), s.ownName})
 
-	for _, item := range result.items {
+	for _, item := range items {
 		s.mu.Lock()
 		_, have := s.icons[item.AppPath]
 		s.mu.Unlock()
@@ -215,30 +184,22 @@ func (s *ItemStore) scan() {
 			s.mu.Unlock()
 		}
 	}
-
-	s.mu.Lock()
-	s.frames, s.file = result.frames, result.file
-	s.mu.Unlock()
 	s.update(func(snap *StoreSnapshot) {
-		snap.Items = result.items
-		snap.Crowded = result.crowded
+		snap.Items = items
 		snap.HasLayoutAccess = positions != nil
 	})
 }
 
-// Move puts an item into section, immediately left of the item with ID before when given, else
-// at the section's edge next to the chevron. It runs in the background.
-func (s *ItemStore) Move(id string, section Section, before string) {
-	go s.move(id, section, before)
+// Move puts an item immediately left of the item with ID before, or at the right end of the bar
+// when before is "", where macOS keeps it on screen longest. It runs in the background.
+func (s *ItemStore) Move(id, before string) {
+	go s.move(id, before)
 }
 
-func (s *ItemStore) move(id string, section Section, before string) {
+func (s *ItemStore) move(id, before string) {
 	s.work.Lock()
 	defer s.work.Unlock()
-	s.mu.Lock()
-	holds := s.holdsBar
-	s.mu.Unlock()
-	if !holds || id == before || s.Snapshot().Moving {
+	if id == before || s.Snapshot().Moving {
 		return
 	}
 	s.update(func(snap *StoreSnapshot) { snap.Moving = true })
@@ -246,43 +207,26 @@ func (s *ItemStore) move(id string, section Section, before string) {
 
 	// Positions shift whenever any app's item changes width, so measure right before moving.
 	s.scan()
-	snap := s.Snapshot()
-	item, ok := find(snap.Items, id)
+	items := s.Snapshot().Items
+	item, ok := find(items, id)
 	if !ok {
 		return
 	}
-	anchor, hasAnchor := find(snap.Items, before)
-	hasAnchor = hasAnchor && anchor.Section == section
-	if !hasAnchor && item.Section == section {
+	anchor, hasAnchor := find(items, before)
+	if hasAnchor && anchor.Section == Absent {
 		return
 	}
 	if !item.CanMove() {
 		s.setError(ErrNotInMenuBar)
 		return
 	}
+	if inPlace, known := placed(items, id, before); known && inPlace {
+		return
+	}
 
-	s.mu.Lock()
-	file, frames := s.file, s.frames
-	s.mu.Unlock()
-
-	if positions := s.p.positions(); item.LayoutKey != "" && file != nil && positions != nil {
-		var existing []float64
-		for key, v := range positions {
-			if key != item.LayoutKey {
-				existing = append(existing, v)
-			}
-		}
-		var target float64
-		switch {
-		case hasAnchor && anchor.HasPosition:
-			target = PositionLeftOf(anchor.Position, existing)
-		case section == Hidden:
-			target = PositionLeftOf(file.separator, existing)
-		default:
-			target = PositionRightOf(file.toggle, existing)
-		}
-		if s.p.setPosition(item.LayoutKey, target) {
-			if s.landedOnBar(id, section) {
+	if positions := s.p.positions(); item.LayoutKey != "" && positions != nil {
+		if target, ok := targetPosition(items, item, anchor, hasAnchor, positions); ok && s.p.setPosition(item.LayoutKey, target) {
+			if s.settledInPlace(id, before) {
 				s.setError(NoError)
 				return
 			}
@@ -290,48 +234,105 @@ func (s *ItemStore) move(id string, section Section, before string) {
 			// reaches it when its cache happens to miss; a restarted agent reads the file afresh.
 			s.p.reloadMenuBar()
 			s.scan()
-			moved, _ := find(s.Snapshot().Items, id)
-			s.setErrorUnless(moved.Section == section)
+			inPlace, known := placed(s.Snapshot().Items, id, before)
+			s.setErrorUnless(inPlace || !known)
 			return
 		}
 	}
 
-	if !item.Reachable || frames == nil {
+	target, ok := dropTarget(items, item, anchor, hasAnchor)
+	if !item.Reachable || !ok {
 		s.setError(ErrDidNotMove)
 		return
 	}
-	target, _ := DropPoint(section, frames.separator, frames.toggle)
-	if hasAnchor && anchor.Reachable {
-		target = DropPointLeftOf(anchor.Frame)
-	}
 	s.p.commandDrag(Point{item.Frame.MidX(), item.Frame.MidY()}, target)
-	time.Sleep(settleDelay)
-	s.scan()
-	after := s.Snapshot().Items
-	moved, _ := find(after, id)
-	landed := moved.Section == section
-	if hasAnchor {
-		if a, ok := find(after, anchor.ID); ok {
-			landed = landed && moved.Frame.MidX() < a.Frame.MidX()
-		}
-	}
-	s.setErrorUnless(landed)
+	s.setErrorUnless(s.settledInPlace(id, before))
 }
 
-// landedOnBar reports whether the bar itself shows the item in section: after a layout-file write
-// the scan sorts by the file, which says nothing about whether MenuBarAgent applied it. An item the
-// bar doesn't show can't be checked, so it counts as not landed.
-func (s *ItemStore) landedOnBar(id string, section Section) bool {
+// settledInPlace rescans after the bar has had a moment and checks the bar itself: the scan orders
+// by the layout file, which says nothing about whether MenuBarAgent applied a write.
+func (s *ItemStore) settledInPlace(id, before string) bool {
 	time.Sleep(settleDelay)
 	s.scan()
-	moved, ok := find(s.Snapshot().Items, id)
-	s.mu.Lock()
-	frames := s.frames
-	s.mu.Unlock()
-	if !ok || !moved.Reachable || frames == nil {
-		return false
+	inPlace, known := placed(s.Snapshot().Items, id, before)
+	return inPlace && known
+}
+
+// placed checks on-screen frames: id must sit right before the item before, or rightmost when
+// before is "". known is false when the bar doesn't show the items needed to tell.
+func placed(items []Item, id, before string) (inPlace, known bool) {
+	item, ok := find(items, id)
+	if !ok || !item.Reachable {
+		return false, false
 	}
-	return SectionOf(moved.Frame, frames.separator, frames.toggle) == section
+	var anchor *Item
+	if before != "" {
+		a, ok := find(items, before)
+		if !ok || !a.Reachable {
+			return false, false
+		}
+		anchor = &a
+		if item.Frame.MidX() >= a.Frame.MidX() {
+			return false, true
+		}
+	}
+	for _, other := range items {
+		if !other.Reachable || other.ID == id || (anchor != nil && other.ID == anchor.ID) {
+			continue
+		}
+		right := other.Frame.MidX() > item.Frame.MidX()
+		if anchor == nil && right {
+			return false, true
+		}
+		if anchor != nil && right && other.Frame.MidX() < anchor.Frame.MidX() {
+			return false, true
+		}
+	}
+	return true, true
+}
+
+// targetPosition is the layout-file value that puts item where Move asked.
+func targetPosition(items []Item, item, anchor Item, hasAnchor bool, positions map[string]float64) (float64, bool) {
+	var existing []float64
+	for key, v := range positions {
+		if key != item.LayoutKey {
+			existing = append(existing, v)
+		}
+	}
+	if hasAnchor {
+		if !anchor.HasPosition {
+			return 0, false
+		}
+		return PositionLeftOf(anchor.Position, existing), true
+	}
+	rightmost, found := 0.0, false
+	for _, other := range items {
+		if other.ID != item.ID && other.HasPosition && other.Section != Absent && (!found || other.Position < rightmost) {
+			rightmost, found = other.Position, true
+		}
+	}
+	if !found {
+		return 0, false
+	}
+	return PositionRightOf(rightmost, existing), true
+}
+
+// dropTarget is where a ⌘-drag must end for Move's placement; only on-screen items can anchor it.
+func dropTarget(items []Item, item, anchor Item, hasAnchor bool) (Point, bool) {
+	if hasAnchor {
+		return DropPointLeftOf(anchor.Frame), anchor.Reachable
+	}
+	var rightmost *Item
+	for i := range items {
+		other := items[i]
+		if other.ID != item.ID && other.Reachable && (rightmost == nil || other.Frame.MidX() > rightmost.Frame.MidX()) {
+			rightmost = &items[i]
+		}
+	}
+	if rightmost == nil {
+		return Point{}, false
+	}
+	return DropPointRightOf(rightmost.Frame), true
 }
 
 func (s *ItemStore) setError(e StoreError) {

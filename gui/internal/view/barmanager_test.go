@@ -1,109 +1,64 @@
 package view
 
 import (
-	"image/png"
-	"os"
 	"testing"
-	"time"
 
 	"github.com/egoist/mygo/ui"
 
 	"powerfultop/internal/barmanager"
 )
 
-func managerTester(m *barmanager.Manager, s *barmanager.ItemStore) *ui.Tester {
+func managerTester(s *barmanager.ItemStore) *ui.Tester {
 	state := &ManagerPageState{}
 	return ui.NewTester(func(c *ui.Context) {
-		ui.Scroll(c).Fill().Children(func() { MenuBarManagerPage(c, m, s, state, 600) })
-	}, 640, 1400)
+		ui.Scroll(c).Fill().Children(func() { MenuBarManagerPage(c, s, state, 760) })
+	}, 800, 900)
 }
 
-func TestManagerPageLayoutEditor(t *testing.T) {
-	m, s := barmanager.NewPreview(true, true, true, barmanager.StoreSnapshot{
-		Trusted: true, HasLayoutAccess: true, Error: barmanager.ErrDidNotMove,
+func TestManagerPageOrderEditor(t *testing.T) {
+	s := barmanager.NewPreview(barmanager.StoreSnapshot{
+		Supported: true, Trusted: true, HasLayoutAccess: true, Error: barmanager.ErrDidNotMove,
 		Items: []barmanager.Item{
-			{ID: "a#0", Name: "FineTune", Section: barmanager.Shown, LayoutKey: "k"},
-			{ID: "b#0", Name: "Stats", Detail: "CPU", Section: barmanager.Hidden, Reachable: true},
+			{ID: "w#0", Name: "WeChat", Section: barmanager.Overflow, LayoutKey: "w"},
+			{ID: "a#0", Name: "FineTune", Section: barmanager.Shown, LayoutKey: "k", Reachable: true},
+			{ID: "b#0", Name: "Stats", Detail: "CPU", Section: barmanager.Shown, Reachable: true},
 			{ID: "c#0", Name: "QQ", Section: barmanager.Absent},
 		},
 	})
-	tt := managerTester(m, s)
+	tt := managerTester(s)
 	for _, want := range []string{
-		"Enable Menu Bar Manager", "Icons Hidden", "Hide Again After", "Show Hidden Items",
-		"Menu Bar Layout", "Shown Icons", "Hidden Icons", "Not in Menu Bar",
-		"Layout file allowed",
-		"The icon didn't move. It may be covered by the notch or the « overflow; try again on a wider display.",
-		"How It Works", "Open System Settings…",
+		"Menu Bar Order", "Layout file allowed", "«", "9:41",
+		"Drop on an icon to place it to its left", "Further right stays in sight longer",
+		"The icon didn't move. Icons behind « can only be moved once the layout file is allowed.",
+		"Not in Menu Bar", "1", "These apps' icons are switched off in System Settings › Menu Bar.", "Open System Settings…",
 	} {
 		if !tt.HasText(want) {
-			t.Errorf("missing %q", want)
+			t.Errorf("missing %q in %q", want, tt.Texts())
 		}
 	}
-	if err := tt.Click("Show Hidden Items"); err != nil {
-		t.Fatal(err)
-	}
-	if m.Snapshot().Collapsed {
-		t.Error("the button expands the bar")
+	for _, gone := range []string{"Enable Menu Bar Manager", "Hide Again After", "Show Hidden Items", "Hidden Icons"} {
+		if tt.HasText(gone) {
+			t.Errorf("%q belonged to PowerfulTop's own hiding, which is gone", gone)
+		}
 	}
 }
 
 func TestManagerPageStates(t *testing.T) {
-	m, s := barmanager.NewPreview(false, false, false, barmanager.StoreSnapshot{})
-	tt := managerTester(m, s)
-	if !tt.HasText("Requires macOS 27 or later.") || tt.HasText("Menu Bar Layout") {
+	tt := managerTester(barmanager.NewPreview(barmanager.StoreSnapshot{}))
+	if !tt.HasText("Requires macOS 27 or later.") || tt.HasText("Layout file allowed") {
 		t.Errorf("unsupported: %q", tt.Texts())
 	}
 
-	m, s = barmanager.NewPreview(true, true, false, barmanager.StoreSnapshot{Trusted: false})
-	tt = managerTester(m, s)
-	if !tt.HasText("Grant Accessibility Access…") || !tt.HasText("Hide Items") {
+	tt = managerTester(barmanager.NewPreview(barmanager.StoreSnapshot{Supported: true}))
+	if !tt.HasText("Grant Accessibility Access…") {
 		t.Errorf("untrusted: %q", tt.Texts())
 	}
 
-	m, s = barmanager.NewPreview(true, true, false, barmanager.StoreSnapshot{Trusted: true, Crowded: true})
-	tt = managerTester(m, s)
-	if !tt.HasText("The active menu bar is too crowded to show the separator.") || !tt.HasText("Allow Layout File…") {
-		t.Errorf("crowded: %q", tt.Texts())
+	tt = managerTester(barmanager.NewPreview(barmanager.StoreSnapshot{Supported: true, Trusted: true}))
+	if !tt.HasText("Reading the menu bar…") || !tt.HasText("Allow Layout File…") {
+		t.Errorf("scanning without the layout file: %q", tt.Texts())
 	}
-	if tt.HasText("Shown Icons") {
-		t.Error("no rows while crowded")
-	}
-}
-
-func TestManagerAutoHideLabels(t *testing.T) {
-	cases := map[time.Duration]string{0: "Never", 5 * time.Second: "5 seconds", time.Minute: "1 minute"}
-	for d, want := range cases {
-		if got := managerAutoHideLabel(d); got != want {
-			t.Errorf("%v: %q", d, got)
-		}
-	}
-}
-
-func TestManagerPageSnapshot(t *testing.T) {
-	path := os.Getenv("MANAGER_SNAPSHOT")
-	if path == "" {
-		t.Skip("set MANAGER_SNAPSHOT to a PNG path to render the page")
-	}
-	m, s := barmanager.NewPreview(true, true, false, barmanager.StoreSnapshot{
-		Trusted: true, HasLayoutAccess: true,
-		Items: []barmanager.Item{
-			{ID: "a#0", Name: "FineTune", Section: barmanager.Shown, LayoutKey: "k"},
-			{ID: "b#0", Name: "Stats", Section: barmanager.Shown, Reachable: true},
-			{ID: "c#0", Name: "QQ", Section: barmanager.Absent},
-		},
-	})
-	state := &ManagerPageState{}
-	tt := ui.NewTester(func(c *ui.Context) {
-		ui.Column(c).Fill().Padding(20).Background(c.Theme().Background).Children(func() {
-			MenuBarManagerPage(c, m, s, state, 560)
-		})
-	}, 620, 1100)
-	f, err := os.Create(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	if err := png.Encode(f, tt.Image()); err != nil {
-		t.Fatal(err)
+	if tt.HasText("Not in Menu Bar") {
+		t.Error("no absent panel without absent items")
 	}
 }

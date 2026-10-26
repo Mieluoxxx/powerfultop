@@ -13,19 +13,21 @@ type fakeItems struct {
 	drags    [][2]Point
 	setCalls int
 	reloads  int
-	onReload func(*fakeItems)
-	// applies makes layout-file writes reach the bar at once, moving FineTune left of the separator.
-	applies   bool
-	isTrusted bool
+	// applyWrite moves the bar the way a layout-file write asked for; nil leaves the bar alone.
+	applyWrite func(*fakeItems)
+	// applyReload is what the bar does after MenuBarAgent restarts and rereads the file.
+	applyReload func(*fakeItems)
+	applyDrag   func(*fakeItems)
+	isTrusted   bool
 }
 
-func (f *fakeItems) trusted() bool                 { return f.isTrusted }
-func (f *fakeItems) requestTrust() bool            { return f.isTrusted }
-func (f *fakeItems) runningApps() []appRef         { return testApps }
-func (f *fakeItems) overflowButton([]appRef) *Rect { return nil }
-func (f *fakeItems) requestLayoutAccess() bool     { return false }
-func (f *fakeItems) ownPID() int32                 { return own }
-func (f *fakeItems) appIcon(string) []byte         { return nil }
+func (f *fakeItems) trusted() bool                  { return f.isTrusted }
+func (f *fakeItems) requestTrust() bool             { return f.isTrusted }
+func (f *fakeItems) runningApps() []appRef          { return testApps }
+func (f *fakeItems) barAnchors([]appRef) barAnchors { return wideBar }
+func (f *fakeItems) requestLayoutAccess() bool      { return false }
+func (f *fakeItems) appIcon(string) []byte          { return nil }
+func (f *fakeItems) ownPID() int32                  { return 1 }
 func (f *fakeItems) readItems([]int32) []rawItem {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -48,8 +50,8 @@ func (f *fakeItems) setPosition(key string, v float64) bool {
 	defer f.mu.Unlock()
 	f.setCalls++
 	f.pos[key] = v
-	if f.applies {
-		f.moveFineTuneLeft()
+	if f.applyWrite != nil {
+		f.applyWrite(f)
 	}
 	return true
 }
@@ -57,33 +59,22 @@ func (f *fakeItems) reloadMenuBar() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.reloads++
-	if f.onReload != nil {
-		f.onReload(f)
+	if f.applyReload != nil {
+		f.applyReload(f)
 	}
 }
 func (f *fakeItems) commandDrag(start, end Point) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.drags = append(f.drags, [2]Point{start, end})
-	f.moveFineTuneLeft()
-}
-
-// moveFineTuneLeft puts FineTune left of the separator; callers hold f.mu.
-func (f *fakeItems) moveFineTuneLeft() {
-	for i := range f.raw {
-		if f.raw[i].PID == 2 {
-			f.raw[i].Frame.X = 690
-		}
+	if f.applyDrag != nil {
+		f.applyDrag(f)
 	}
 }
 
-func newTestStore(p *fakeItems) (*ItemStore, *fakeBar) {
-	m, b, _ := newTestManager(fakePrefs{enabledKey: true, autoHideDelayKey: 0.0})
-	onMain(m, func() {
-		m.Start()
-		m.Collapse()
-	})
-	return newItemStore(m, p), b
+// slide moves the item at index to x on the bar; callers hold f.mu.
+func slide(index int, x float64) func(*fakeItems) {
+	return func(f *fakeItems) { f.raw[index].Frame.X = x }
 }
 
 func waitFor(t *testing.T, what string, cond func() bool) {
@@ -97,98 +88,101 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-func TestStoreHoldsBarWhileVisible(t *testing.T) {
-	p := &fakeItems{raw: expandedRaw(), isTrusted: true}
-	s, b := newTestStore(p)
+func visibleStore(t *testing.T, p *fakeItems) *ItemStore {
+	t.Helper()
+	s := newItemStore(p, true, "PowerfulTop.status")
 	s.SetVisible(true)
+	t.Cleanup(func() { s.SetVisible(false) })
 	waitFor(t, "items", func() bool { return len(s.Snapshot().Items) > 0 })
-	b.mu.Lock()
-	expanded := !b.collapsed
-	b.mu.Unlock()
-	if !expanded {
-		t.Error("the editor keeps the bar expanded")
-	}
-	s.SetVisible(false)
-	waitFor(t, "collapse after editing", func() bool { b.mu.Lock(); defer b.mu.Unlock(); return b.collapsed })
-	if len(s.Snapshot().Items) != 0 {
-		t.Error("no items once hidden")
+	return s
+}
+
+func filePositions() map[string]float64 {
+	return map[string]float64{
+		"status:io.github.mieluoxxx.PowerfulTop::PowerfulTop.status": 700,
+		"status:com.finetuneapp.FineTune::Item-0":                    500,
+		"status:eu.exelban.Stats::CPU_mini":                          465,
+		"status:eu.exelban.Stats::RAM_mini":                          418,
+		"status:com.tencent.qq::Item-0":                              588,
 	}
 }
 
-func TestStoreUntrustedListsNothing(t *testing.T) {
-	s, _ := newTestStore(&fakeItems{raw: expandedRaw()})
+func TestStoreListsOnlyWhileVisibleAndTrusted(t *testing.T) {
+	s := newItemStore(&fakeItems{raw: wideRaw()}, true, "")
 	s.SetVisible(true)
-	waitFor(t, "trust check", func() bool { return true })
 	time.Sleep(50 * time.Millisecond)
 	if snap := s.Snapshot(); snap.Trusted || len(snap.Items) != 0 {
 		t.Errorf("untrusted: %+v", snap)
 	}
 	s.SetVisible(false)
+
+	trusted := newItemStore(&fakeItems{raw: wideRaw(), isTrusted: true}, true, "")
+	trusted.SetVisible(true)
+	waitFor(t, "items", func() bool { return len(trusted.Snapshot().Items) == 5 })
+	trusted.SetVisible(false)
+	if len(trusted.Snapshot().Items) != 0 {
+		t.Error("no items once the page is gone")
+	}
 }
 
 func TestStoreMovesThroughLayoutFile(t *testing.T) {
-	p := &fakeItems{raw: expandedRaw(), isTrusted: true, pos: map[string]float64{
-		"status:PowerfulTop::PowerfulTop.MenuBarSection.separator": 928,
-		"status:PowerfulTop::PowerfulTop.MenuBarSection.spacer0":   832,
-		"status:PowerfulTop::PowerfulTop.MenuBarSection.toggle":    805,
-		"status:com.finetuneapp.FineTune::Item-0":                  512,
-		"status:com.tencent.qq::Item-0":                            588,
-	}}
-	s, _ := newTestStore(p)
-	s.SetVisible(true)
-	defer s.SetVisible(false)
-	waitFor(t, "items", func() bool { return s.Snapshot().HasLayoutAccess && len(s.Snapshot().Items) > 0 })
-	s.move("com.finetuneapp.FineTune#0", Hidden, "")
+	// RAM goes left of FineTune: between PowerfulTop's label and FineTune once the bar applies it.
+	p := &fakeItems{raw: wideRaw(), isTrusted: true, pos: filePositions(), applyReload: slide(3, 1100)}
+	s := visibleStore(t, p)
+	s.move("eu.exelban.Stats#1", "com.finetuneapp.FineTune#0")
 	if p.setCalls != 1 || len(p.drags) != 0 {
 		t.Fatalf("file moves don't drag: set %d drags %d", p.setCalls, len(p.drags))
 	}
-	if p.reloads != 1 {
-		t.Errorf("a write the bar ignores reloads the bar once, got %d", p.reloads)
+	if got := p.positions()["status:eu.exelban.Stats::RAM_mini"]; got <= 500 || got >= 700 {
+		t.Errorf("the position lands between FineTune and the next item left of it: %v", got)
 	}
-	if got := p.positions()["status:com.finetuneapp.FineTune::Item-0"]; got <= 928 {
-		t.Errorf("hidden lands left of the separator: %v", got)
-	}
-	it, _ := find(s.Snapshot().Items, "com.finetuneapp.FineTune#0")
-	if it.Section != Hidden || s.Snapshot().Error != NoError {
-		t.Errorf("after move: %+v err %v", it, s.Snapshot().Error)
-	}
-	s.move("com.tencent.qq#0", Hidden, "")
-	if s.Snapshot().Error != ErrNotInMenuBar {
-		t.Error("an absent item can't be moved")
+	if p.reloads != 1 || s.Snapshot().Error != NoError {
+		t.Errorf("a write the bar ignores reloads the bar once: reloads %d err %v", p.reloads, s.Snapshot().Error)
 	}
 }
 
-func TestStoreFallsBackToDrag(t *testing.T) {
-	p := &fakeItems{raw: expandedRaw(), isTrusted: true}
-	s, _ := newTestStore(p)
-	s.SetVisible(true)
-	defer s.SetVisible(false)
-	waitFor(t, "items", func() bool { return len(s.Snapshot().Items) > 0 })
-	s.move("com.finetuneapp.FineTune#0", Hidden, "")
+func TestStoreSkipsReloadWhenTheBarApplies(t *testing.T) {
+	p := &fakeItems{raw: wideRaw(), isTrusted: true, pos: filePositions(), applyWrite: slide(3, 1100)}
+	s := visibleStore(t, p)
+	s.move("eu.exelban.Stats#1", "com.finetuneapp.FineTune#0")
+	if p.reloads != 0 || s.Snapshot().Error != NoError {
+		t.Errorf("reloads %d err %v", p.reloads, s.Snapshot().Error)
+	}
+}
+
+func TestStoreMovesRightmostWithDrag(t *testing.T) {
+	p := &fakeItems{raw: wideRaw(), isTrusted: true, applyDrag: slide(2, 1270)}
+	s := visibleStore(t, p)
+	s.move("eu.exelban.Stats#0", "")
 	if len(p.drags) != 1 {
 		t.Fatalf("drags: %d", len(p.drags))
 	}
-	if d := p.drags[0]; d[0] != (Point{1150, -1064.5}) || d[1] != (Point{720, -1064.5}) {
-		t.Errorf("drag from the item's centre to just left of the separator: %v", d)
+	if d := p.drags[0]; d[0] != (Point{1192.5, -1064.5}) || d[1] != (Point{1264, -1064.5}) {
+		t.Errorf("drag from the item's centre to just right of the rightmost item: %v", d)
 	}
 	if s.Snapshot().Error != NoError {
 		t.Errorf("landed: %v", s.Snapshot().Error)
 	}
 }
 
-func TestStoreSkipsReloadWhenTheBarApplies(t *testing.T) {
-	p := &fakeItems{raw: expandedRaw(), isTrusted: true, applies: true, pos: map[string]float64{
-		"status:PowerfulTop::PowerfulTop.MenuBarSection.separator": 928,
-		"status:PowerfulTop::PowerfulTop.MenuBarSection.spacer0":   832,
-		"status:PowerfulTop::PowerfulTop.MenuBarSection.toggle":    805,
-		"status:com.finetuneapp.FineTune::Item-0":                  512,
-	}}
-	s, _ := newTestStore(p)
+func TestStoreReportsMovesThatDidNotLand(t *testing.T) {
+	p := &fakeItems{raw: wideRaw(), isTrusted: true}
+	s := visibleStore(t, p)
+	s.move("eu.exelban.Stats#0", "")
+	if s.Snapshot().Error != ErrDidNotMove {
+		t.Errorf("a drag the bar ignored is reported: %v", s.Snapshot().Error)
+	}
+	s.move("com.tencent.qq#0", "")
+	if s.Snapshot().Error != ErrNotInMenuBar {
+		t.Error("an absent item can't be moved")
+	}
+}
+
+func TestStoreUnsupportedNeverScans(t *testing.T) {
+	s := newItemStore(&fakeItems{raw: wideRaw(), isTrusted: true}, false, "")
 	s.SetVisible(true)
-	defer s.SetVisible(false)
-	waitFor(t, "items", func() bool { return s.Snapshot().HasLayoutAccess && len(s.Snapshot().Items) > 0 })
-	s.move("com.finetuneapp.FineTune#0", Hidden, "")
-	if p.reloads != 0 || s.Snapshot().Error != NoError {
-		t.Errorf("reloads %d err %v", p.reloads, s.Snapshot().Error)
+	time.Sleep(50 * time.Millisecond)
+	if len(s.Snapshot().Items) != 0 {
+		t.Error("before macOS 27 the editor stays empty")
 	}
 }

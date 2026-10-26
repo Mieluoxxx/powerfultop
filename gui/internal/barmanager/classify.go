@@ -4,7 +4,6 @@ import (
 	"math"
 	"sort"
 	"strconv"
-	"strings"
 )
 
 // Item is one app's menu bar item as the layout editor shows it.
@@ -48,47 +47,31 @@ type rawItem struct {
 	Frame      Rect
 }
 
-type fileAnchors struct{ separator, toggle float64 }
-
-type frameAnchors struct{ separator, toggle Rect }
-
-type scanResult struct {
-	items   []Item
-	crowded bool
-	frames  *frameAnchors
-	file    *fileAnchors
+// barAnchors are what MenuBarAgent's own items say about the bar being read.
+type barAnchors struct {
+	// overflow is the system « button's frame while the bar overflows.
+	overflow *Rect
+	// row is a frame on the bar's row; items parked elsewhere aren't in the menu bar.
+	row *Rect
 }
 
-// classify turns what Accessibility and the layout file report into the editor's rows. overflow is
-// the system « button's frame when the bar overflows; positions is nil without layout-file access.
-func classify(apps []appRef, raw []rawItem, overflow *Rect, positions map[string]float64, ownPID int32) scanResult {
+// ownItem is PowerfulTop's own status item: earlier versions left other keys of this app in the
+// layout file, and only the one with this autosave name is live.
+type ownItem struct {
+	pid  int32
+	name string
+}
+
+// classify turns what Accessibility and the layout file report into the editor's list, left to
+// right. positions is nil without layout-file access.
+func classify(apps []appRef, raw []rawItem, bar barAnchors, positions map[string]float64, own ownItem) []Item {
+	onRow := func(f Rect) bool {
+		// macOS 27 parks items it isn't drawing at a fixed spot off the bar's row, e.g. (-1, 970).
+		return bar.row == nil || math.Abs(f.MidY()-bar.row.MidY()) <= bar.row.H/2
+	}
 	// Items behind « report stacked placeholder frames, so only those right of it are real.
 	reachable := func(f Rect) bool {
-		if overflow == nil || math.Abs(f.MidY()-overflow.MidY()) >= overflow.H {
-			return true
-		}
-		return f.MidX() > overflow.MaxX()
-	}
-
-	var separator, toggle *Rect
-	for i := range raw {
-		if raw[i].PID != ownPID {
-			continue
-		}
-		switch raw[i].Identifier {
-		case SeparatorIdentifier:
-			separator = &raw[i].Frame
-		case ToggleIdentifier:
-			toggle = &raw[i].Frame
-		}
-	}
-	if separator == nil || toggle == nil {
-		return scanResult{}
-	}
-	var result scanResult
-	framesUsable := reachable(*separator) && reachable(*toggle)
-	if framesUsable {
-		result.frames = &frameAnchors{*separator, *toggle}
+		return onRow(f) && (bar.overflow == nil || f.MidX() > bar.overflow.MaxX())
 	}
 
 	appsByPID := map[int32]appRef{}
@@ -105,42 +88,10 @@ func classify(apps []appRef, raw []rawItem, overflow *Rect, positions map[string
 			parsed = append(parsed, entry{key, owner, name, value})
 		}
 	}
-	ownOwners := appsByPID[ownPID].Owners
-	var blockEdge float64
-	hasBlock := false
-	var sepPos, togglePos *float64
-	for _, e := range parsed {
-		if !contains(ownOwners, e.owner) || !strings.HasPrefix(e.name, AutosavePrefix) {
-			continue
-		}
-		e := e
-		switch {
-		case e.name == SeparatorIdentifier:
-			sepPos = &e.position
-		case e.name == ToggleIdentifier:
-			togglePos = &e.position
-			continue
-		}
-		if !hasBlock || e.position < blockEdge {
-			blockEdge, hasBlock = e.position, true
-		}
-	}
-	if sepPos != nil && togglePos != nil {
-		result.file = &fileAnchors{*sepPos, *togglePos}
-	}
 
-	result.crowded = result.file == nil && !framesUsable
-	if result.crowded {
-		return result
-	}
-
-	own := map[string]bool{SeparatorIdentifier: true, ToggleIdentifier: true, SpacerIdentifier: true}
 	byPID := map[int32][]rawItem{}
 	var pids []int32
 	for _, r := range raw {
-		if own[r.Identifier] || (r.PID == ownPID && r.Frame.W < 4) {
-			continue
-		}
 		if _, seen := byPID[r.PID]; !seen {
 			pids = append(pids, r.PID)
 		}
@@ -156,7 +107,7 @@ func classify(apps []appRef, raw []rawItem, overflow *Rect, positions map[string
 		live := byPID[pid]
 		var entries []entry
 		for _, e := range parsed {
-			if contains(app.Owners, e.owner) && !strings.HasPrefix(e.name, "PowerfulTop.") {
+			if contains(app.Owners, e.owner) && (pid != own.pid || e.name == own.name) {
 				entries = append(entries, e)
 			}
 		}
@@ -177,23 +128,12 @@ func classify(apps []appRef, raw []rawItem, overflow *Rect, positions map[string
 		}
 		for _, r := range live {
 			e, keyed := keys[r.Index]
-			onScreen := SectionOf(r.Frame, *separator, *toggle)
-			var section Section
+			section := Shown
 			switch {
-			case onScreen == Absent:
+			case !onRow(r.Frame):
 				section = Absent
-			case keyed && hasBlock && result.file != nil:
-				section = SectionOfPosition(e.position, blockEdge)
-			case reachable(r.Frame):
-				// With the chevron itself behind «, anything still on screen sits right of it.
-				if framesUsable {
-					section = onScreen
-				} else {
-					section = Shown
-				}
-			default:
-				// Overflowed with no layout entry: the bar isn't showing it, so it is hidden in practice.
-				section = Hidden
+			case !reachable(r.Frame):
+				section = Overflow
 			}
 			id := app.BundleID
 			if id == "" {
@@ -206,7 +146,7 @@ func classify(apps []appRef, raw []rawItem, overflow *Rect, positions map[string
 				AppPath:   app.Path,
 				Frame:     r.Frame,
 				Section:   section,
-				Reachable: framesUsable && reachable(r.Frame),
+				Reachable: reachable(r.Frame),
 			}
 			if len(live) > 1 {
 				item.Detail = firstNonEmpty(r.Help, r.Title, strconv.Itoa(r.Index+1))
@@ -217,9 +157,10 @@ func classify(apps []appRef, raw []rawItem, overflow *Rect, positions map[string
 			items = append(items, item)
 		}
 	}
-	result.items = sortItems(items)
-	return result
+	return sortItems(items)
 }
+
+var sectionRank = map[Section]int{Overflow: 0, Shown: 1, Absent: 2}
 
 // sortItems orders items left to right as in the bar: layout positions grow leftwards, and
 // unmatched items borrow a position between their matched on-screen neighbours.
@@ -264,6 +205,10 @@ func sortItems(items []Item) []Item {
 			return a > b
 		case okA != okB:
 			return okA
+		}
+		// Without positions the section says more than a placeholder frame: « holds the leftmost items.
+		if ra, rb := sectionRank[items[i].Section], sectionRank[items[j].Section]; ra != rb {
+			return ra < rb
 		}
 		return items[i].Frame.X < items[j].Frame.X
 	})

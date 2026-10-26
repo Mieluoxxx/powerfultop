@@ -33,7 +33,6 @@ type app struct {
 	system       *system.Monitor
 	displays     *display.Controller
 	menuSettings *menubar.Settings
-	bar          *barmanager.Manager
 	store        *barmanager.ItemStore
 	history      history.History
 
@@ -71,8 +70,7 @@ func newApp() *app {
 	a.displays = display.NewController()
 	a.menuSettings = menubar.NewSettings(a.prefs)
 	a.menuSettings.Load()
-	a.bar = barmanager.NewManager()
-	a.store = barmanager.NewItemStore(a.bar)
+	a.store = barmanager.NewItemStore(trayID)
 	a.detailsState = view.DetailsState{Selected: view.PageOverview, Available: true, OnSelect: a.persistPage}
 	if page, ok := a.prefs.String(dashboardPageKey); ok {
 		a.detailsState.Selected = view.PageID(page)
@@ -88,7 +86,7 @@ func (a *app) ready() {
 	a.displays.Start()
 	a.setupTray()
 
-	for _, onChange := range []func(func()){a.power.OnChange, a.chargeLimit.OnChange, a.thermal.OnChange, a.system.OnChange, a.displays.OnChange, a.bar.OnChange, a.store.OnChange} {
+	for _, onChange := range []func(func()){a.power.OnChange, a.chargeLimit.OnChange, a.thermal.OnChange, a.system.OnChange, a.displays.OnChange, a.store.OnChange} {
 		onChange(a.invalidate)
 	}
 	a.menuSettings.OnChange(func() {
@@ -97,8 +95,6 @@ func (a *app) ready() {
 			a.scheduleTray()
 		})
 	})
-	a.bar.OpenSettings = func() { a.openDetails(view.PageMenuBarManager) }
-	a.bar.Start()
 
 	mygo.Power.OnSuspend(a.thermal.HandleSleep)
 	// App.Quit must still close the details window, which otherwise only hides.
@@ -134,7 +130,6 @@ func (a *app) recordHistory() {
 func (a *app) shutdown() {
 	a.thermal.Shutdown()
 	a.displays.Shutdown()
-	a.bar.Shutdown()
 	a.system.Stop()
 	a.power.Stop()
 	if a.trayTicker != nil {

@@ -5,12 +5,14 @@ import (
 	"strings"
 )
 
-// Section is where an item sits relative to the separator.
+// Section is where macOS 27 puts an item right now.
 type Section int
 
 const (
+	// Shown items are drawn in the menu bar.
 	Shown Section = iota
-	Hidden
+	// Overflow items didn't fit, so macOS tucked them behind its « button.
+	Overflow
 	// Absent items aren't drawn in any menu bar, typically switched off in System Settings › Menu Bar.
 	Absent
 )
@@ -25,34 +27,14 @@ func (r Rect) MaxX() float64 { return r.X + r.W }
 // Point is a global point with a top-left origin.
 type Point struct{ X, Y float64 }
 
-// SectionOf sorts an expanded item around the separator.
-func SectionOf(frame, separator, toggle Rect) Section {
-	// macOS 27 parks items it isn't drawing at a fixed spot off the bar's row, e.g. (-1, 970).
-	if math.Abs(frame.MidY()-toggle.MidY()) > toggle.H/2 {
-		return Absent
-	}
-	// Neighbouring frames overlap by a point or two, so compare centres rather than edges.
-	if frame.MidX() < separator.MidX() {
-		return Hidden
-	}
-	return Shown
-}
-
-// DropPoint is where a ⌘-drag has to end for the item to land in section. A lifted item lets the
-// items left of it slide right, so both targets stay valid whichever side it starts on.
-func DropPoint(section Section, separator, toggle Rect) (Point, bool) {
-	switch section {
-	case Shown:
-		return Point{toggle.MaxX() + 4, toggle.MidY()}, true
-	case Hidden:
-		return DropPointLeftOf(separator), true
-	}
-	return Point{}, false
-}
-
 // DropPointLeftOf lands an item immediately left of the item at frame.
 func DropPointLeftOf(frame Rect) Point {
 	return Point{frame.X - 8, frame.MidY()}
+}
+
+// DropPointRightOf lands an item immediately right of the item at frame.
+func DropPointRightOf(frame Rect) Point {
+	return Point{frame.MaxX() + 8, frame.MidY()}
 }
 
 // ParseKey splits a macOS 27 layout key, "status:<owner>::<autosave name>", where the owner is
@@ -67,16 +49,6 @@ func ParseKey(key string) (owner, name string, ok bool) {
 		return "", "", false
 	}
 	return owner, name, true
-}
-
-// SectionOfPosition: preferred positions count from the right edge, so a larger value sits
-// further left, and everything left of the rightmost block item (separator or spacer) is pushed
-// out when collapsed.
-func SectionOfPosition(position, blockEdge float64) Section {
-	if position > blockEdge {
-		return Hidden
-	}
-	return Shown
 }
 
 // PositionLeftOf is immediately left of anchor, halfway to the next item so nothing else is crossed.
