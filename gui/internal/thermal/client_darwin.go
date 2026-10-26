@@ -188,6 +188,9 @@ func (c *HelperClient) call(req Request, timeout time.Duration) (Response, error
 	if err := ReadMessage(conn, &resp); err != nil {
 		return Response{}, ErrConnectionFailed
 	}
+	if resp.Error == ErrOverheated.Error() {
+		return resp, ErrOverheated
+	}
 	if resp.Error != "" {
 		return resp, errors.New(resp.Error)
 	}

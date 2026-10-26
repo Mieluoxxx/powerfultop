@@ -2,6 +2,7 @@ package thermal
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -112,8 +113,45 @@ func TestControllerHeartbeatAndFailsafe(t *testing.T) {
 	if c.Engaged() {
 		t.Error("three hot ticks hand the fans back")
 	}
-	if err := c.Apply([]float64{3000, 3000}); err == nil {
+	if err := c.Apply([]float64{3000, 3000}); !errors.Is(err, ErrOverheated) {
 		t.Error("control pauses for a minute after overheating")
+	}
+}
+
+// Full speed is the most cooling there is; handing the fans to macOS while hot could only slow them.
+func TestControllerFailsafeSparesFullSpeed(t *testing.T) {
+	smc := newFakeSMC()
+	c, _, _ := newController(t, smc)
+	if err := c.Apply([]float64{9000, 9000}); err != nil {
+		t.Fatal(err)
+	}
+	smc.values["Tp01"] = Value{Type: "flt ", Bytes: FloatBytes(FailsafeCelsius + 5)}
+	for range 5 {
+		c.Tick()
+	}
+	if !c.Engaged() {
+		t.Error("fans at their maximum stay engaged through heat")
+	}
+	_ = c.Apply([]float64{9000, 3000})
+	for range 3 {
+		c.Tick()
+	}
+	if c.Engaged() {
+		t.Error("once a fan is held below maximum, overheating hands the fans back")
+	}
+}
+
+func TestControllerFailsafeIgnoresNonTemperatureKeys(t *testing.T) {
+	smc := newFakeSMC()
+	smc.values["TpXX"] = Value{Type: "ui16", Bytes: []byte{0, 120}}
+	smc.keys = append(smc.keys, "TpXX")
+	c, _, _ := newController(t, smc)
+	_ = c.Apply([]float64{3000, 3000})
+	for range 5 {
+		c.Tick()
+	}
+	if !c.Engaged() {
+		t.Error("only flt sensors count towards the failsafe")
 	}
 }
 

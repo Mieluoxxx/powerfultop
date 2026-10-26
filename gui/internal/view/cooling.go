@@ -409,6 +409,8 @@ func HelperErrorText(err error) string {
 		return L("PowerfulTop must be code-signed to control fans.", "PowerfulTop 需要代码签名才能控制风扇。")
 	case errors.Is(err, thermal.ErrCancelled):
 		return L("Authorization was cancelled.", "已取消授权。")
+	case errors.Is(err, thermal.ErrOverheated):
+		return Lf("The chip passed %.0f°C, so macOS has the fans for a minute.", "芯片超过 %.0f°C，风扇暂交系统控制 1 分钟。", thermal.FailsafeCelsius)
 	case errors.Is(err, thermal.ErrConnectionFailed):
 		return L("Could not connect to the fan helper.", "无法连接风扇控制组件。")
 	}

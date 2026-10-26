@@ -1,6 +1,7 @@
 package thermal
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -9,6 +10,9 @@ import (
 
 // The Ftst unlock and FnMd/FnTg handoff follow the research in macos-smc-fan
 // (https://github.com/agoodkind/macos-smc-fan, MIT License, © 2026 Alexander Goodkind).
+
+// ErrOverheated travels from the helper to the app by its message, so its text is part of the protocol.
+var ErrOverheated = errors.New("fan control paused after overheating")
 
 // FanController is the helper's root-only SMC writer. It accepts fan keys exclusively and always
 // fails towards macOS control. It is not safe for concurrent use; the helper serializes calls.
@@ -24,6 +28,9 @@ type FanController struct {
 	cooldownUntil    time.Time
 	// overheatTicks counts consecutive 1 s ticks at or above the failsafe; a single core spike must not trip it.
 	overheatTicks int
+	// belowMax is whether the last request held any fan under its maximum. Only then can handing
+	// the fans to macOS cool better, so only then does the failsafe trip.
+	belowMax bool
 
 	now   func() time.Time
 	sleep func(time.Duration)
@@ -44,7 +51,12 @@ func NewFanController(smc SMC, markerPath string) *FanController {
 	}
 	_, c.hasDiagnosticKey = smc.Read("Ftst")
 	for i := range smc.KeyCount() {
-		if key, ok := smc.KeyAt(i); ok && (GroupCPU.Matches(key) || GroupGPU.Matches(key)) {
+		key, ok := smc.KeyAt(i)
+		if !ok || !(GroupCPU.Matches(key) || GroupGPU.Matches(key)) {
+			continue
+		}
+		// The same filter as the app's sensors: other types under these prefixes aren't temperatures.
+		if v, ok := smc.Read(key); ok && v.Type == "flt " {
 			c.failsafeKeys = append(c.failsafeKeys, key)
 		}
 	}
@@ -60,7 +72,7 @@ func (c *FanController) Engaged() bool { return c.engaged }
 func (c *FanController) Apply(rpms []float64) error {
 	c.lastRequest = c.now()
 	if c.now().Before(c.cooldownUntil) {
-		return fmt.Errorf("fan control paused after overheating")
+		return ErrOverheated
 	}
 	if c.fanCount == 0 {
 		return fmt.Errorf("no fans found")
@@ -71,13 +83,19 @@ func (c *FanController) Apply(rpms []float64) error {
 			return err
 		}
 	}
+	c.belowMax = len(rpms) < c.fanCount
 	for i := range min(c.fanCount, len(rpms)) {
 		lo, okMin := readFloat(c.smc, fmt.Sprintf("F%dMn", i))
 		hi, okMax := readFloat(c.smc, fmt.Sprintf("F%dMx", i))
 		if !okMin || !okMax || hi <= lo {
+			c.belowMax = true
 			continue
 		}
-		c.smc.Write(fmt.Sprintf("F%dTg", i), FloatBytes(math.Min(math.Max(rpms[i], lo), hi)))
+		target := math.Min(math.Max(rpms[i], lo), hi)
+		if target < hi {
+			c.belowMax = true
+		}
+		c.smc.Write(fmt.Sprintf("F%dTg", i), FloatBytes(target))
 	}
 	return nil
 }
@@ -110,7 +128,7 @@ func (c *FanController) Tick() {
 			hottest = math.Max(hottest, v)
 		}
 	}
-	if hottest >= FailsafeCelsius {
+	if hottest >= FailsafeCelsius && c.belowMax {
 		c.overheatTicks++
 	} else {
 		c.overheatTicks = 0
