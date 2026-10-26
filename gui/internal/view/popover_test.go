@@ -45,11 +45,11 @@ func TestPopoverSections(t *testing.T) {
 	if len(opened) != 1 || opened[0] != PageBattery {
 		t.Errorf("opened %v, want the charge limit row to open the Battery page", opened)
 	}
-	if err := tt.Click("Settings"); err != nil {
+	if err := tt.Click("Details"); err != nil {
 		t.Fatal(err)
 	}
-	if len(opened) != 2 || opened[1] != PageSettings {
-		t.Errorf("opened %v, want the gear to open the Settings page", opened)
+	if len(opened) != 2 || opened[1] != PageOverview {
+		t.Errorf("opened %v, want the gear to open the details window on Overview", opened)
 	}
 }
 

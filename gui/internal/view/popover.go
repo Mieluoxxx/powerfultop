@@ -118,11 +118,11 @@ func popoverHeader(c *ui.Context, p power.Data, a PopoverActions) {
 	ui.Column(c).Gap(8).Children(func() {
 		ui.Row(c).AlignItems(ui.Start).Children(func() {
 			ui.Textf(c, "%d%%", p.DisplayBatteryPercent()).FontSize(30).Bold().FontFeatures("tnum").Grow(1)
-			gear := ui.ButtonBase(c).Label(L("Settings", "设置")).Tooltip(L("Settings", "设置")).Padding(5).Radius(6).Children(func() {
+			gear := ui.ButtonBase(c).Label(L("Details", "详细参数")).Tooltip(L("Details", "详细参数")).Padding(5).Radius(6).Children(func() {
 				ui.Icon(c, icons.Get("settings")).Size(14, 14).TextColor(t.TextMuted)
 			})
 			if gear.Clicked() && a.OpenDetails != nil {
-				a.OpenDetails(PageSettings)
+				a.OpenDetails(PageOverview)
 			}
 		})
 		LevelBar(c, float64(p.DisplayBatteryPercent())/100, BatteryLevelTint(p), 6)
