@@ -27,13 +27,17 @@ type PopoverData struct {
 	Displays []display.Brightness
 	// ChargeLimit edits the macOS charge limit in place; nil leaves a row that opens the Battery page.
 	ChargeLimit *power.ChargeLimiter
+
+	LaunchAtLogin      bool
+	LaunchAtLoginError string
 }
 
 // PopoverActions are what the popover's controls do.
 type PopoverActions struct {
-	OpenDetails   func(PageID)
-	SetBrightness func(id uint32, level float64)
-	Quit          func()
+	OpenDetails      func(PageID)
+	SetBrightness    func(id uint32, level float64)
+	SetLaunchAtLogin func(bool)
+	Quit             func()
 }
 
 // BatteryTemperatureC prefers the battery's own reading; some machines drop it, and the SMC pack
@@ -63,7 +67,7 @@ func Popover(c *ui.Context, d PopoverData, a PopoverActions) ui.Element {
 		}
 		divider := func() { ui.Divider(c).PaddingX(12) }
 
-		section(14, 12, func() { popoverHeader(c, d.Power) })
+		section(14, 12, func() { popoverHeader(c, d.Power, a) })
 		divider()
 		section(12, 12, func() { popoverFlow(c, d.Power) })
 		divider()
@@ -85,11 +89,11 @@ func Popover(c *ui.Context, d PopoverData, a PopoverActions) ui.Element {
 			section(8, 10, func() { popoverChargeLimit(c, d.Power, d.ChargeLimit, a) })
 		}
 		divider()
-		ui.Column(c).Padding(6, 10).Children(func() { popoverFooter(c, a) })
+		ui.Column(c).Padding(6, 10).Children(func() { popoverFooter(c, d, a) })
 	})
 }
 
-func popoverHeader(c *ui.Context, p power.Data) {
+func popoverHeader(c *ui.Context, p power.Data, a PopoverActions) {
 	t := c.Theme()
 	state := p.PowerState()
 	icon, tint := BatteryLevelIcon(p.DisplayBatteryPercent()), Gray
@@ -112,7 +116,15 @@ func popoverHeader(c *ui.Context, p power.Data) {
 		status += " · " + p.EstimatedTimeRemainingLabel() + " " + remaining
 	}
 	ui.Column(c).Gap(8).Children(func() {
-		ui.Textf(c, "%d%%", p.DisplayBatteryPercent()).FontSize(30).Bold().FontFeatures("tnum")
+		ui.Row(c).AlignItems(ui.Start).Children(func() {
+			ui.Textf(c, "%d%%", p.DisplayBatteryPercent()).FontSize(30).Bold().FontFeatures("tnum").Grow(1)
+			gear := ui.ButtonBase(c).Label(L("Settings", "设置")).Tooltip(L("Settings", "设置")).Padding(5).Radius(6).Children(func() {
+				ui.Icon(c, icons.Get("settings")).Size(14, 14).TextColor(t.TextMuted)
+			})
+			if gear.Clicked() && a.OpenDetails != nil {
+				a.OpenDetails(PageSettings)
+			}
+		})
 		LevelBar(c, float64(p.DisplayBatteryPercent())/100, BatteryLevelTint(p), 6)
 		ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
 			ui.Icon(c, icons.Get(icon)).Size(12, 12).TextColor(tint.Color(c)).Shrink(0)
@@ -320,30 +332,30 @@ func popoverChargeLimitControl(c *ui.Context, s power.ChargeLimitState, limit *p
 	})
 }
 
-func popoverFooter(c *ui.Context, a PopoverActions) {
+func popoverFooter(c *ui.Context, d PopoverData, a PopoverActions) {
 	t := c.Theme()
-	ui.Row(c).Gap(2).AlignItems(ui.Center).Children(func() {
-		details := ui.ButtonBase(c).Label(L("Details", "详细参数")).Padding(4, 6).Radius(5).Children(func() {
-			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, L("Details", "详细参数")).FontSize(12).TextColor(t.TextMuted)
-				ui.Icon(c, icons.Get("chevron-right")).Size(9, 9).TextColor(t.TextMuted)
+	ui.Column(c).Gap(4).Children(func() {
+		ui.Row(c).Gap(8).AlignItems(ui.Center).PaddingStart(4).Children(func() {
+			label := L("Launch at Login", "开机自启")
+			on := d.LaunchAtLogin
+			if ui.Switch(c.Key("login"), &on).Label(label).Changed() && a.SetLaunchAtLogin != nil {
+				a.SetLaunchAtLogin(on)
+			}
+			// Clicking the label toggles, as a labeled switch does in System Settings.
+			ui.Text(c, label).FontSize(12).TextColor(t.TextMuted).Grow(1).OnClick(func() {
+				if a.SetLaunchAtLogin != nil {
+					a.SetLaunchAtLogin(!d.LaunchAtLogin)
+				}
 			})
+			quit := ui.ButtonBase(c).Label(L("Quit", "退出")).Tooltip(L("Quit", "退出")).Padding(4, 6).Radius(5).Children(func() {
+				ui.Icon(c, icons.Get("power")).Size(13, 13).TextColor(t.TextMuted)
+			})
+			if quit.Clicked() && a.Quit != nil {
+				a.Quit()
+			}
 		})
-		if details.Clicked() && a.OpenDetails != nil {
-			a.OpenDetails("")
-		}
-		ui.Spacer(c)
-		gear := ui.ButtonBase(c).Label(L("Settings", "设置")).Tooltip(L("Settings", "设置")).Padding(4, 6).Radius(5).Children(func() {
-			ui.Icon(c, icons.Get("settings")).Size(13, 13).TextColor(t.TextMuted)
-		})
-		if gear.Clicked() && a.OpenDetails != nil {
-			a.OpenDetails(PageSettings)
-		}
-		quit := ui.ButtonBase(c).Label(L("Quit", "退出")).Tooltip(L("Quit", "退出")).Padding(4, 6).Radius(5).Children(func() {
-			ui.Icon(c, icons.Get("power")).Size(13, 13).TextColor(t.TextMuted)
-		})
-		if quit.Clicked() && a.Quit != nil {
-			a.Quit()
+		if d.LaunchAtLoginError != "" {
+			ui.Text(c, d.LaunchAtLoginError).FontSize(10).TextColor(Red.Color(c)).PaddingX(4)
 		}
 	})
 }

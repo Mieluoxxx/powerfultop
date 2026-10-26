@@ -30,7 +30,7 @@ func TestPopoverSections(t *testing.T) {
 	var opened []PageID
 	a := PopoverActions{OpenDetails: func(p PageID) { opened = append(opened, p) }}
 	tt := ui.NewTester(func(c *ui.Context) { Popover(c, d, a) }, PopoverWidth, 700)
-	for _, want := range []string{"85%", "Charger", "65 W", "System", "11.1 W", "CPU", "39°C", "Memory", "Built-in Retina Display", "99%", "Health", "74", "Charge Limit", "Details"} {
+	for _, want := range []string{"85%", "Charger", "65 W", "System", "11.1 W", "CPU", "39°C", "Memory", "Built-in Retina Display", "99%", "Health", "74", "Charge Limit", "Launch at Login"} {
 		if !tt.HasText(want) {
 			t.Errorf("missing %q in %q", want, tt.Texts())
 		}
@@ -39,19 +39,16 @@ func TestPopoverSections(t *testing.T) {
 	if r, ok := tt.Find(d.Power.ChargeLimitText()); !ok || r.X+r.W < PopoverWidth-40 {
 		t.Errorf("charge limit value %q at %+v, want it at the right edge", d.Power.ChargeLimitText(), r)
 	}
-	if err := tt.Click("Details"); err != nil {
-		t.Fatal(err)
-	}
 	if err := tt.Click("Charge Limit"); err != nil {
 		t.Fatal(err)
 	}
-	if len(opened) != 2 || opened[1] != PageBattery {
+	if len(opened) != 1 || opened[0] != PageBattery {
 		t.Errorf("opened %v, want the charge limit row to open the Battery page", opened)
 	}
 	if err := tt.Click("Settings"); err != nil {
 		t.Fatal(err)
 	}
-	if len(opened) != 3 || opened[2] != PageSettings {
+	if len(opened) != 2 || opened[1] != PageSettings {
 		t.Errorf("opened %v, want the gear to open the Settings page", opened)
 	}
 }
@@ -84,5 +81,25 @@ func TestPopoverSetsChargeLimit(t *testing.T) {
 	}
 	if got := limit.State().Percent; got != 95 {
 		t.Errorf("limit = %d after choosing 95%% in the popover", got)
+	}
+}
+
+func TestPopoverLaunchAtLogin(t *testing.T) {
+	var login *bool
+	d := PopoverData{Available: true, LaunchAtLoginError: "Couldn't change Launch at Login."}
+	tt := ui.NewTester(func(c *ui.Context) {
+		Popover(c, d, PopoverActions{SetLaunchAtLogin: func(on bool) { login = &on }})
+	}, PopoverWidth, 600)
+	if r, ok := tt.Find("Launch at Login"); !ok || r.W == 0 {
+		t.Fatal("the footer's switch needs a visible label")
+	}
+	if err := tt.Click("Launch at Login"); err != nil {
+		t.Fatal(err)
+	}
+	if login == nil || !*login {
+		t.Error("the footer switch turns launch at login on")
+	}
+	if !tt.HasText("Couldn't change Launch at Login.") {
+		t.Error("a failure to change it shows under the switch")
 	}
 }
