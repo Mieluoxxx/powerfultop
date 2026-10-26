@@ -271,3 +271,27 @@ func autoDomain(points []Point) (float64, float64) {
 	pad := math.Max((high-low)*0.25, math.Max(math.Abs(high)*0.1, 1))
 	return math.Max(0, low-pad), high + pad
 }
+
+// PanelHeader is a panel's tinted icon badge and title, with trailing content such as a Pill at the far end.
+func PanelHeader(c *ui.Context, icon, title string, tint Tint, trailing func()) {
+	col := tint.Color(c)
+	ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+		ui.Row(c).Width(24).Height(24).Center().Radius(7).Background(col.Alpha(0.16)).Children(func() {
+			ui.Icon(c, icons.Get(icon)).Size(13, 13).TextColor(col)
+		})
+		ui.Text(c, title).FontSize(13).Bold().Grow(1)
+		trailing()
+	})
+}
+
+// Pill is a small tinted status capsule; Gray reads as neutral.
+func Pill(c *ui.Context, icon, text string, tint Tint) ui.Element {
+	col := tint.Color(c)
+	if tint == Gray {
+		col = c.Theme().TextMuted
+	}
+	return ui.Row(c).Gap(4).AlignItems(ui.Center).Padding(3, 8).Radius(9).Background(col.Alpha(0.14)).Children(func() {
+		ui.Icon(c, icons.Get(icon)).Size(11, 11).TextColor(col)
+		ui.Text(c, text).FontSize(11).FontWeight(600).TextColor(col).FontFeatures("tnum").NoWrap()
+	})
+}

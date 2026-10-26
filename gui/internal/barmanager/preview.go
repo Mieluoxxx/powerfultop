@@ -41,3 +41,10 @@ func (nullItems) requestLayoutAccess() bool        { return false }
 func (nullItems) commandDrag(Point, Point)         {}
 func (nullItems) ownPID() int32                    { return 0 }
 func (nullItems) appIcon(string) []byte            { return nil }
+
+// SetPreviewIcon gives a preview store the logo of the app at appPath.
+func (s *ItemStore) SetPreviewIcon(appPath string, png []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.icons[appPath] = png
+}

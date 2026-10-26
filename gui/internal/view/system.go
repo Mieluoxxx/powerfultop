@@ -37,7 +37,7 @@ func SystemPage(c *ui.Context, s system.Snapshot, cpuTempC func() (float64, bool
 func sysCPUPanel(c *ui.Context, s system.Snapshot, cpuTempC func() (float64, bool), hist *history.History) {
 	cpu := s.CPU
 	Surface(c, ui.Column(c).Padding(18).Gap(14), 18).Children(func() {
-		sysPanelHeader(c, "cpu", "CPU", Blue, func() {
+		PanelHeader(c, "cpu", "CPU", Blue, func() {
 			if cpuTempC == nil {
 				return
 			}
@@ -46,7 +46,7 @@ func sysCPUPanel(c *ui.Context, s system.Snapshot, cpuTempC func() (float64, boo
 				if temp < 60 {
 					tint = Gray
 				}
-				sysPill(c, "thermometer", fmt.Sprintf("%.0f°C", temp), tint)
+				Pill(c, "thermometer", fmt.Sprintf("%.0f°C", temp), tint)
 			}
 		})
 		Hero(c, sysPercent(cpu.Usage()), "", Lf("User %s · System %s · Idle %s", "用户 %s · 系统 %s · 空闲 %s",
@@ -59,9 +59,9 @@ func sysCPUPanel(c *ui.Context, s system.Snapshot, cpuTempC func() (float64, boo
 func sysMemoryPanel(c *ui.Context, s system.Snapshot, hist *history.History) {
 	m := s.Memory
 	Surface(c, ui.Column(c).Padding(18).Gap(14), 18).Children(func() {
-		sysPanelHeader(c, "memory-stick", L("Memory", "内存"), Green, func() {
+		PanelHeader(c, "memory-stick", L("Memory", "内存"), Green, func() {
 			if m != nil {
-				sysPill(c, "gauge", sysPressureText(m.Pressure), sysPressureTint(m.Pressure))
+				Pill(c, "gauge", sysPressureText(m.Pressure), sysPressureTint(m.Pressure))
 			}
 		})
 		if m == nil {
@@ -117,28 +117,6 @@ func sysStatTiles(c *ui.Context, s system.Snapshot) {
 		sysTile(c, "hard-drive", tint, L("Swap Used", "交换区"), system.FormatBytes(float64(m.SwapUsedBytes)),
 			L("Memory paged out to disk", "换出到磁盘的内存"), "")
 	}
-}
-
-func sysPanelHeader(c *ui.Context, icon, title string, tint Tint, trailing func()) {
-	col := tint.Color(c)
-	ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-		ui.Row(c).Width(24).Height(24).Center().Radius(7).Background(col.Alpha(0.16)).Children(func() {
-			ui.Icon(c, icons.Get(icon)).Size(13, 13).TextColor(col)
-		})
-		ui.Text(c, title).FontSize(13).Bold().Grow(1)
-		trailing()
-	})
-}
-
-func sysPill(c *ui.Context, icon, text string, tint Tint) {
-	col := tint.Color(c)
-	if tint == Gray {
-		col = c.Theme().TextMuted
-	}
-	ui.Row(c).Gap(4).AlignItems(ui.Center).Padding(3, 8).Radius(9).Background(col.Alpha(0.14)).Children(func() {
-		ui.Icon(c, icons.Get(icon)).Size(11, 11).TextColor(col)
-		ui.Text(c, text).FontSize(11).FontWeight(600).TextColor(col).FontFeatures("tnum").NoWrap()
-	})
 }
 
 func sysTile(c *ui.Context, icon string, tint Tint, label, value, detail, tooltip string) {
@@ -307,7 +285,7 @@ func sysLegend(c *ui.Context, tint Tint, label, value string) {
 func sysProcessPanel(c *ui.Context, title, icon string, tint Tint, processes []system.ProcessUsage, format func(float64) string) {
 	t := c.Theme()
 	Surface(c, ui.Column(c).Padding(18).Gap(10), 18).Children(func() {
-		sysPanelHeader(c, icon, title, tint, func() {})
+		PanelHeader(c, icon, title, tint, func() {})
 		if len(processes) == 0 {
 			ui.Text(c, L("Collecting data…", "正在收集数据…")).FontSize(11).TextColor(t.TextMuted.Alpha(0.75))
 			return

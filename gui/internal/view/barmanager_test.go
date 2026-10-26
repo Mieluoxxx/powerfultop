@@ -31,7 +31,7 @@ func TestManagerPageLayoutEditor(t *testing.T) {
 	for _, want := range []string{
 		"Enable Menu Bar Manager", "Icons Hidden", "Hide Again After", "Show Hidden Items",
 		"Menu Bar Layout", "Shown Icons", "Hidden Icons", "Not in Menu Bar",
-		"Using the menu bar layout file: icons move without the pointer, even behind the notch.",
+		"Layout file allowed",
 		"The icon didn't move. It may be covered by the notch or the « overflow; try again on a wider display.",
 		"How It Works", "Open System Settings…",
 	} {
@@ -62,7 +62,7 @@ func TestManagerPageStates(t *testing.T) {
 
 	m, s = barmanager.NewPreview(true, true, false, barmanager.StoreSnapshot{Trusted: true, Crowded: true})
 	tt = managerTester(m, s)
-	if !tt.HasText("The active menu bar is too crowded to show the separator.") || !tt.HasText("Allow…") {
+	if !tt.HasText("The active menu bar is too crowded to show the separator.") || !tt.HasText("Allow Layout File…") {
 		t.Errorf("crowded: %q", tt.Texts())
 	}
 	if tt.HasText("Shown Icons") {

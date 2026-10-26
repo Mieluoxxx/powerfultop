@@ -1,6 +1,7 @@
 package view
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -18,65 +19,74 @@ type ManagerPageState struct {
 	icons map[string]*ui.Bitmap
 }
 
-// MenuBarManagerPage shows the hiding settings, the Ice/Thaw-style layout editor and how it works.
+// MenuBarManagerPage puts the switches in a System Settings group, then the layout editor, which
+// draws each section as a menu bar over a wallpaper the way Ice and Thaw do, then how it works.
 // Main reports the page's on-screen state to store.SetVisible, which holds the bar open while it shows.
 func MenuBarManagerPage(c *ui.Context, m *barmanager.Manager, store *barmanager.ItemStore, state *ManagerPageState, width float32) {
 	snap := m.Snapshot()
-	ui.Column(c).Gap(16).MaxWidth(560).Children(func() {
-		Card(c, L("Hidden Items", "图标隐藏"), "eye-off", Indigo, func() {
-			enabled := snap.Enabled
-			ui.Checkbox(c, &enabled, L("Enable Menu Bar Manager", "启用菜单栏管理")).FontSize(12).Disabled(!snap.Supported)
-			if enabled != snap.Enabled {
-				m.SetEnabled(enabled)
-				store.Refresh()
-			}
-			switch {
-			case !snap.Supported:
-				Status(c, "triangle-alert", Orange, L("Requires macOS 27 or later.", "需要 macOS 27 或更高版本。"), "")
-			case snap.Enabled:
-				status := L("Icons Shown", "已显示")
-				if snap.Collapsed {
-					status = L("Icons Hidden", "已隐藏")
-				}
-				Row(c, L("Status", "状态"), status, "", true)
-				managerAutoHideRow(c, m, snap)
-			}
-		})
+	ui.Column(c).Gap(22).MaxWidth(880).Children(func() {
+		managerSettings(c, m, store, snap)
 		if snap.Supported {
-			managerLayoutCard(c, m, store, state)
+			managerLayoutPanel(c, m, store, state)
 		}
-		managerHowItWorks(c)
+		managerHowItWorks(c, width)
 	})
 }
 
-func managerAutoHideRow(c *ui.Context, m *barmanager.Manager, snap barmanager.Snapshot) {
-	labels := make([]string, len(barmanager.AutoHideChoices))
-	selected := ""
-	for i, d := range barmanager.AutoHideChoices {
-		labels[i] = managerAutoHideLabel(d)
-		if d == snap.AutoHideDelay {
-			selected = labels[i]
+func managerSettings(c *ui.Context, m *barmanager.Manager, store *barmanager.ItemStore, snap barmanager.Snapshot) {
+	t := c.Theme()
+	rows := []func(){func() {
+		label := L("Enable Menu Bar Manager", "启用菜单栏管理")
+		ui.Column(c).Gap(2).Grow(1).Shrink(1).Children(func() {
+			ui.Text(c, label).FontSize(13)
+			ui.Text(c, L("Icons left of the │ separator tuck away behind a chevron.", "分隔符 │ 左侧的图标会收进箭头里。")).
+				FontSize(11).TextColor(t.TextMuted)
+		})
+		enabled := snap.Enabled
+		if ui.Switch(c.Key("enabled"), &enabled).Label(label).Disabled(!snap.Supported).Changed() {
+			m.SetEnabled(enabled)
+			store.Refresh()
 		}
-	}
-	ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
-		ui.Text(c, L("Hide Again After", "自动重新隐藏")).FontSize(12).TextColor(c.Theme().TextMuted).NoWrap()
-		chosen := selected
-		if ui.Select(c, &chosen, labels).Changed() {
-			for i, label := range labels {
-				if label == chosen {
-					m.SetAutoHideDelay(barmanager.AutoHideChoices[i])
+	}}
+	if snap.Supported && snap.Enabled {
+		rows = append(rows, func() {
+			SectionLabel(c, L("Hidden Icons", "隐藏的图标"))
+			if snap.Collapsed {
+				Pill(c, "eye-off", L("Icons Hidden", "已隐藏"), Indigo)
+			} else {
+				Pill(c, "eye", L("Icons Shown", "已显示"), Gray)
+			}
+			label := L("Hide Items", "隐藏图标")
+			if snap.Collapsed {
+				label = L("Show Hidden Items", "显示隐藏的图标")
+			}
+			if ui.Button(c, label).Clicked() {
+				m.Toggle()
+			}
+		}, func() {
+			SectionLabel(c, L("Hide Again After", "自动重新隐藏"))
+			labels := make([]string, len(barmanager.AutoHideChoices))
+			chosen := ""
+			for i, d := range barmanager.AutoHideChoices {
+				labels[i] = managerAutoHideLabel(d)
+				if d == snap.AutoHideDelay {
+					chosen = labels[i]
 				}
 			}
-		}
-		ui.Spacer(c)
-		label := L("Hide Items", "隐藏图标")
-		if snap.Collapsed {
-			label = L("Show Hidden Items", "显示隐藏的图标")
-		}
-		if ui.Button(c, label).Clicked() {
-			m.Toggle()
-		}
-	})
+			if ui.Select(c, &chosen, labels).Changed() {
+				for i, label := range labels {
+					if label == chosen {
+						m.SetAutoHideDelay(barmanager.AutoHideChoices[i])
+					}
+				}
+			}
+		})
+	}
+	footer := ""
+	if !snap.Supported {
+		footer = L("Requires macOS 27 or later.", "需要 macOS 27 或更高版本。")
+	}
+	Section(c, L("Hiding", "图标隐藏"), footer, rows...)
 }
 
 // managerAutoHideLabel words a delay as the Swift app's DateComponentsFormatter did.
@@ -99,52 +109,65 @@ func managerAutoHideLabel(d time.Duration) string {
 	}
 }
 
-func managerLayoutCard(c *ui.Context, m *barmanager.Manager, store *barmanager.ItemStore, state *ManagerPageState) {
-	Card(c, L("Menu Bar Layout", "菜单栏布局"), "layout-panel-top", Purple, func() {
-		snap := store.Snapshot()
+func managerLayoutPanel(c *ui.Context, m *barmanager.Manager, store *barmanager.ItemStore, state *ManagerPageState) {
+	snap := store.Snapshot()
+	enabled := m.Snapshot().Enabled
+	Surface(c, ui.Column(c).Padding(18).Gap(16), 18).Children(func() {
+		PanelHeader(c, "layout-panel-top", L("Menu Bar Layout", "菜单栏布局"), Purple, func() {
+			if enabled && snap.Trusted {
+				managerLayoutAccess(c, store, snap)
+			}
+		})
 		switch {
-		case !m.Snapshot().Enabled:
-			Note(c, L("Turn on the menu bar manager to arrange icons here.", "启用菜单栏管理后，即可在这里整理图标。"))
+		case !enabled:
+			managerEmptyState(c, "eye-off", L("Turn on the menu bar manager to arrange icons here.", "启用菜单栏管理后，即可在这里整理图标。"), "")
 		case !snap.Trusted:
-			Status(c, "lock", Orange, L("Arranging icons here needs Accessibility access.", "在这里整理图标需要辅助功能权限。"), "")
-			ui.Row(c).Children(func() {
-				if ui.Button(c, L("Grant Accessibility Access…", "授予辅助功能权限…")).Clicked() {
+			managerEmptyState(c, "lock", L("Arranging icons here needs Accessibility access.", "在这里整理图标需要辅助功能权限。"),
+				L("macOS has no API for other apps' menu bar icons, so PowerfulTop reads them through Accessibility and moves them with the same ⌘-drag you would do.",
+					"macOS 没有提供管理其他 app 菜单栏图标的接口，所以 PowerfulTop 通过辅助功能读取图标，并模拟你手动的 ⌘ 拖动来移动它们。"))
+			ui.Row(c).Justify(ui.Center).Children(func() {
+				if ui.PrimaryButton(c, L("Grant Accessibility Access…", "授予辅助功能权限…")).Clicked() {
 					store.RequestAccessibility()
 				}
 			})
-			Note(c, L("macOS has no API for other apps' menu bar icons, so PowerfulTop reads them through Accessibility and moves them with the same ⌘-drag you would do.",
-				"macOS 没有提供管理其他 app 菜单栏图标的接口，所以 PowerfulTop 通过辅助功能读取图标，并模拟你手动的 ⌘ 拖动来移动它们。"))
-		default:
-			managerLayoutAccessRow(c, store, snap)
-			if snap.Crowded {
-				Status(c, "fold-vertical", Orange, L("The active menu bar is too crowded to show the separator.", "当前活动的菜单栏太挤，连分隔符都放不下。"), "")
-				Note(c, L("Click an empty spot in the menu bar of a wider display, or hide a few icons with ⌘-drag first.",
+		case snap.Crowded:
+			managerEmptyState(c, "fold-vertical", L("The active menu bar is too crowded to show the separator.", "当前活动的菜单栏太挤，连分隔符都放不下。"),
+				L("Click an empty spot in the menu bar of a wider display, or hide a few icons with ⌘-drag first.",
 					"请在更宽的显示器的菜单栏空白处点一下，或先用 ⌘ 拖动隐藏几个图标。"))
-				return
-			}
-			managerLayoutRows(c, store, snap, state)
+		default:
+			managerLayoutSections(c, store, snap, state)
 		}
 	})
 }
 
-func managerLayoutAccessRow(c *ui.Context, store *barmanager.ItemStore, snap barmanager.StoreSnapshot) {
+// managerLayoutAccess sits in the header: a badge once the layout file is allowed, else the button that asks for it.
+func managerLayoutAccess(c *ui.Context, store *barmanager.ItemStore, snap barmanager.StoreSnapshot) {
 	if snap.HasLayoutAccess {
-		Status(c, "badge-check", Green, L("Using the menu bar layout file: icons move without the pointer, even behind the notch.",
-			"已使用菜单栏布局文件：移动图标无需移动鼠标，被刘海遮住的图标也能移动。"), "")
+		Pill(c, "badge-check", L("Layout file allowed", "布局文件已授权"), Green).
+			Tooltip(L("Using the menu bar layout file: icons move without the pointer, even behind the notch.",
+				"已使用菜单栏布局文件：移动图标无需移动鼠标，被刘海遮住的图标也能移动。"))
 		return
 	}
-	ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-		ui.Box(c).Grow(1).Shrink(1).Children(func() {
-			Status(c, "file-cog", Blue, L("Allow the menu bar layout file for reliable sorting and pointer-free moves.",
-				"授权菜单栏布局文件后，分区判断更准确，移动图标也不用移动鼠标。"), "")
-		})
-		if ui.Button(c, L("Allow…", "授权…")).Clicked() {
-			store.RequestLayoutAccess()
+	if ui.Button(c, L("Allow Layout File…", "授权布局文件…")).
+		Tooltip(L("Allow the menu bar layout file for reliable sorting and pointer-free moves.",
+			"授权菜单栏布局文件后，分区判断更准确，移动图标也不用移动鼠标。")).Clicked() {
+		store.RequestLayoutAccess()
+	}
+}
+
+func managerEmptyState(c *ui.Context, icon, title, detail string) {
+	t := c.Theme()
+	ui.Column(c).Gap(8).AlignItems(ui.Center).PaddingY(18).PaddingX(24).Radius(12).Background(t.Text.Alpha(0.03)).Children(func() {
+		ui.Icon(c, icons.Get(icon)).Size(22, 22).TextColor(t.TextMuted)
+		ui.Text(c, title).FontSize(13).FontWeight(600).TextAlign(ui.Center)
+		if detail != "" {
+			ui.Text(c, detail).FontSize(11).TextColor(t.TextMuted).TextAlign(ui.Center).MaxWidth(520)
 		}
 	})
 }
 
-func managerLayoutRows(c *ui.Context, store *barmanager.ItemStore, snap barmanager.StoreSnapshot, state *ManagerPageState) {
+func managerLayoutSections(c *ui.Context, store *barmanager.ItemStore, snap barmanager.StoreSnapshot, state *ManagerPageState) {
+	t := c.Theme()
 	var shown, hidden, absent []barmanager.Item
 	for _, it := range snap.Items {
 		switch it.Section {
@@ -156,22 +179,33 @@ func managerLayoutRows(c *ui.Context, store *barmanager.ItemStore, snap barmanag
 			absent = append(absent, it)
 		}
 	}
-	managerLayoutBar(c, store, state, L("Shown Icons", "显示区"), L("Always in the menu bar", "始终显示在菜单栏"), shown, barmanager.Shown)
-	managerLayoutBar(c, store, state, L("Hidden Icons", "隐藏区"), L("Revealed with the chevron", "点击箭头时显示"), hidden, barmanager.Hidden)
+	managerSection(c, store, state, barmanager.Shown, "eye", L("Shown Icons", "显示区"), L("Always in the menu bar", "始终显示在菜单栏"), shown)
+	managerSection(c, store, state, barmanager.Hidden, "eye-off", L("Hidden Icons", "隐藏区"), L("Revealed with the chevron", "点击箭头时显示"), hidden)
 	if len(absent) > 0 {
-		managerLayoutBar(c, store, state, L("Not in Menu Bar", "未在菜单栏显示"), L("Usually switched off in System Settings", "通常是在系统设置中被关闭了"), absent, barmanager.Absent)
+		managerSection(c, store, state, barmanager.Absent, "circle-slash", L("Not in Menu Bar", "未在菜单栏显示"), L("Usually switched off in System Settings", "通常是在系统设置中被关闭了"), absent)
 	}
-	ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-		switch {
-		case snap.Moving:
+	switch {
+	case snap.Moving:
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			ui.Spinner(c).Size(12, 12)
-			ui.Text(c, L("Moving…", "正在移动…")).FontSize(11).TextColor(c.Theme().TextMuted)
-		case snap.Error != barmanager.NoError:
-			Status(c, "triangle-alert", Orange, managerErrorText(snap.Error), "")
-		}
+			ui.Text(c, L("Moving…", "正在移动…")).FontSize(11).TextColor(t.TextMuted)
+		})
+	case snap.Error != barmanager.NoError:
+		Status(c, "triangle-alert", Orange, managerErrorText(snap.Error), "")
+	}
+	ui.Row(c).Gap(16).Wrap().Children(func() {
+		managerTip(c, "move", L("Drop on an icon to place it to its left", "拖到图标上，放在它的左边"))
+		managerTip(c, "mouse-pointer-click", L("Right-click for more", "右键查看更多操作"))
+		managerTip(c, "panel-top", L("The menu bar stays expanded while this page is open", "此页面打开时菜单栏保持展开"))
 	})
-	Note(c, L("Drag an icon onto another to put it just left of that one, or onto an empty spot to move it to that row. Right-click an icon for more. The pointer jumps for a moment while an icon moves, and the menu bar stays expanded while this page is open.",
-		"把图标拖到另一个图标上，就会放到它的左边；拖到空白处则移到该行。右键图标可查看更多操作。移动时鼠标指针会短暂跳动；此页面打开期间菜单栏会保持展开。"))
+}
+
+func managerTip(c *ui.Context, icon, text string) {
+	t := c.Theme()
+	ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
+		ui.Icon(c, icons.Get(icon)).Size(11, 11).TextColor(t.TextMuted.Alpha(0.8))
+		ui.Text(c, text).FontSize(11).TextColor(t.TextMuted.Alpha(0.8)).NoWrap()
+	})
 }
 
 func managerErrorText(e barmanager.StoreError) string {
@@ -187,43 +221,68 @@ func managerErrorText(e barmanager.StoreError) string {
 	}
 }
 
-// managerLayoutBar draws one section like a strip of the menu bar, logos in their real left-to-right
-// order, after Ice and Thaw.
-func managerLayoutBar(c *ui.Context, store *barmanager.ItemStore, state *ManagerPageState, title, subtitle string, items []barmanager.Item, section barmanager.Section) {
+// managerWallpaper stands in for the desktop behind the menu bar, so the strips read as menu bars.
+func managerWallpaper(c *ui.Context) ui.LinearGradient {
+	if c.Theme().Dark {
+		return ui.LinearGradient{From: ui.RGB(38, 62, 128), To: ui.RGB(92, 52, 128), Angle: 90, Oklab: true}
+	}
+	return ui.LinearGradient{From: ui.RGB(96, 150, 240), To: ui.RGB(178, 128, 232), Angle: 90, Oklab: true}
+}
+
+// managerSection is one section: its title and count, then its icons on a menu bar in their real
+// left-to-right order, right-aligned like the status area itself.
+func managerSection(c *ui.Context, store *barmanager.ItemStore, state *ManagerPageState, section barmanager.Section, icon, title, subtitle string, items []barmanager.Item) {
 	t := c.Theme()
-	ui.Column(c).Key(int(section)).Gap(6).Children(func() {
+	droppable := section != barmanager.Absent
+	ui.Column(c.Key(int(section))).Gap(8).Children(func() {
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, title).FontSize(12).Bold()
+			ui.Icon(c, icons.Get(icon)).Size(13, 13).TextColor(t.TextMuted)
+			ui.Text(c, title).FontSize(13).FontWeight(600)
+			ui.Text(c, fmt.Sprint(len(items))).FontSize(10).FontWeight(600).TextColor(t.TextMuted).FontFeatures("tnum").
+				Padding(1, 6).Radius(7).Background(t.Text.Alpha(0.07))
+			ui.Spacer(c)
 			ui.Text(c, subtitle).FontSize(11).TextColor(t.TextMuted)
 		})
-		strip := ui.Row(c).Wrap().Gap(4).AlignItems(ui.Center).PaddingX(8).PaddingY(3).MinHeight(34).Radius(9)
-		if section == barmanager.Absent {
-			strip.Background(ui.RGBA(0, 0, 0, 0.35))
+		frame := ui.Column(c).Radius(12).Clip()
+		if droppable {
+			frame.LinearGradient(managerWallpaper(c))
 		} else {
-			strip.Background(ui.RGBA(0, 0, 0, 0.72))
+			frame.Background(t.Text.Alpha(0.04)).Border(1, t.Text.Alpha(0.12)).BorderStyle(ui.BorderDashed)
 		}
-		strip.Border(1, ui.RGBA(255, 255, 255, 0.08))
-		if section != barmanager.Absent {
-			if _, over := ui.DragOver[string](strip); over {
-				strip.Border(2, t.Accent)
+		if droppable {
+			if _, over := ui.DragOver[string](frame); over {
+				frame.Border(2, ui.RGBA(255, 255, 255, 0.9))
 			}
-			if id, ok := ui.Drop[string](strip); ok {
+			if id, ok := ui.Drop[string](frame); ok {
 				store.Move(id, section, "")
 			}
 		}
-		strip.Children(func() {
-			for _, item := range items {
-				managerItemTile(c, store, state, item)
+		frame.Children(func() {
+			// A mini desktop: the bar along the top edge and a strip of wallpaper under it.
+			bar := ui.Row(c).Wrap().Gap(2).AlignItems(ui.Center).Justify(ui.End).PaddingX(10).PaddingY(3).MinHeight(36)
+			if droppable {
+				bar.Background(ui.RGBA(0, 0, 0, 0.3))
 			}
-			if len(items) == 0 && section != barmanager.Absent {
-				ui.Text(c, L("Drop icons here", "拖到这里")).FontSize(11).TextColor(ui.RGBA(255, 255, 255, 0.4)).Grow(1).TextAlign(ui.Center).AlignSelf(ui.Center)
+			bar.Children(func() {
+				for _, item := range items {
+					managerItemTile(c, store, state, item)
+				}
+				if len(items) == 0 {
+					color := t.TextMuted
+					if droppable {
+						color = ui.RGBA(255, 255, 255, 0.6)
+					}
+					ui.Text(c, L("Drop icons here", "拖到这里")).FontSize(11).TextColor(color).Grow(1).TextAlign(ui.Center)
+				}
+			})
+			if droppable {
+				ui.Box(c).Height(18)
 			}
 		})
 	})
 }
 
 func managerItemTile(c *ui.Context, store *barmanager.ItemStore, state *ManagerPageState, item barmanager.Item) {
-	t := c.Theme()
 	title := item.Name
 	if item.Detail != "" {
 		title += " · " + item.Detail
@@ -233,9 +292,9 @@ func managerItemTile(c *ui.Context, store *barmanager.ItemStore, state *ManagerP
 	if !movable && item.Section != barmanager.Absent {
 		help += "\n" + L("Behind the « button right now, so it can't be moved.", "目前被收在 « 按钮后面，暂时无法移动。")
 	}
-	tile := ui.Box(c).Key(item.ID).Size(28, 28).Center().Radius(6).Tooltip(help)
+	tile := ui.Box(c).Key(item.ID).Size(32, 30).Center().Radius(6).Tooltip(help)
 	if tile.Hovered() {
-		tile.Background(ui.RGBA(255, 255, 255, 0.16))
+		tile.Background(ui.RGBA(255, 255, 255, 0.18))
 	}
 	if !movable {
 		tile.Opacity(0.45)
@@ -244,7 +303,7 @@ func managerItemTile(c *ui.Context, store *barmanager.ItemStore, state *ManagerP
 		tile.Drag(item.ID)
 		// Shows where the dragged icon will land: just left of this one.
 		if id, over := ui.DragOver[string](tile); over && id != item.ID {
-			tile.Border(2, t.Accent)
+			tile.Border(2, ui.RGBA(255, 255, 255, 0.9))
 		}
 		if id, ok := ui.Drop[string](tile); ok && id != item.ID {
 			store.Move(id, item.Section, item.ID)
@@ -264,7 +323,11 @@ func managerItemTile(c *ui.Context, store *barmanager.ItemStore, state *ManagerP
 		if bitmap := managerAppLogo(store, state, item); bitmap != nil {
 			ui.Image(c, bitmap).Size(20, 20)
 		} else {
-			ui.Icon(c, icons.Get("app-window")).Size(18, 18).TextColor(ui.RGBA(255, 255, 255, 0.85))
+			color := ui.RGBA(255, 255, 255, 0.85)
+			if item.Section == barmanager.Absent {
+				color = c.Theme().TextMuted
+			}
+			ui.Icon(c, icons.Get("app-window")).Size(18, 18).TextColor(color)
 		}
 	})
 }
@@ -291,28 +354,41 @@ func managerAppLogo(store *barmanager.ItemStore, state *ManagerPageState, item b
 	return bitmap
 }
 
-func managerHowItWorks(c *ui.Context) {
-	Card(c, L("How It Works", "使用方法"), "hand", Blue, func() {
-		managerStep(c, 1, L("Hold ⌘ and drag menu bar icons to the left of the │ separator to choose which ones hide.",
-			"按住 ⌘ 把菜单栏图标拖到 │ 分隔符左侧，就会被归入隐藏区域。"))
-		managerStep(c, 2, L("Click the chevron to hide or show them. The macOS « button can't reveal them, because it shows the blank space that pushes them out first.",
-			"点击箭头即可隐藏或显示这些图标。系统的 « 按钮展开后只会显示用来挤出图标的空白区域，所以请用箭头来显示它们。"))
-		managerStep(c, 3, L("Right-click the chevron for more options.", "右键点击箭头查看更多选项。"))
-		Note(c, L("Uses the macOS 27 menu bar itself, so no Screen Recording or Accessibility access is needed. Apple's own icons are switched on and off in System Settings.",
-			"直接利用 macOS 27 菜单栏自身的机制，无需屏幕录制或辅助功能权限。Apple 自带的图标请在系统设置中开关。"))
-		ui.Row(c).Children(func() {
+// managerHowItWorks lays the three steps side by side, each a short card, with the note and the
+// System Settings link as the section's footer.
+func managerHowItWorks(c *ui.Context, width float32) {
+	t := c.Theme()
+	columns := 3
+	if width < 640 {
+		columns = 1
+	}
+	steps := []struct{ icon, title, text string }{
+		{"command", L("⌘-drag to hide", "⌘ 拖动来隐藏"), L("Hold ⌘ and drag menu bar icons to the left of the │ separator.", "按住 ⌘ 把菜单栏图标拖到 │ 分隔符左侧。")},
+		{"chevron-left", L("Click the chevron", "点击箭头"), L("It hides or shows them. The macOS « button can't reveal them.", "隐藏或显示它们。系统的 « 按钮无法显示这些图标。")},
+		{"mouse-pointer-click", L("Right-click for more", "右键查看更多"), L("Right-click the chevron for more options.", "右键点击箭头查看更多选项。")},
+	}
+	ui.Column(c).Gap(6).Children(func() {
+		ui.Text(c, L("How It Works", "使用方法")).FontSize(13).FontWeight(600).PaddingX(10)
+		ui.Grid(c).Columns(columns).Gap(12).Children(func() {
+			for i, s := range steps {
+				Surface(c, ui.Column(c.Key(i)).Padding(14).Gap(6), 12).Children(func() {
+					ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+						ui.Row(c).Size(22, 22).Center().Radius(11).Background(Blue.Color(c).Alpha(0.15)).Children(func() {
+							ui.Icon(c, icons.Get(s.icon)).Size(12, 12).TextColor(Blue.Color(c))
+						})
+						ui.Text(c, s.title).FontSize(12).FontWeight(600)
+					})
+					ui.Text(c, s.text).FontSize(11).TextColor(t.TextMuted)
+				})
+			}
+		})
+		ui.Row(c).Gap(8).AlignItems(ui.Center).PaddingX(10).PaddingY(2).Children(func() {
+			ui.Text(c, L("Hiding uses the macOS 27 menu bar itself, so it needs no Screen Recording or Accessibility access. Apple's own icons are switched on and off in System Settings.",
+				"隐藏功能直接利用 macOS 27 菜单栏自身的机制，无需屏幕录制或辅助功能权限。Apple 自带的图标请在系统设置中开关。")).
+				FontSize(11).TextColor(t.TextMuted).Grow(1).Shrink(1)
 			if ui.Button(c, L("Open System Settings…", "打开系统设置…")).Clicked() {
 				_ = mygo.Shell.OpenExternal(managerControlCenterURL)
 			}
 		})
-	})
-}
-
-func managerStep(c *ui.Context, number int, text string) {
-	ui.Row(c).Gap(8).AlignItems(ui.Start).Children(func() {
-		ui.Box(c).Size(16, 16).Center().Radius(8).Background(Blue.Color(c)).Shrink(0).Children(func() {
-			ui.Textf(c, "%d", number).FontSize(10).Bold().TextColor(ui.RGB(255, 255, 255))
-		})
-		ui.Text(c, text).FontSize(12).Grow(1).Shrink(1)
 	})
 }
