@@ -44,7 +44,7 @@ func TestSystemSnapshot(t *testing.T) {
 				BrightnessSection(c, displays, &power, func(uint32, float64) {})
 			})
 		})
-	}, 1000, 1250)
+	}, 1000, 1150)
 	f, _ := os.Create(path)
 	defer f.Close()
 	_ = png.Encode(f, tt.Image())

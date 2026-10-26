@@ -33,7 +33,7 @@ func TestSystemPageRenders(t *testing.T) {
 		tt := ui.NewTester(func(c *ui.Context) { SystemPage(c, s, temp, &hist, width) }, int(width), 1400)
 		for _, want := range []string{"CPU", "45%", "48°", "2.50", "Efficiency Cores", "80%", "Performance Cores", "1 days, 2 hr",
 			"Load Average", "3.50", "WindowServer", "33.5%", "Memory", "54 GB", "/ 128 GB", "Pressure Warning", "App Memory", "44 GB",
-			"Collecting data…"} {
+			"Collecting data…", "User 35% · System 10% · Idle 55%", "Top CPU", "Top Memory", "Swap Used", "1 cores · 80%"} {
 			if !tt.HasText(want) {
 				t.Errorf("width %v: missing %q in %q", width, want, tt.Texts())
 			}
