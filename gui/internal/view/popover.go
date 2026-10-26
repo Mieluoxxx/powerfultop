@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/egoist/mygo/ui"
 
@@ -24,6 +25,8 @@ type PopoverData struct {
 	Fans     *thermal.Monitor
 	System   system.Snapshot
 	Displays []display.Brightness
+	// ChargeLimit edits the macOS charge limit in place; nil leaves a row that opens the Battery page.
+	ChargeLimit *power.ChargeLimiter
 
 	LaunchAtLogin      bool
 	LaunchAtLoginError string
@@ -84,7 +87,7 @@ func Popover(c *ui.Context, d PopoverData, a PopoverActions) ui.Element {
 		if d.Power.BatteryHealthPercent != nil || hasTemp || d.Power.CycleCount != nil {
 			divider()
 			section(10, 0, func() { popoverStats(c, d.Power, temp, hasTemp) })
-			section(8, 10, func() { popoverChargeLimit(c, d.Power, a) })
+			section(8, 10, func() { popoverChargeLimit(c, d.Power, d.ChargeLimit, a) })
 		}
 		divider()
 		ui.Column(c).Padding(6, 10).Children(func() { popoverFooter(c, d, a) })
@@ -266,8 +269,14 @@ func popoverStats(c *ui.Context, p power.Data, temp float64, hasTemp bool) {
 	})
 }
 
-func popoverChargeLimit(c *ui.Context, p power.Data, a PopoverActions) {
+func popoverChargeLimit(c *ui.Context, p power.Data, limit *power.ChargeLimiter, a PopoverActions) {
 	t := c.Theme()
+	if limit != nil {
+		if s := limit.State(); s.Supported {
+			popoverChargeLimitControl(c, s, limit)
+			return
+		}
+	}
 	row := ui.ButtonBase(c).AlignSelf(ui.Stretch).Label(L("Charge Limit", "充电上限")).
 		Tooltip(L("Adjust the charge limit on the Battery page", "在电池页调整充电上限")).
 		Children(func() {
@@ -281,6 +290,39 @@ func popoverChargeLimit(c *ui.Context, p power.Data, a PopoverActions) {
 	if row.Clicked() && a.OpenDetails != nil {
 		a.OpenDetails(PageBattery)
 	}
+}
+
+// popoverChargeLimitControl sets the limit right in the popover: the same choices as the Battery page.
+func popoverChargeLimitControl(c *ui.Context, s power.ChargeLimitState, limit *power.ChargeLimiter) {
+	t := c.Theme()
+	ui.Column(c).Gap(7).Children(func() {
+		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+			ui.Icon(c, icons.Get("battery-charging")).Size(12, 12).TextColor(Green.Color(c))
+			ui.Text(c, L("Charge Limit", "充电上限")).FontSize(12).TextColor(t.TextMuted).Grow(1)
+			if s.Pending {
+				ui.Spinner(c).Size(10, 10)
+			}
+			value := fmt.Sprintf("%d%%", s.Percent)
+			if s.Percent >= 100 {
+				value = L("Off", "关闭")
+			}
+			ui.Text(c, value).FontSize(12).FontWeight(600).FontFeatures("tnum").NoWrap()
+		})
+		selected := slices.Index(s.Choices, s.Percent)
+		segments := make([]segment, len(s.Choices))
+		for i, choice := range s.Choices {
+			segments[i] = segment{label: fmt.Sprintf("%d%%", choice)}
+		}
+		if e := segmented(c, L("Charge Limit", "充电上限"), &selected, segments, true, s.Pending); !s.Pending && e.Changed() {
+			limit.Set(s.Choices[selected])
+		}
+		switch {
+		case s.Err != nil:
+			Status(c, "octagon-x", Red, L("Could not change the charge limit", "无法修改充电上限"), s.Err.Error())
+		case s.AlDenteRunning:
+			Status(c, "triangle-alert", Orange, L("AlDente may override this limit", "AlDente 可能会改写这个上限"), "")
+		}
+	})
 }
 
 func popoverFooter(c *ui.Context, d PopoverData, a PopoverActions) {

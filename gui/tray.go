@@ -150,6 +150,7 @@ func (a *app) popoverView(c *ui.Context) {
 		Fans:               a.thermal,
 		System:             a.system.Snapshot(),
 		Displays:           a.displays.Snapshot(),
+		ChargeLimit:        a.chargeLimit,
 		LaunchAtLogin:      mygo.App.OpenAtLogin(),
 		LaunchAtLoginError: a.loginError,
 		Version:            mygo.App.Version(),

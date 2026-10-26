@@ -58,3 +58,26 @@ func TestPopoverOnBattery(t *testing.T) {
 		t.Errorf("texts %q", tt.Texts())
 	}
 }
+
+func TestPopoverSetsChargeLimit(t *testing.T) {
+	limit := power.ChargeLimiterWithState(power.ChargeLimitState{Loaded: true, Supported: true, Choices: []int{80, 85, 90, 95, 100}, Percent: 85})
+	changed := make(chan struct{}, 4)
+	limit.OnChange(func() { changed <- struct{}{} })
+	d := PopoverData{Available: true, ChargeLimit: limit,
+		Power: power.Data{BatteryPercent: 85, IsOnAC: true, ConnectionPhase: power.PhaseOnAC, BatteryHealthPercent: intp(99), ChargeLimitPercent: 85}}
+	tt := ui.NewTester(func(c *ui.Context) { Popover(c, d, PopoverActions{}) }, PopoverWidth, 700)
+	for _, want := range []string{"Charge Limit", "80%", "95%", "100%"} {
+		if !tt.HasText(want) {
+			t.Errorf("missing %q in %q", want, tt.Texts())
+		}
+	}
+	if err := tt.Click("95%"); err != nil {
+		t.Fatal(err)
+	}
+	for limit.State().Pending {
+		<-changed
+	}
+	if got := limit.State().Percent; got != 95 {
+		t.Errorf("limit = %d after choosing 95%% in the popover", got)
+	}
+}
