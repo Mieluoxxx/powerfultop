@@ -161,7 +161,8 @@ func (f *fakeTray) showingUI(int32) bool {
 	defer f.mu.Unlock()
 	return f.ui
 }
-func (f *fakeTray) ownBundleID() string { return "io.powerfultop" }
+func (f *fakeTray) ownBundleID() string       { return "io.powerfultop" }
+func (f *fakeTray) onBarChange(func()) func() { return func() {} }
 func (f *fakeTray) restart(id string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -298,21 +299,39 @@ func TestTrayRemovePlacesLeftOfTheAnchor(t *testing.T) {
 	}
 }
 
-func TestTrayReconcileDropsWhatTheUserSwitchedOn(t *testing.T) {
+func TestTrayReconcileFlagsWhatWasSwitchedOnOutside(t *testing.T) {
 	f := newFakeTray()
 	s, prefs := newTestTray(t, f, "com.example.chat", "com.apple.menuextra.sound")
 	s.switchMembers(false)
-	// The user switches both back on in System Settings.
+	// Switched back on in System Settings.
 	out, _, _ := settingAllowed(f.allowList(), owners("com.example.chat"), true)
 	f.setAllowList(out)
 	f.setCheckbox("Sound", checkboxWrite{value: 2})
 	s.reconcile()
-	if s.Contains("com.example.chat") || s.Contains("com.apple.menuextra.sound") {
-		t.Errorf("members %v", s.members)
+	if !s.Contains("com.example.chat") || !s.Contains("com.apple.menuextra.sound") {
+		t.Fatalf("the tray never drops members on a guess: %v", s.members)
 	}
-	if v, _ := prefs.Value(trayItemsKey); len(v.([]any)) != 0 {
+	if v, _ := prefs.Value(trayItemsKey); len(v.([]any)) != 2 {
 		t.Errorf("saved %v", v)
 	}
+	for _, e := range s.Snapshot().Entries {
+		if !e.SwitchedOn {
+			t.Errorf("%s should be flagged", e.ID)
+		}
+	}
+	s.Rehide("com.example.chat")
+	waitFor(t, "rehidden", func() bool {
+		allowed, _ := f.allowed("com.example.chat")
+		return !allowed
+	})
+	waitFor(t, "flag cleared", func() bool {
+		for _, e := range s.Snapshot().Entries {
+			if e.ID == "com.example.chat" {
+				return !e.SwitchedOn
+			}
+		}
+		return false
+	})
 }
 
 func TestTrayReconcileRelistsALostEntry(t *testing.T) {

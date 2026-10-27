@@ -8,7 +8,7 @@ import (
 
 type fakeItems struct {
 	mu       sync.Mutex
-	raw      []rawItem
+	bars     []agentBar
 	pos      map[string]float64
 	drags    [][2]Point
 	setCalls int
@@ -28,12 +28,24 @@ func (f *fakeItems) barAnchors([]appRef) barAnchors { return wideBar }
 func (f *fakeItems) requestLayoutAccess() bool      { return false }
 func (f *fakeItems) appIcon(string) []byte          { return nil }
 func (f *fakeItems) ownPID() int32                  { return 1 }
-func (f *fakeItems) drawn() map[string]Rect         { return nil }
-func (f *fakeItems) allowList() []any               { return nil }
-func (f *fakeItems) readItems([]int32) []rawItem {
+
+func (f *fakeItems) agentBars() []agentBar {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([]rawItem(nil), f.raw...)
+	out := make([]agentBar, len(f.bars))
+	for i, b := range f.bars {
+		out[i] = agentBar{Frame: b.Frame, Slots: append([]agentSlot(nil), b.Slots...)}
+	}
+	return out
+}
+func (f *fakeItems) displays() []Display {
+	return []Display{{Name: "P275MV MAX", Frame: externalFrame}}
+}
+func (f *fakeItems) onBarChange(func()) func() { return func() {} }
+
+// allowList has QQ switched off.
+func (f *fakeItems) allowList() []any {
+	return []any{allowKey("com.tencent.qq"), allowValue("com.tencent.qq", false)}
 }
 func (f *fakeItems) positions() map[string]float64 {
 	f.mu.Lock()
@@ -76,7 +88,7 @@ func (f *fakeItems) commandDrag(start, end Point) {
 
 // slide moves the item at index to x on the bar; callers hold f.mu.
 func slide(index int, x float64) func(*fakeItems) {
-	return func(f *fakeItems) { f.raw[index].Frame.X = x }
+	return func(f *fakeItems) { f.bars[0].Slots[index].Frame.X = x }
 }
 
 func waitFor(t *testing.T, what string, cond func() bool) {
@@ -92,25 +104,15 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 
 func visibleStore(t *testing.T, p *fakeItems) *ItemStore {
 	t.Helper()
-	s := newItemStore(p, true, []string{"PowerfulTop.status"})
+	s := newItemStore(p, &fakePrefs{values: map[string]any{}}, true, []string{"PowerfulTop.status"})
 	s.SetVisible(true)
 	t.Cleanup(func() { s.SetVisible(false) })
 	waitFor(t, "items", func() bool { return len(s.Snapshot().Items) > 0 })
 	return s
 }
 
-func filePositions() map[string]float64 {
-	return map[string]float64{
-		"status:io.github.mieluoxxx.PowerfulTop::PowerfulTop.status": 700,
-		"status:com.finetuneapp.FineTune::Item-0":                    500,
-		"status:eu.exelban.Stats::CPU_mini":                          465,
-		"status:eu.exelban.Stats::RAM_mini":                          418,
-		"status:com.tencent.qq::Item-0":                              588,
-	}
-}
-
 func TestStoreListsOnlyWhileVisibleAndTrusted(t *testing.T) {
-	s := newItemStore(&fakeItems{raw: wideRaw()}, true, nil)
+	s := newItemStore(&fakeItems{bars: wideBars()}, &fakePrefs{values: map[string]any{}}, true, nil)
 	s.SetVisible(true)
 	time.Sleep(50 * time.Millisecond)
 	if snap := s.Snapshot(); snap.Trusted || len(snap.Items) != 0 {
@@ -118,9 +120,9 @@ func TestStoreListsOnlyWhileVisibleAndTrusted(t *testing.T) {
 	}
 	s.SetVisible(false)
 
-	trusted := newItemStore(&fakeItems{raw: wideRaw(), isTrusted: true}, true, nil)
+	trusted := newItemStore(&fakeItems{bars: wideBars(), isTrusted: true}, &fakePrefs{values: map[string]any{}}, true, nil)
 	trusted.SetVisible(true)
-	waitFor(t, "items", func() bool { return len(trusted.Snapshot().Items) == 5 })
+	waitFor(t, "items", func() bool { return len(trusted.Snapshot().Items) == 6 })
 	trusted.SetVisible(false)
 	if len(trusted.Snapshot().Items) != 0 {
 		t.Error("no items once the page is gone")
@@ -129,9 +131,9 @@ func TestStoreListsOnlyWhileVisibleAndTrusted(t *testing.T) {
 
 func TestStoreMovesThroughLayoutFile(t *testing.T) {
 	// RAM goes left of FineTune: between PowerfulTop's label and FineTune once the bar applies it.
-	p := &fakeItems{raw: wideRaw(), isTrusted: true, pos: filePositions(), applyReload: slide(3, 1100)}
+	p := &fakeItems{bars: wideBars(), isTrusted: true, pos: filePositions(), applyReload: slide(3, 1100)}
 	s := visibleStore(t, p)
-	s.move("eu.exelban.Stats#1", "com.finetuneapp.FineTune#0")
+	s.move("eu.exelban.Stats#RAM_mini", "com.finetuneapp.FineTune#Item-0")
 	if p.setCalls != 1 || len(p.drags) != 0 {
 		t.Fatalf("file moves don't drag: set %d drags %d", p.setCalls, len(p.drags))
 	}
@@ -144,22 +146,22 @@ func TestStoreMovesThroughLayoutFile(t *testing.T) {
 }
 
 func TestStoreSkipsReloadWhenTheBarApplies(t *testing.T) {
-	p := &fakeItems{raw: wideRaw(), isTrusted: true, pos: filePositions(), applyWrite: slide(3, 1100)}
+	p := &fakeItems{bars: wideBars(), isTrusted: true, pos: filePositions(), applyWrite: slide(3, 1100)}
 	s := visibleStore(t, p)
-	s.move("eu.exelban.Stats#1", "com.finetuneapp.FineTune#0")
+	s.move("eu.exelban.Stats#RAM_mini", "com.finetuneapp.FineTune#Item-0")
 	if p.reloads != 0 || s.Snapshot().Error != NoError {
 		t.Errorf("reloads %d err %v", p.reloads, s.Snapshot().Error)
 	}
 }
 
 func TestStoreMovesRightmostWithDrag(t *testing.T) {
-	p := &fakeItems{raw: wideRaw(), isTrusted: true, applyDrag: slide(2, 1270)}
+	p := &fakeItems{bars: wideBars(), isTrusted: true, applyDrag: slide(1, 1540)}
 	s := visibleStore(t, p)
-	s.move("eu.exelban.Stats#0", "")
+	s.move("com.finetuneapp.FineTune#0", "")
 	if len(p.drags) != 1 {
 		t.Fatalf("drags: %d", len(p.drags))
 	}
-	if d := p.drags[0]; d[0] != (Point{1192.5, -1064.5}) || d[1] != (Point{1264, -1064.5}) {
+	if d := p.drags[0]; d[0] != (Point{1150, -1064.5}) || d[1] != (Point{1533, -1064.5}) {
 		t.Errorf("drag from the item's centre to just right of the rightmost item: %v", d)
 	}
 	if s.Snapshot().Error != NoError {
@@ -168,7 +170,7 @@ func TestStoreMovesRightmostWithDrag(t *testing.T) {
 }
 
 func TestStoreReportsMovesThatDidNotLand(t *testing.T) {
-	p := &fakeItems{raw: wideRaw(), isTrusted: true}
+	p := &fakeItems{bars: wideBars(), isTrusted: true}
 	s := visibleStore(t, p)
 	s.move("eu.exelban.Stats#0", "")
 	if s.Snapshot().Error != ErrDidNotMove {
@@ -181,7 +183,7 @@ func TestStoreReportsMovesThatDidNotLand(t *testing.T) {
 }
 
 func TestStoreUnsupportedNeverScans(t *testing.T) {
-	s := newItemStore(&fakeItems{raw: wideRaw(), isTrusted: true}, false, nil)
+	s := newItemStore(&fakeItems{bars: wideBars(), isTrusted: true}, &fakePrefs{values: map[string]any{}}, false, nil)
 	s.SetVisible(true)
 	time.Sleep(50 * time.Millisecond)
 	if len(s.Snapshot().Items) != 0 {

@@ -92,7 +92,11 @@ func managerTrayPanel(c *ui.Context, tray *barmanager.TrayStore, snap barmanager
 func managerTrayTile(c *ui.Context, tray *barmanager.TrayStore, state *ManagerPageState, e barmanager.TrayEntry) {
 	t := c.Theme()
 	name := trayEntryName(e)
-	tile := ui.Box(c).Key("tray:"+e.ID).Size(36, 34).Center().Radius(8).Tooltip(name).Label(name).Drag(trayDrag{e.ID})
+	help := name
+	if e.SwitchedOn {
+		help += "\n" + L("Switched back on in System Settings, so it shows in the menu bar.", "已在系统设置中重新打开，所以显示在菜单栏上。")
+	}
+	tile := ui.Box(c).Key("tray:"+e.ID).Size(36, 34).Center().Radius(8).Tooltip(help).Label(name).Drag(trayDrag{e.ID})
 	if tile.Hovered() {
 		tile.Background(t.Text.Alpha(0.08))
 	}
@@ -101,11 +105,20 @@ func managerTrayTile(c *ui.Context, tray *barmanager.TrayStore, state *ManagerPa
 	}
 	tile.ContextMenu(func(m *ui.Menu) {
 		m.Item(name).Disabled(true)
+		if e.SwitchedOn && m.Item(L("Hide Again", "重新收起")).Chosen() {
+			tray.Rehide(e.ID)
+		}
 		if m.Item(L("Put Back in Menu Bar", "放回菜单栏")).Chosen() {
 			tray.Remove(e.ID, "")
 		}
 	})
-	tile.Children(func() { trayEntryLogo(c, tray, &state.icons, e, 22) })
+	tile.Children(func() {
+		trayEntryLogo(c, tray, &state.icons, e, 22)
+		if e.SwitchedOn {
+			// A dot in the corner, like a notification badge.
+			ui.Box(c).Size(8, 8).Radius(4).Background(Orange.Color(c)).Absolute().Top(2).Right(2)
+		}
+	})
 }
 
 // managerAllowListAccess sits in the tray's header: a badge once the list is allowed, else the button that asks for it.
@@ -124,6 +137,13 @@ func managerAllowListAccess(c *ui.Context, tray *barmanager.TrayStore, snap barm
 }
 
 func managerTrayStatus(c *ui.Context, tray *barmanager.TrayStore, snap barmanager.TraySnapshot) {
+	for _, e := range snap.Entries {
+		if e.SwitchedOn {
+			Status(c, "triangle-alert", Orange, L("Some icons were switched back on in System Settings. Right-click one to hide it again or put it back.",
+				"有图标在系统设置中被重新打开了。右键它，可以重新收起或放回菜单栏。"), "")
+			break
+		}
+	}
 	switch snap.Error {
 	case barmanager.ErrTrayNoAccess:
 		Status(c, "lock", Orange, L("PowerfulTop can't read the Allow in the Menu Bar list yet. Allow the switch file above.",
@@ -178,8 +198,8 @@ func managerLayoutPanel(c *ui.Context, store *barmanager.ItemStore, tray *barman
 				ui.Text(c, L("Reading the menu bar…", "正在读取菜单栏…")).FontSize(12).TextColor(c.Theme().TextMuted)
 			})
 		default:
+			managerDisplays(c, store, snap)
 			managerBar(c, store, tray, snap, state)
-			managerDisplay(c, snap)
 			managerStatus(c, snap)
 			ui.Row(c).Gap(16).Wrap().Children(func() {
 				managerTip(c, "move", L("Drop on an icon to place it to its left", "拖到图标上，放在它的左边"))
@@ -228,18 +248,27 @@ func managerStatus(c *ui.Context, snap barmanager.StoreSnapshot) {
 	}
 }
 
-// managerDisplay names the display whose menu bar the editor shows: apps report the bar of the
-// active display, and « differs between displays, so the editor changes as the user moves.
-func managerDisplay(c *ui.Context, snap barmanager.StoreSnapshot) {
-	if snap.BarRow == nil {
+// managerDisplays picks the display whose menu bar the editor shows: each has its own, and only
+// the one with a notch is likely to need «.
+func managerDisplays(c *ui.Context, store *barmanager.ItemStore, snap barmanager.StoreSnapshot) {
+	if len(snap.Displays) < 2 {
 		return
 	}
-	r := snap.BarRow
-	d := mygo.Screen.DisplayMatching(mygo.Rectangle{X: int(r.X), Y: int(r.Y), Width: max(int(r.W), 1), Height: max(int(r.H), 1)})
-	if d.Label == "" {
-		return
+	selected := 0
+	segments := make([]segment, len(snap.Displays))
+	for i, d := range snap.Displays {
+		icon := "monitor"
+		if d.Internal {
+			icon = "laptop"
+		}
+		segments[i] = segment{icon, d.Name}
+		if d.Name == snap.Display {
+			selected = i
+		}
 	}
-	managerTip(c, "monitor", fmt.Sprintf(L("Showing the menu bar of %s; it follows the display you're using.", "显示的是「%s」上的菜单栏，会随你正在使用的屏幕切换。"), d.Label))
+	if segmented(c, L("Display", "显示器"), &selected, segments, false, false).Changed() {
+		store.SelectDisplay(snap.Displays[selected].Name)
+	}
 }
 
 func managerTip(c *ui.Context, icon, text string) {

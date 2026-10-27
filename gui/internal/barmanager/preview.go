@@ -3,7 +3,7 @@ package barmanager
 // NewPreview builds a store that touches no AppKit, showing snap: for page tests and previews of
 // the layout editor.
 func NewPreview(snap StoreSnapshot) *ItemStore {
-	s := newItemStore(nullItems{}, snap.Supported, nil)
+	s := newItemStore(nullItems{}, memoryPrefs{}, snap.Supported, nil)
 	s.snap = snap
 	return s
 }
@@ -23,7 +23,6 @@ type nullItems struct{}
 func (nullItems) trusted() bool                    { return true }
 func (nullItems) requestTrust() bool               { return true }
 func (nullItems) runningApps() []appRef            { return nil }
-func (nullItems) readItems([]int32) []rawItem      { return nil }
 func (nullItems) barAnchors([]appRef) barAnchors   { return barAnchors{} }
 func (nullItems) positions() map[string]float64    { return nil }
 func (nullItems) setPosition(string, float64) bool { return false }
@@ -33,6 +32,9 @@ func (nullItems) commandDrag(Point, Point)         {}
 func (nullItems) ownPID() int32                    { return 0 }
 func (nullItems) appIcon(string) []byte            { return nil }
 func (nullItems) drawn() map[string]Rect           { return nil }
+func (nullItems) agentBars() []agentBar            { return nil }
+func (nullItems) displays() []Display              { return nil }
+func (nullItems) onBarChange(func()) func()        { return func() {} }
 
 func (nullItems) allowList() []any                     { return nil }
 func (nullItems) setAllowList([]any) bool              { return false }

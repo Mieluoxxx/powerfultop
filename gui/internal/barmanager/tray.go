@@ -30,6 +30,9 @@ type TrayEntry struct {
 	// Icon is a lucide icon for Apple's items, which have no app logo.
 	Icon    string
 	Running bool
+	// SwitchedOn: switched back on outside the tray, in System Settings, so it shows in the menu
+	// bar. The tray doesn't guess whether the user meant it to leave; the page asks.
+	SwitchedOn bool
 }
 
 // TraySnapshot is what the tray's flyout and page show; safe to read from any goroutine.
@@ -95,6 +98,8 @@ type trayPlatform interface {
 	// showingUI: a menu hangs from a menu bar, or pid shows a window above the normal level.
 	showingUI(pid int32) bool
 	ownBundleID() string
+	// onBarChange calls fn, from any goroutine, a moment after MenuBarAgent lays a bar out again.
+	onBarChange(fn func()) (stop func())
 }
 
 type prefStore interface {
@@ -111,6 +116,7 @@ const (
 	traySavedKey = "menuBarTraySystemValues"
 
 	reconcileInterval = 30 * time.Second
+	reconcileSettle   = time.Second
 	// MenuBarAgent takes well under a second to apply a switch.
 	confirmDelay = 1500 * time.Millisecond
 	// A restart that didn't help wouldn't help again right away, and each one blinks the bar.
@@ -151,9 +157,8 @@ type TrayStore struct {
 	// lost are apps whose list entry went away; MenuBarAgent's new entry is allowed by default,
 	// which is not the user switching it on.
 	lost map[string]bool
-	// hidden are the members this run switched off. Only those coming back on were switched on by
-	// the user: anything else on was put back by the tray itself, as RestoreAll does.
-	hidden map[string]bool
+	// conflicts are members switched on outside the tray, found by reconcile.
+	conflicts map[string]bool
 	// closed is set as the app quits; nothing switches after it.
 	closed bool
 
@@ -176,7 +181,7 @@ type openedItem struct {
 func newTrayStore(p trayPlatform, prefs prefStore, supported bool, overflowName string) *TrayStore {
 	s := &TrayStore{
 		p: p, prefs: prefs, overflowName: overflowName,
-		icons: map[string][]byte{}, lost: map[string]bool{}, hidden: map[string]bool{},
+		icons: map[string][]byte{}, lost: map[string]bool{}, conflicts: map[string]bool{},
 		sleep: time.Sleep, now: time.Now, logf: func(string, ...any) {},
 	}
 	s.snap.Supported = supported
@@ -466,6 +471,11 @@ func (s *TrayStore) refreshEntries() {
 			s.mu.Unlock()
 		}
 	}
+	s.mu.Lock()
+	for i := range entries {
+		entries[i].SwitchedOn = s.conflicts[entries[i].ID]
+	}
+	s.mu.Unlock()
 	access := s.p.allowList() != nil
 	s.update(func(snap *TraySnapshot) {
 		snap.Entries = entries
@@ -512,7 +522,11 @@ func (s *TrayStore) switchItems(ids []string, shown bool) TrayError {
 	for _, owner := range restarts {
 		s.p.restart(owner)
 	}
-	s.markHidden(ids, !shown)
+	s.mu.Lock()
+	for _, id := range ids {
+		delete(s.conflicts, id)
+	}
+	s.mu.Unlock()
 	if len(apps) == 0 {
 		return TrayNoError
 	}
@@ -525,7 +539,6 @@ func (s *TrayStore) switchItems(ids []string, shown bool) TrayError {
 		return ErrTrayNoAccess
 	}
 	if len(missing) > 0 {
-		s.markHidden(missing, false)
 		if len(ids) == 1 {
 			return ErrTrayUntracked
 		}
@@ -538,24 +551,6 @@ func (s *TrayStore) switchItems(ids []string, shown bool) TrayError {
 		}
 	}
 	return TrayNoError
-}
-
-func (s *TrayStore) markHidden(ids []string, hidden bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, id := range ids {
-		if hidden {
-			s.hidden[id] = true
-		} else {
-			delete(s.hidden, id)
-		}
-	}
-}
-
-func (s *TrayStore) wasHidden(id string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.hidden[id]
 }
 
 func (s *TrayStore) switchSystem(sys SystemItem, shown bool) {
@@ -656,11 +651,27 @@ func (s *TrayStore) startReconciling() {
 	stop := make(chan struct{})
 	s.stop = stop
 	s.mu.Unlock()
+	changed := make(chan struct{}, 1)
+	off := s.p.onBarChange(func() {
+		select {
+		case changed <- struct{}{}:
+		default:
+		}
+	})
 	go func() {
+		defer off()
 		for {
 			select {
 			case <-stop:
 				return
+			case <-changed:
+				// What the tray just switched lays the bar out too; let it settle first.
+				s.sleep(reconcileSettle)
+				select {
+				case <-changed:
+				default:
+				}
+				s.reconcile()
 			case <-time.After(reconcileInterval):
 				s.reconcile()
 			}
@@ -694,7 +705,8 @@ func (s *TrayStore) reconcile() {
 	members := append([]string(nil), s.members...)
 	s.mu.Unlock()
 
-	var dropped, again []string
+	var again []string
+	conflicts := map[string]bool{}
 	needRestart := false
 	list := s.p.allowList()
 	drawn := s.p.drawn()
@@ -703,9 +715,8 @@ func (s *TrayStore) reconcile() {
 			continue
 		}
 		if sys, ok := systemItem(id); ok {
-			// Shown with its switch on: the user switched it back on in System Settings.
-			if shown, ok := s.systemShown(sys); ok && shown && s.wasHidden(id) {
-				dropped = append(dropped, id)
+			if shown, ok := s.systemShown(sys); ok && shown {
+				conflicts[id] = true
 			}
 			continue
 		}
@@ -728,13 +739,18 @@ func (s *TrayStore) reconcile() {
 			}
 		case on && lost:
 			again = append(again, id)
-		case on && s.wasHidden(id):
-			dropped = append(dropped, id)
+		case on:
+			conflicts[id] = true
 		}
 	}
-	if len(dropped) > 0 {
-		s.logf("reconcile: %v were switched on outside the tray; dropping them", dropped)
+	s.mu.Lock()
+	for id := range conflicts {
+		if !s.conflicts[id] {
+			s.logf("reconcile: %s was switched on outside the tray", id)
+		}
 	}
+	s.conflicts = conflicts
+	s.mu.Unlock()
 	if needRestart && s.restartAgent() {
 		s.logf("reconcile: restarted MenuBarAgent to relist %v", s.lostCopy())
 		s.mu.Lock()
@@ -758,19 +774,21 @@ func (s *TrayStore) reconcile() {
 			s.mu.Unlock()
 		}
 	}
-	if len(dropped) > 0 {
-		s.mu.Lock()
-		var kept []string
-		for _, m := range s.members {
-			if !contains(dropped, m) {
-				kept = append(kept, m)
-			}
-		}
-		s.members = kept
-		s.mu.Unlock()
-		s.persist()
-	}
 	s.refreshEntries()
+}
+
+// Rehide switches a member that was switched on outside the tray off again.
+func (s *TrayStore) Rehide(id string) {
+	go func() {
+		s.work.Lock()
+		defer s.work.Unlock()
+		if !s.Contains(id) || !s.active() {
+			return
+		}
+		s.logf("rehide %s", id)
+		s.switchItems([]string{id}, false)
+		s.refreshEntries()
+	}()
 }
 
 // Open opens a tray item. An app's menu is returned for the flyout to show a copy of, whose

@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/egoist/mygo"
+
 	"powerfultop/internal/macos"
 )
 
@@ -91,12 +93,56 @@ func eachChild(element uintptr, fn func(child uintptr)) {
 	}
 }
 
-// drawn keeps the first frame of each item: it shows in every Space's window, in the same place.
+// agentBars reads one bar per display: MenuBarAgent keeps a window per display and Space, and
+// those of one display list the same items in the same places.
+func (d *darwinItems) agentBars() []agentBar {
+	var bars []agentBar
+	index := map[Rect]int{}
+	d.forEachSlot(func(window, slot Rect, id string, _ uintptr) {
+		i, ok := index[window]
+		if !ok {
+			i = len(bars)
+			index[window] = i
+			bars = append(bars, agentBar{Frame: window})
+		}
+		// Every Space's window repeats the display's slots.
+		if !hasSlot(bars[i], id, slot) {
+			bars[i].Slots = append(bars[i].Slots, agentSlot{ID: id, Frame: slot})
+		}
+	})
+	return bars
+}
+
+func hasSlot(b agentBar, id string, frame Rect) bool {
+	for _, s := range b.Slots {
+		if s.ID == id && s.Frame == frame {
+			return true
+		}
+	}
+	return false
+}
+
+// drawn keeps the first frame of each item drawn in any menu bar.
 func (d *darwinItems) drawn() map[string]Rect {
 	out := map[string]Rect{}
-	d.forEachSlot(func(_, slot Rect, id string, _ uintptr) {
-		if _, seen := out[id]; !seen {
-			out[id] = slot
+	for _, b := range d.agentBars() {
+		for _, s := range b.Slots {
+			if _, seen := out[s.ID]; !seen {
+				out[s.ID] = s.Frame
+			}
+		}
+	}
+	return out
+}
+
+// displays come from MyGo, whose screen coordinates share Accessibility's top-left origin.
+func (d *darwinItems) displays() []Display {
+	var out []Display
+	d.onMain(func() {
+		for _, s := range mygo.Screen.Displays() {
+			b := s.Bounds
+			out = append(out, Display{Name: s.Label, Internal: s.Internal,
+				Frame: Rect{float64(b.X), float64(b.Y), float64(b.Width), float64(b.Height)}})
 		}
 	})
 	return out

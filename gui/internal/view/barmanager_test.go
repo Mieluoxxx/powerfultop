@@ -131,3 +131,32 @@ func TestTrayFlyout(t *testing.T) {
 		t.Errorf("empty: %q", empty.Texts())
 	}
 }
+
+func TestManagerPagePicksADisplay(t *testing.T) {
+	s := barmanager.NewPreview(barmanager.StoreSnapshot{
+		Supported: true, Trusted: true, HasLayoutAccess: true, Display: "P275MV MAX",
+		Displays: []barmanager.Display{{Name: "Built-in Retina Display", Internal: true}, {Name: "P275MV MAX"}},
+		Items:    []barmanager.Item{{ID: "a#0", Name: "FineTune", Section: barmanager.Shown, Reachable: true}},
+	})
+	tt := managerTester(s)
+	if !tt.HasText("Built-in Retina Display") || !tt.HasText("P275MV MAX") {
+		t.Errorf("both displays offered: %q", tt.Texts())
+	}
+	one := managerTester(barmanager.NewPreview(barmanager.StoreSnapshot{
+		Supported: true, Trusted: true, Displays: []barmanager.Display{{Name: "Built-in Retina Display"}},
+		Items: []barmanager.Item{{ID: "a#0", Name: "FineTune", Section: barmanager.Shown}},
+	}))
+	if one.HasText("Built-in Retina Display") {
+		t.Error("nothing to pick with one display")
+	}
+}
+
+func TestManagerPageFlagsIconsSwitchedOnOutsideTheTray(t *testing.T) {
+	store := barmanager.NewPreview(barmanager.StoreSnapshot{Supported: true, Trusted: true})
+	tray := barmanager.NewTrayPreview(barmanager.TraySnapshot{Supported: true, Enabled: true, HasAllowListAccess: true,
+		Entries: []barmanager.TrayEntry{{ID: "com.tencent.qq", Name: "QQ", Running: true, SwitchedOn: true}}})
+	tt := trayManagerTester(store, tray)
+	if !tt.HasText("Some icons were switched back on in System Settings. Right-click one to hide it again or put it back.") {
+		t.Errorf("texts %q", tt.Texts())
+	}
+}

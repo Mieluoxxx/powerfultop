@@ -113,16 +113,24 @@ type noIcons struct{ *darwinItems }
 
 func (noIcons) appIcon(string) []byte { return nil }
 
-// Scans the real menu bar as the editor does and prints each item's section.
+// MyGo lists displays on its run loop too; the bars name themselves.
+func (noIcons) displays() []Display { return nil }
+
+// Scans the real menu bars as the editor does and prints each display's items.
 func TestLiveScan(t *testing.T) {
 	if os.Getenv("SCAN_LIVE") == "" {
 		t.Skip()
 	}
-	s := newItemStore(&darwinItems{onMain: func(fn func()) { fn() }}, true, []string{"PowerfulTop.status", "PowerfulTop.overflow"})
-	s.p = noIcons{s.p.(*darwinItems)}
+	d := &darwinItems{onMain: func(fn func()) { fn() }}
+	s := newItemStore(noIcons{d}, &livePrefs{values: map[string]any{}}, true, []string{"PowerfulTop.status", "PowerfulTop.overflow"})
 	s.scan()
-	for _, it := range s.Snapshot().Items {
-		t.Logf("%-8v %-28s %v", map[Section]string{Shown: "shown", Overflow: "«", Absent: "absent"}[it.Section], it.BundleID, it.Frame)
+	for _, display := range s.Snapshot().Displays {
+		s.chosen = display.Name
+		s.scan()
+		t.Logf("== %s %v", display.Name, display.Frame)
+		for _, it := range s.Snapshot().Items {
+			t.Logf("%-8v %-34s %-10s %v", map[Section]string{Shown: "shown", Overflow: "«", Absent: "absent"}[it.Section], it.BundleID, it.Detail, it.Frame)
+		}
 	}
 }
 

@@ -25,7 +25,7 @@ import (
 // NewItemStore lists items for the layout editor; ownStatusItems are the autosave names of the
 // app's own status items. It re-opens file grants saved on an earlier launch.
 func NewItemStore(ownStatusItems ...string) *ItemStore {
-	return newItemStore(platform(), majorVersion() >= 27, ownStatusItems)
+	return newItemStore(platform(), macos.AppPreferences(), majorVersion() >= 27, ownStatusItems)
 }
 
 // NewTrayStore keeps the tray's items out of the menu bar; overflowItem is the autosave name of
@@ -33,6 +33,7 @@ func NewItemStore(ownStatusItems ...string) *ItemStore {
 func NewTrayStore(overflowItem string) *TrayStore {
 	s := newTrayStore(platform(), macos.AppPreferences(), majorVersion() >= 27, overflowItem)
 	s.logf = trayLogger()
+	watchLog = s.logf
 	return s
 }
 
@@ -94,8 +95,6 @@ const (
 	positionsKey     = "TrailingItemPreferredPositions"
 	bookmarkKey      = "menuBarLayoutFileBookmark"
 	axMessageTimeout = 0.25
-	// Every app is asked at once, but a hung app's timeout shouldn't hold up the rest for long.
-	axParallelism = 16
 )
 
 // layoutPath is the one file where macOS 27 keeps the menu bar order: each item's preferred
@@ -281,45 +280,6 @@ func extrasChildren(pid int32, fn func(index int, element uintptr)) {
 	for i := range cfArrayGetCount(children) {
 		fn(i, cfArrayGetValueAtIndex(children, i))
 	}
-}
-
-// readItems asks every app in parallel, since an AX call blocks until the other app answers.
-func (d *darwinItems) readItems(pids []int32) []rawItem {
-	loadAX()
-	var (
-		mu     sync.Mutex
-		result []rawItem
-		wg     sync.WaitGroup
-		slots  = make(chan struct{}, axParallelism)
-	)
-	for _, pid := range pids {
-		wg.Add(1)
-		slots <- struct{}{}
-		go func(pid int32) {
-			defer wg.Done()
-			defer func() { <-slots }()
-			var found []rawItem
-			extrasChildren(pid, func(index int, element uintptr) {
-				title := stringAttribute(element, "AXTitle")
-				if title == "" {
-					title = stringAttribute(element, "AXDescription")
-				}
-				found = append(found, rawItem{
-					PID:        pid,
-					Index:      index,
-					Title:      title,
-					Help:       stringAttribute(element, "AXHelp"),
-					Identifier: stringAttribute(element, "AXIdentifier"),
-					Frame:      frameOf(element),
-				})
-			})
-			mu.Lock()
-			result = append(result, found...)
-			mu.Unlock()
-		}(pid)
-	}
-	wg.Wait()
-	return result
 }
 
 // overflowButton finds the system « button: MenuBarAgent's only button among its status groups,

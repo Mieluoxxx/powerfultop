@@ -1,6 +1,8 @@
 package barmanager
 
 import (
+	"sort"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -28,17 +30,21 @@ type StoreSnapshot struct {
 	HasLayoutAccess bool
 	Moving          bool
 	Error           StoreError
-	// BarRow is a frame on the row of the menu bar the items were read from: apps report the
-	// bar of the active display, so the editor names it.
-	BarRow *Rect
+	// Displays have a menu bar each; Items are as the one named Display shows them.
+	Displays []Display
+	Display  string
 }
 
 type itemPlatform interface {
 	trusted() bool
 	requestTrust() bool
 	runningApps() []appRef
-	readItems(pids []int32) []rawItem
 	barAnchors(apps []appRef) barAnchors
+	// agentBars are MenuBarAgent's windows, one per display's menu bar.
+	agentBars() []agentBar
+	displays() []Display
+	// onBarChange calls fn, from any goroutine, a moment after MenuBarAgent lays a bar out again.
+	onBarChange(fn func()) (stop func())
 	// positions is nil without access to the layout file.
 	positions() map[string]float64
 	setPosition(key string, value float64) bool
@@ -48,25 +54,30 @@ type itemPlatform interface {
 	reloadMenuBar()
 	ownPID() int32
 	appIcon(path string) []byte
-	// drawn is every item MenuBarAgent draws now, by tray ID; the editor lists Apple's from it.
-	drawn() map[string]Rect
 	// allowList is nil without access to the list's file.
 	allowList() []any
 }
 
 const (
-	pollInterval = 3 * time.Second
+	// MenuBarAgent tells of every layout; the poll only catches what it doesn't, such as a
+	// layout file write it ignores.
+	pollInterval = 15 * time.Second
+	// A layout comes as a burst of notifications, one per display and Space.
+	changeDebounce = 250 * time.Millisecond
 	// The bar needs a moment to lay out after a drop.
 	settleDelay = 400 * time.Millisecond
 )
 
-// ItemStore lists every app's menu bar items for the layout editor. Items come from
-// Accessibility; their order comes from the macOS 27 layout file when the user has granted it,
-// which also moves them without the pointer. Otherwise they are ordered by on-screen frames and
-// moved with the ⌘-drag a user would do, which only reaches items the active bar shows.
+// ItemStore lists every app's menu bar items for the layout editor, as the menu bar of a chosen
+// display shows them (see model.go). Their order comes from the macOS 27 layout file when the user
+// has granted it, which also moves them without the pointer; otherwise they are moved with the
+// ⌘-drag a user would do, which only reaches items the bar shows.
 type ItemStore struct {
 	p        itemPlatform
+	prefs    prefStore
 	ownNames []string
+	// chosen is the display the user picked; it may be disconnected, and comes back with it.
+	chosen string
 
 	mu        sync.Mutex
 	snap      StoreSnapshot
@@ -79,8 +90,43 @@ type ItemStore struct {
 	work sync.Mutex
 }
 
-func newItemStore(p itemPlatform, supported bool, ownNames []string) *ItemStore {
-	return &ItemStore{p: p, ownNames: ownNames, snap: StoreSnapshot{Supported: supported}, icons: map[string][]byte{}}
+const editorDisplayKey = "menuBarEditorDisplay"
+
+func newItemStore(p itemPlatform, prefs prefStore, supported bool, ownNames []string) *ItemStore {
+	s := &ItemStore{p: p, prefs: prefs, ownNames: ownNames, snap: StoreSnapshot{Supported: supported}, icons: map[string][]byte{}}
+	if v, ok := prefs.Value(editorDisplayKey); ok {
+		s.chosen, _ = v.(string)
+	}
+	return s
+}
+
+// SelectDisplay shows the menu bar of the display named name, and keeps the choice.
+func (s *ItemStore) SelectDisplay(name string) {
+	_ = s.prefs.Set(editorDisplayKey, name)
+	s.mu.Lock()
+	s.chosen = name
+	s.mu.Unlock()
+	s.update(func(snap *StoreSnapshot) { snap.Display = name })
+	s.Refresh()
+}
+
+// displaysOf names each bar after its display; frames come from MenuBarAgent and the display
+// list alike, in global top-left points.
+func (s *ItemStore) displaysOf(bars []agentBar) []Display {
+	known := s.p.displays()
+	var out []Display
+	for i, b := range bars {
+		d := Display{Name: "Display " + strconv.Itoa(i+1), Frame: b.Frame}
+		for _, k := range known {
+			if _, ok := barFor([]agentBar{b}, k.Frame); ok {
+				d.Name, d.Internal = k.Name, k.Internal
+			}
+		}
+		out = append(out, d)
+	}
+	// The built-in display first, as System Settings lists them.
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Internal && !out[j].Internal })
+	return out
 }
 
 func (s *ItemStore) Snapshot() StoreSnapshot {
@@ -139,12 +185,26 @@ func (s *ItemStore) SetVisible(visible bool) {
 		s.update(func(snap *StoreSnapshot) { snap.Items = nil })
 		return
 	}
+	changed := make(chan struct{}, 1)
+	off := s.p.onBarChange(func() {
+		select {
+		case changed <- struct{}{}:
+		default:
+		}
+	})
 	go func() {
+		defer off()
 		for {
 			s.refresh()
 			select {
 			case <-stop:
 				return
+			case <-changed:
+				time.Sleep(changeDebounce)
+				select {
+				case <-changed:
+				default:
+				}
 			case <-time.After(pollInterval):
 			}
 		}
@@ -170,15 +230,11 @@ func (s *ItemStore) refresh() {
 }
 
 func (s *ItemStore) scan() {
-	all := s.p.runningApps()
-	bar := s.p.barAnchors(all)
-	apps := withoutAgent(all)
-	pids := make([]int32, len(apps))
-	for i, a := range apps {
-		pids[i] = a.PID
-	}
+	apps := s.p.runningApps()
+	anchors := s.p.barAnchors(apps)
+	bars := s.p.agentBars()
+	displays := s.displaysOf(bars)
 	positions := s.p.positions()
-	drawn := s.p.drawn()
 	off := map[string]bool{}
 	if list := s.p.allowList(); list != nil {
 		for _, a := range apps {
@@ -187,8 +243,29 @@ func (s *ItemStore) scan() {
 			}
 		}
 	}
-	items := classify(apps, s.p.readItems(pids), bar, positions, ownItem{s.p.ownPID(), s.ownNames}, drawn, off)
-	items = sortItems(append(items, systemBarItems(drawn, bar, positions)...))
+	s.mu.Lock()
+	chosen := s.chosen
+	s.mu.Unlock()
+	display, found := Display{}, false
+	for _, d := range displays {
+		if d.Name == chosen {
+			display, found = d, true
+		}
+	}
+	if !found && len(displays) > 0 {
+		// Until the user picks one, the display in use, as the active bar tells.
+		display = displays[0]
+		for _, d := range displays {
+			if anchors.row != nil && anchors.row.MidY() >= d.Frame.Y && anchors.row.MidY() <= d.Frame.Y+d.Frame.H &&
+				anchors.row.MidX() >= d.Frame.X && anchors.row.MidX() <= d.Frame.MaxX() {
+				display = d
+			}
+		}
+	}
+	items := buildItems(modelInput{
+		apps: apps, bars: bars, positions: positions, off: off,
+		own: ownItem{s.p.ownPID(), s.ownNames}, overflow: anchors.overflow,
+	}, display.Frame)
 
 	for _, item := range items {
 		s.mu.Lock()
@@ -204,7 +281,7 @@ func (s *ItemStore) scan() {
 	s.update(func(snap *StoreSnapshot) {
 		snap.Items = items
 		snap.HasLayoutAccess = positions != nil
-		snap.BarRow = bar.row
+		snap.Displays, snap.Display = displays, display.Name
 	})
 }
 
