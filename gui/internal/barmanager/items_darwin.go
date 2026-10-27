@@ -3,6 +3,7 @@
 package barmanager
 
 import (
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -21,12 +22,53 @@ import (
 	"powerfultop/internal/macos"
 )
 
-// NewItemStore lists items for the layout editor; ownStatusItem is the autosave name of the app's
-// own status item. It re-opens a layout-file grant saved on an earlier launch.
-func NewItemStore(ownStatusItem string) *ItemStore {
-	p := &darwinItems{onMain: mygo.RunOnMain}
-	p.restoreLayoutAccess()
-	return newItemStore(p, majorVersion() >= 27, ownStatusItem)
+// NewItemStore lists items for the layout editor; ownStatusItems are the autosave names of the
+// app's own status items. It re-opens file grants saved on an earlier launch.
+func NewItemStore(ownStatusItems ...string) *ItemStore {
+	return newItemStore(platform(), majorVersion() >= 27, ownStatusItems)
+}
+
+// NewTrayStore keeps the tray's items out of the menu bar; overflowItem is the autosave name of
+// the tray's own status item.
+func NewTrayStore(overflowItem string) *TrayStore {
+	s := newTrayStore(platform(), macos.AppPreferences(), majorVersion() >= 27, overflowItem)
+	s.logf = trayLogger()
+	return s
+}
+
+// trayLogger appends to ~/Library/Logs/PowerfulTop/tray.log, started afresh once it grows past
+// a few hundred kilobytes; a menu bar app's stderr goes nowhere.
+func trayLogger() func(string, ...any) {
+	dir := filepath.Join(os.Getenv("HOME"), "Library/Logs/PowerfulTop")
+	path := filepath.Join(dir, "tray.log")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return func(string, ...any) {}
+	}
+	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND
+	if info, err := os.Stat(path); err == nil && info.Size() > 512<<10 {
+		flags |= os.O_TRUNC
+	}
+	f, err := os.OpenFile(path, flags, 0o644)
+	if err != nil {
+		return func(string, ...any) {}
+	}
+	logger := log.New(f, "", log.LstdFlags)
+	return logger.Printf
+}
+
+var (
+	platformOnce sync.Once
+	shared       *darwinItems
+)
+
+// platform is shared by both stores, so file grants are re-opened once.
+func platform() *darwinItems {
+	platformOnce.Do(func() {
+		shared = &darwinItems{onMain: mygo.RunOnMain}
+		shared.restoreFileAccess(bookmarkKey)
+		shared.restoreFileAccess(allowListBookmarkKey)
+	})
+	return shared
 }
 
 func (d *darwinItems) ownPID() int32 { return int32(os.Getpid()) }
@@ -70,6 +112,8 @@ var (
 	axUIElementCopyAttributeValue  func(element, attribute uintptr, value *uintptr) int32
 	axUIElementSetMessagingTimeout func(element uintptr, seconds float32) int32
 	axValueGetValue                func(value uintptr, typ int32, out unsafe.Pointer) bool
+	axUIElementGetPid              func(element uintptr, pid *int32) int32
+	axUIElementPerformAction       func(element, action uintptr) int32
 
 	axAttributes = map[string]uintptr{}
 )
@@ -87,8 +131,11 @@ func loadAX() {
 		purego.RegisterLibFunc(&axUIElementCopyAttributeValue, lib, "AXUIElementCopyAttributeValue")
 		purego.RegisterLibFunc(&axUIElementSetMessagingTimeout, lib, "AXUIElementSetMessagingTimeout")
 		purego.RegisterLibFunc(&axValueGetValue, lib, "AXValueGetValue")
+		purego.RegisterLibFunc(&axUIElementGetPid, lib, "AXUIElementGetPid")
+		purego.RegisterLibFunc(&axUIElementPerformAction, lib, "AXUIElementPerformAction")
 		// Created once and kept: the CFStrings name attributes on every scan.
-		for _, name := range []string{"AXExtrasMenuBar", "AXChildren", "AXPosition", "AXSize", "AXTitle", "AXDescription", "AXHelp", "AXIdentifier", "AXRole"} {
+		for _, name := range []string{"AXExtrasMenuBar", "AXChildren", "AXPosition", "AXSize", "AXTitle", "AXDescription", "AXHelp", "AXIdentifier", "AXRole",
+			"AXSubrole", "AXWindows", "AXEnabled", "AXMenuItemMarkChar", "AXMenuItemCmdChar", "AXMenuItemCmdModifiers", "AXPress"} {
 			axAttributes[name] = macos.CFString(name)
 		}
 	})
@@ -120,28 +167,64 @@ func (d *darwinItems) runningApps() []appRef {
 			list := send(send(class("NSWorkspace"), "sharedWorkspace"), "runningApplications")
 			n := objc.Send[uint](list, sel("count"))
 			for i := range n {
-				app := send(list, "objectAtIndex:", i)
-				ref := appRef{
-					PID:      objc.Send[int32](app, sel("processIdentifier")),
-					Name:     goString(send(app, "localizedName")),
-					BundleID: goString(send(app, "bundleIdentifier")),
-					Path:     goString(send(send(app, "bundleURL"), "path")),
-				}
-				executable := goString(send(send(app, "executableURL"), "lastPathComponent"))
-				for _, owner := range []string{ref.BundleID, ref.Name, executable} {
-					if owner != "" {
-						ref.Owners = append(ref.Owners, owner)
-					}
-				}
-				if ref.Name == "" {
-					ref.Name = firstNonEmpty(ref.BundleID, executable, "?")
-				}
-				apps = append(apps, ref)
+				apps = append(apps, appRefOf(send(list, "objectAtIndex:", i)))
 			}
 		})
 	})
 	return apps
 }
+
+// runningApp is the first running app with bundleID.
+func (d *darwinItems) runningApp(bundleID string) (appRef, bool) {
+	var ref appRef
+	found := false
+	d.onMain(func() {
+		withPool(func() {
+			list := send(class("NSRunningApplication"), "runningApplicationsWithBundleIdentifier:", nsString(bundleID))
+			if objc.Send[uint](list, sel("count")) > 0 {
+				ref, found = appRefOf(send(list, "objectAtIndex:", uint(0))), true
+			}
+		})
+	})
+	return ref, found
+}
+
+// appPath locates an app that may not be running, for its icon and to launch it.
+func (d *darwinItems) appPath(bundleID string) string {
+	var path string
+	d.onMain(func() {
+		withPool(func() {
+			url := send(send(class("NSWorkspace"), "sharedWorkspace"), "URLForApplicationWithBundleIdentifier:", nsString(bundleID))
+			path = goString(send(url, "path"))
+		})
+	})
+	return path
+}
+
+func appRefOf(app objc.ID) appRef {
+	ref := appRef{
+		PID:      objc.Send[int32](app, sel("processIdentifier")),
+		Name:     goString(send(app, "localizedName")),
+		BundleID: goString(send(app, "bundleIdentifier")),
+		Path:     goString(send(send(app, "bundleURL"), "path")),
+	}
+	ref.Executable = goString(send(send(app, "executableURL"), "path"))
+	executable := ""
+	if ref.Executable != "" {
+		executable = filepath.Base(ref.Executable)
+	}
+	for _, owner := range []string{ref.BundleID, ref.Name, executable} {
+		if owner != "" && !contains(ref.Owners, owner) {
+			ref.Owners = append(ref.Owners, owner)
+		}
+	}
+	if ref.Name == "" {
+		ref.Name = firstNonEmpty(ref.BundleID, executable, "?")
+	}
+	return ref
+}
+
+func (d *darwinItems) ownBundleID() string { return macos.MainBundleID() }
 
 func copyAttribute(element uintptr, name string) uintptr {
 	var value uintptr
@@ -316,19 +399,33 @@ func toPositions(value any) map[string]float64 {
 // setPosition writes through cfprefsd so MenuBarAgent sees the change; a direct file write would be
 // overwritten from cfprefsd's cache and never reach the bar.
 func (d *darwinItems) setPosition(key string, value float64) bool {
+	return d.setPositions(map[string]float64{key: value})
+}
+
+func (d *darwinItems) setPositions(values map[string]float64) bool {
+	// MenuBarAgent writes the file while PowerfulTop runs; a stale copy would undo its changes.
+	macos.DomainPreferences(layoutPath).Synchronize()
 	all := d.positions()
 	if all == nil {
 		return false
 	}
-	dict := make(map[string]any, len(all)+1)
+	dict := make(map[string]any, len(all)+len(values))
 	for k, v := range all {
 		dict[k] = v
 	}
-	dict[key] = value
+	for k, v := range values {
+		dict[k] = v
+	}
 	if err := macos.DomainPreferences(layoutPath).Set(positionsKey, dict); err != nil {
 		return false
 	}
-	return d.positions()[key] == value
+	after := d.positions()
+	for k, v := range values {
+		if after[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // reloadMenuBar restarts MenuBarAgent, which launchd starts again at once, and waits until the new
@@ -358,30 +455,37 @@ func (d *darwinItems) menuBarAgentPID() int32 {
 	return 0
 }
 
-// requestLayoutAccess asks the user to pick the file; their choice is what lets this app past the
-// container's protection. Main thread only: it runs a modal panel.
 func (d *darwinItems) requestLayoutAccess() bool {
-	granted := false
+	granted := d.requestFileAccess(layoutPath, bookmarkKey, tr(
+		"Choose com.apple.MenuBar.plist so PowerfulTop can arrange the menu bar without moving the pointer.",
+		"请选择 com.apple.MenuBar.plist，PowerfulTop 就能在不移动鼠标的情况下整理菜单栏。"))
+	return granted && d.positions() != nil
+}
+
+// requestFileAccess asks the user to pick the file at path; their choice is what lets this app
+// past its container's protection, and the bookmark saved under bookmarkKey renews it at launch.
+// MyGo runs the panel: a runModal of our own, sent from inside a MyGo event, returns at once
+// without showing anything.
+func (d *darwinItems) requestFileAccess(path, bookmarkKey, message string) bool {
+	picked, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
+		// The file's own folder, so the panel lists it in sight; given the file itself, it scrolls away.
+		DefaultPath:     filepath.Dir(path),
+		Message:         message,
+		ButtonLabel:     tr("Allow", "允许"),
+		ShowHiddenFiles: true,
+	})
+	if err != nil || len(picked) != 1 {
+		if err != nil {
+			log.Printf("file access: %v", err)
+		}
+		return false
+	}
+	if filepath.Clean(picked[0]) != filepath.Clean(path) {
+		log.Printf("file access: picked %q, want %q", picked[0], path)
+		return false
+	}
 	withPool(func() {
-		panel := send(class("NSOpenPanel"), "openPanel")
-		send(panel, "setDirectoryURL:", send(class("NSURL"), "fileURLWithPath:", nsString(filepath.Dir(layoutPath))))
-		msgBool(panel, sel("setCanChooseFiles:"), true)
-		msgBool(panel, sel("setCanChooseDirectories:"), false)
-		msgBool(panel, sel("setAllowsMultipleSelection:"), false)
-		msgBool(panel, sel("setShowsHiddenFiles:"), true)
-		send(panel, "setMessage:", nsString(tr(
-			"Choose com.apple.MenuBar.plist so PowerfulTop can arrange the menu bar without moving the pointer.",
-			"请选择 com.apple.MenuBar.plist，PowerfulTop 就能在不移动鼠标的情况下整理菜单栏。")))
-		send(panel, "setPrompt:", nsString(tr("Allow", "允许")))
-		msgBool(send(class("NSApplication"), "sharedApplication"), sel("activateIgnoringOtherApps:"), true)
-		const modalResponseOK = 1
-		if objc.Send[int](panel, sel("runModal")) != modalResponseOK {
-			return
-		}
-		url := send(panel, "URL")
-		if filepath.Clean(goString(send(url, "path"))) != filepath.Clean(layoutPath) {
-			return
-		}
+		url := send(class("NSURL"), "fileURLWithPath:", nsString(path))
 		send(url, "startAccessingSecurityScopedResource")
 		const withSecurityScope = 1 << 11 // NSURLBookmarkCreationWithSecurityScope
 		bookmark := send(url, "bookmarkDataWithOptions:includingResourceValuesForKeys:relativeToURL:error:", uint64(withSecurityScope), objc.ID(0), objc.ID(0), objc.ID(0))
@@ -390,14 +494,15 @@ func (d *darwinItems) requestLayoutAccess() bool {
 		}
 		if b := dataBytes(bookmark); len(b) > 0 {
 			_ = macos.AppPreferences().Set(bookmarkKey, b)
+		} else {
+			log.Printf("file access: no bookmark for %q", path)
 		}
-		granted = true
 	})
-	return granted && d.positions() != nil
+	return true
 }
 
-// restoreLayoutAccess re-opens the grant saved by requestLayoutAccess on a previous launch.
-func (d *darwinItems) restoreLayoutAccess() {
+// restoreFileAccess re-opens the grant requestFileAccess saved on a previous launch.
+func (d *darwinItems) restoreFileAccess(bookmarkKey string) {
 	bookmark, ok := macos.AppPreferences().Data(bookmarkKey)
 	if !ok {
 		return

@@ -36,13 +36,19 @@ var (
 	cfBundleGetMainBundle        func() uintptr
 	cfBundleGetIdentifier        func(bundle uintptr) uintptr
 	cfPreferencesCopyKeyList     func(app, user, host uintptr) uintptr
+	cfPreferencesCopyValue       func(key, app, user, host uintptr) uintptr
+	cfPreferencesSetValue        func(key, value, app, user, host uintptr)
+	cfPreferencesSynchronize     func(app, user, host uintptr) bool
 
 	kCFPreferencesCurrentUser uintptr
 	kCFPreferencesAnyHost     uintptr
+	kCFPreferencesCurrentHost uintptr
 )
 
 // kCFPropertyListXMLFormat_v1_0: CF objects cross into Go as XML, which saves wrapping every CF type.
 const xmlPropertyListFormat = 100
+
+const binaryPropertyListFormat = 200 // kCFPropertyListBinaryFormat_v1_0
 
 func load() error {
 	loadOnce.Do(func() {
@@ -74,10 +80,14 @@ func load() error {
 		purego.RegisterLibFunc(&cfBundleGetMainBundle, cf, "CFBundleGetMainBundle")
 		purego.RegisterLibFunc(&cfBundleGetIdentifier, cf, "CFBundleGetIdentifier")
 		purego.RegisterLibFunc(&cfPreferencesCopyKeyList, cf, "CFPreferencesCopyKeyList")
+		purego.RegisterLibFunc(&cfPreferencesCopyValue, cf, "CFPreferencesCopyValue")
+		purego.RegisterLibFunc(&cfPreferencesSetValue, cf, "CFPreferencesSetValue")
+		purego.RegisterLibFunc(&cfPreferencesSynchronize, cf, "CFPreferencesSynchronize")
 		// These are CFStringRef globals, so the symbol is the address of the pointer.
 		for name, dst := range map[string]*uintptr{
 			"kCFPreferencesCurrentUser": &kCFPreferencesCurrentUser,
 			"kCFPreferencesAnyHost":     &kCFPreferencesAnyHost,
+			"kCFPreferencesCurrentHost": &kCFPreferencesCurrentHost,
 		} {
 			if sym, err := purego.Dlsym(cf, name); err == nil {
 				*dst = **(**uintptr)(unsafe.Pointer(&sym))
@@ -164,6 +174,43 @@ func ToCF(value any) (uintptr, error) {
 		return 0, errors.New("CFPropertyListCreateWithData failed")
 	}
 	return ref, nil
+}
+
+// DecodePlistData parses an XML or binary property list, which ParsePlist (XML only) can't.
+func DecodePlistData(data []byte) (any, error) {
+	if err := load(); err != nil {
+		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, errors.New("plist: empty")
+	}
+	cfData := cfDataCreate(0, data, len(data))
+	if cfData == 0 {
+		return nil, errors.New("CFDataCreate failed")
+	}
+	defer cfRelease(cfData)
+	ref := cfPropertyListCreateWithData(0, cfData, 0, 0, 0)
+	if ref == 0 {
+		return nil, errors.New("CFPropertyListCreateWithData failed")
+	}
+	defer cfRelease(ref)
+	return FromCF(ref)
+}
+
+// EncodeBinaryPlist writes value as a binary property list, the format system preferences nest
+// inside data values.
+func EncodeBinaryPlist(value any) ([]byte, error) {
+	ref, err := ToCF(value)
+	if err != nil {
+		return nil, err
+	}
+	defer cfRelease(ref)
+	data := cfPropertyListCreateData(0, ref, binaryPropertyListFormat, 0, 0)
+	if data == 0 {
+		return nil, errors.New("CFPropertyListCreateData failed")
+	}
+	defer cfRelease(data)
+	return append([]byte(nil), unsafe.Slice(cfDataGetBytePtr(data), cfDataGetLength(data))...), nil
 }
 
 // CFString returns a CFString the caller releases.

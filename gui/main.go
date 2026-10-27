@@ -34,6 +34,7 @@ type app struct {
 	displays     *display.Controller
 	menuSettings *menubar.Settings
 	store        *barmanager.ItemStore
+	trayStore    *barmanager.TrayStore
 	history      history.History
 
 	tray     *mygo.Tray
@@ -41,6 +42,14 @@ type app struct {
 	details  atomic.Pointer[mygo.Window]
 	clicks   *macos.ClickMonitor
 	closedAt time.Time
+
+	overflow         *mygo.Tray
+	overflowPanel    atomic.Pointer[mygo.Window]
+	overflowClicks   *macos.ClickMonitor
+	overflowClosedAt time.Time
+	overflowHeight   int
+	overflowMenuOpen bool
+	overflowState    view.TrayFlyoutState
 
 	trayIcon      []byte
 	trayTicker    *time.Ticker
@@ -70,7 +79,8 @@ func newApp() *app {
 	a.displays = display.NewController()
 	a.menuSettings = menubar.NewSettings(a.prefs)
 	a.menuSettings.Load()
-	a.store = barmanager.NewItemStore(trayID)
+	a.store = barmanager.NewItemStore(trayID, overflowID)
+	a.trayStore = barmanager.NewTrayStore(overflowID)
 	a.detailsState = view.DetailsState{Selected: view.PageOverview, Available: true, OnSelect: a.persistPage}
 	if page, ok := a.prefs.String(dashboardPageKey); ok {
 		a.detailsState.Selected = view.PageID(page)
@@ -85,8 +95,9 @@ func (a *app) ready() {
 	a.system.Start()
 	a.displays.Start()
 	a.setupTray()
+	a.setupOverflow()
 
-	for _, onChange := range []func(func()){a.power.OnChange, a.chargeLimit.OnChange, a.thermal.OnChange, a.system.OnChange, a.displays.OnChange, a.store.OnChange} {
+	for _, onChange := range []func(func()){a.power.OnChange, a.chargeLimit.OnChange, a.thermal.OnChange, a.system.OnChange, a.displays.OnChange, a.store.OnChange, a.trayStore.OnChange} {
 		onChange(a.invalidate)
 	}
 	a.menuSettings.OnChange(func() {
@@ -115,6 +126,9 @@ func (a *app) invalidate() {
 	if w := a.details.Load(); w != nil {
 		w.Invalidate()
 	}
+	if w := a.overflowPanel.Load(); w != nil {
+		w.Invalidate()
+	}
 }
 
 func (a *app) recordHistory() {
@@ -126,14 +140,19 @@ func (a *app) recordHistory() {
 	}
 }
 
-// shutdown runs synchronously at quit: a deferred hand-back could leave the fans in manual mode.
+// shutdown runs synchronously at quit: a deferred hand-back could leave the fans in manual mode,
+// and the tray's icons out of the menu bar.
 func (a *app) shutdown() {
+	a.trayStore.Shutdown()
 	a.thermal.Shutdown()
 	a.displays.Shutdown()
 	a.system.Stop()
 	a.power.Stop()
 	if a.trayTicker != nil {
 		a.trayTicker.Stop()
+	}
+	if a.overflow != nil {
+		a.overflow.Destroy()
 	}
 	a.tray.Destroy()
 }
@@ -159,7 +178,7 @@ func smokeLaunch() bool {
 func (a *app) checkSmokeLaunch() {
 	time.AfterFunc(700*time.Millisecond, func() {
 		mygo.RunOnMain(func() {
-			if a.panel.Load() != nil || a.details.Load() != nil {
+			if a.panel.Load() != nil || a.details.Load() != nil || a.overflowPanel.Load() != nil {
 				log.Print("smoke-launch FAIL: a window opened at launch")
 				os.Exit(1)
 			}

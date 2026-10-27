@@ -3,6 +3,7 @@
 package barmanager
 
 import (
+	"runtime"
 	"sync"
 	"unsafe"
 
@@ -113,7 +114,10 @@ func dataBytes(data objc.ID) []byte {
 }
 
 // withPool drains what fn autoreleases; AppKit work outside the run loop's own pool leaks otherwise.
+// A pool belongs to its thread, so the goroutine stays on one until the pool drains.
 func withPool(fn func()) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	pool := send(class("NSAutoreleasePool"), "new")
 	defer send(pool, "drain")
 	fn()

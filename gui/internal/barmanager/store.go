@@ -28,6 +28,9 @@ type StoreSnapshot struct {
 	HasLayoutAccess bool
 	Moving          bool
 	Error           StoreError
+	// BarRow is a frame on the row of the menu bar the items were read from: apps report the
+	// bar of the active display, so the editor names it.
+	BarRow *Rect
 }
 
 type itemPlatform interface {
@@ -45,6 +48,10 @@ type itemPlatform interface {
 	reloadMenuBar()
 	ownPID() int32
 	appIcon(path string) []byte
+	// drawn is every item MenuBarAgent draws now, by tray ID; the editor lists Apple's from it.
+	drawn() map[string]Rect
+	// allowList is nil without access to the list's file.
+	allowList() []any
 }
 
 const (
@@ -58,8 +65,8 @@ const (
 // which also moves them without the pointer. Otherwise they are ordered by on-screen frames and
 // moved with the ⌘-drag a user would do, which only reaches items the active bar shows.
 type ItemStore struct {
-	p       itemPlatform
-	ownName string
+	p        itemPlatform
+	ownNames []string
 
 	mu        sync.Mutex
 	snap      StoreSnapshot
@@ -72,8 +79,8 @@ type ItemStore struct {
 	work sync.Mutex
 }
 
-func newItemStore(p itemPlatform, supported bool, ownName string) *ItemStore {
-	return &ItemStore{p: p, ownName: ownName, snap: StoreSnapshot{Supported: supported}, icons: map[string][]byte{}}
+func newItemStore(p itemPlatform, supported bool, ownNames []string) *ItemStore {
+	return &ItemStore{p: p, ownNames: ownNames, snap: StoreSnapshot{Supported: supported}, icons: map[string][]byte{}}
 }
 
 func (s *ItemStore) Snapshot() StoreSnapshot {
@@ -171,7 +178,17 @@ func (s *ItemStore) scan() {
 		pids[i] = a.PID
 	}
 	positions := s.p.positions()
-	items := classify(apps, s.p.readItems(pids), bar, positions, ownItem{s.p.ownPID(), s.ownName})
+	drawn := s.p.drawn()
+	off := map[string]bool{}
+	if list := s.p.allowList(); list != nil {
+		for _, a := range apps {
+			if allowed, listed := allowedState(list, allowOwner{a.BundleID, a.Executable}); listed && !allowed {
+				off[a.BundleID] = true
+			}
+		}
+	}
+	items := classify(apps, s.p.readItems(pids), bar, positions, ownItem{s.p.ownPID(), s.ownNames}, drawn, off)
+	items = sortItems(append(items, systemBarItems(drawn, bar, positions)...))
 
 	for _, item := range items {
 		s.mu.Lock()
@@ -187,6 +204,7 @@ func (s *ItemStore) scan() {
 	s.update(func(snap *StoreSnapshot) {
 		snap.Items = items
 		snap.HasLayoutAccess = positions != nil
+		snap.BarRow = bar.row
 	})
 }
 
@@ -353,15 +371,17 @@ func (s *ItemStore) RequestAccessibility() {
 	s.update(func(snap *StoreSnapshot) { snap.Trusted = trusted })
 }
 
-// RequestLayoutAccess asks the user to pick the layout file; it runs a modal panel, so call it on
-// the main thread.
+// RequestLayoutAccess asks the user to pick the layout file. The panel waits for the user, so it
+// runs in the background.
 func (s *ItemStore) RequestLayoutAccess() {
-	if s.p.requestLayoutAccess() {
-		s.setError(NoError)
-	} else {
-		s.setError(ErrNoLayoutAccess)
-	}
-	s.Refresh()
+	go func() {
+		if s.p.requestLayoutAccess() {
+			s.setError(NoError)
+		} else {
+			s.setError(ErrNoLayoutAccess)
+		}
+		s.Refresh()
+	}()
 }
 
 func find(items []Item, id string) (Item, bool) {

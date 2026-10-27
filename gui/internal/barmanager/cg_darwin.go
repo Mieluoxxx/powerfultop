@@ -14,14 +14,19 @@ import (
 var (
 	cgOnce sync.Once
 
-	cgEventCreate             func(source uintptr) uintptr
-	cgEventGetLocation        func(event uintptr) nsPoint
-	cgEventCreateMouseEvent   func(source uintptr, typ uint32, at nsPoint, button uint32) uintptr
-	cgEventSetFlags           func(event uintptr, flags uint64)
-	cgEventPost               func(tap uint32, event uintptr)
-	cgWarpMouseCursorPosition func(at nsPoint) int32
+	cgEventCreate               func(source uintptr) uintptr
+	cgEventGetLocation          func(event uintptr) nsPoint
+	cgEventCreateMouseEvent     func(source uintptr, typ uint32, at nsPoint, button uint32) uintptr
+	cgEventSetFlags             func(event uintptr, flags uint64)
+	cgEventPost                 func(tap uint32, event uintptr)
+	cgWarpMouseCursorPosition   func(at nsPoint) int32
+	cgEventSourceCreate         func(state int32) uintptr
+	cgEventSetIntegerValueField func(event uintptr, field uint32, value int64)
+	cgWindowListCopyWindowInfo  func(options uint32, relativeTo uint32) uintptr
+	cgWindowLevelForKey         func(key int32) int32
 
 	cfRelease                    func(ref uintptr)
+	cfRetain                     func(ref uintptr) uintptr
 	cfArrayGetCount              func(array uintptr) int
 	cfArrayGetValueAtIndex       func(array uintptr, index int) uintptr
 	cfDataCreate                 func(allocator uintptr, bytes []byte, length int) uintptr
@@ -44,7 +49,12 @@ func loadCG() {
 		purego.RegisterLibFunc(&cgEventSetFlags, cg, "CGEventSetFlags")
 		purego.RegisterLibFunc(&cgEventPost, cg, "CGEventPost")
 		purego.RegisterLibFunc(&cgWarpMouseCursorPosition, cg, "CGWarpMouseCursorPosition")
+		purego.RegisterLibFunc(&cgEventSourceCreate, cg, "CGEventSourceCreate")
+		purego.RegisterLibFunc(&cgEventSetIntegerValueField, cg, "CGEventSetIntegerValueField")
+		purego.RegisterLibFunc(&cgWindowListCopyWindowInfo, cg, "CGWindowListCopyWindowInfo")
+		purego.RegisterLibFunc(&cgWindowLevelForKey, cg, "CGWindowLevelForKey")
 		purego.RegisterLibFunc(&cfRelease, cf, "CFRelease")
+		purego.RegisterLibFunc(&cfRetain, cf, "CFRetain")
 		purego.RegisterLibFunc(&cfArrayGetCount, cf, "CFArrayGetCount")
 		purego.RegisterLibFunc(&cfArrayGetValueAtIndex, cf, "CFArrayGetValueAtIndex")
 		purego.RegisterLibFunc(&cfDataCreate, cf, "CFDataCreate")

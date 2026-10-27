@@ -18,27 +18,142 @@ type ManagerPageState struct {
 	icons map[string]*ui.Bitmap
 }
 
-// MenuBarManagerPage arranges the order of every app's menu bar icons. Hiding is left to macOS 27,
-// which tucks the leftmost icons behind its « once the bar runs out of room, so the order is what
-// decides which icons stay in sight. Main reports the page's on-screen state to store.SetVisible,
-// which scans the bar only while the page shows.
-func MenuBarManagerPage(c *ui.Context, store *barmanager.ItemStore, state *ManagerPageState, width float32) {
+// MenuBarManagerPage puts icons in the tray and arranges the order of the rest. macOS 27 tucks the
+// leftmost icons behind its « once the bar runs out of room, so the order decides which icons stay
+// in sight; the tray takes icons out of the bar altogether. Main reports the page's on-screen state
+// to store.SetVisible, which scans the bar only while the page shows.
+func MenuBarManagerPage(c *ui.Context, store *barmanager.ItemStore, tray *barmanager.TrayStore, state *ManagerPageState, width float32) {
 	snap := store.Snapshot()
 	var absent []barmanager.Item
 	for _, it := range snap.Items {
-		if it.Section == barmanager.Absent {
+		// The tray's apps are switched off too, but by the tray, not the user.
+		if it.Section == barmanager.Absent && !tray.Contains(it.BundleID) {
 			absent = append(absent, it)
 		}
 	}
 	ui.Column(c).Gap(22).MaxWidth(880).Children(func() {
-		managerLayoutPanel(c, store, snap, state)
+		if snap.Supported {
+			managerTrayPanel(c, tray, snap, state)
+		}
+		managerLayoutPanel(c, store, tray, snap, state)
 		if len(absent) > 0 {
 			managerAbsentPanel(c, store, state, absent)
 		}
 	})
 }
 
-func managerLayoutPanel(c *ui.Context, store *barmanager.ItemStore, snap barmanager.StoreSnapshot, state *ManagerPageState) {
+// trayDrag is a tray icon being dragged, which the bar takes to put it back there.
+type trayDrag struct{ id string }
+
+func managerTrayPanel(c *ui.Context, tray *barmanager.TrayStore, snap barmanager.StoreSnapshot, state *ManagerPageState) {
+	t := c.Theme()
+	tsnap := tray.Snapshot()
+	Surface(c, ui.Column(c).Padding(18).Gap(14), 18).Children(func() {
+		PanelHeader(c, "archive", L("Tray", "托盘"), Indigo, func() {
+			if tsnap.Enabled {
+				managerAllowListAccess(c, tray, tsnap)
+			}
+			on := tsnap.Enabled
+			if ui.Switch(c.Key("tray-enabled"), &on).Label(L("Use the Tray", "启用托盘")).Changed() {
+				tray.SetEnabled(on)
+			}
+		})
+		ui.Text(c, L("Icons in the tray leave the menu bar and open from PowerfulTop's chevron, like the overflow of Windows' taskbar. macOS switches an app's icons together, so an app goes in whole. Quitting PowerfulTop puts them back.",
+			"托盘里的图标会离开菜单栏，改从 PowerfulTop 的箭头图标里打开，就像 Windows 任务栏的溢出区。macOS 按 app 开关图标，所以同一个 app 的图标会一起收起。退出 PowerfulTop 时它们会回到菜单栏。")).
+			FontSize(11).TextColor(t.TextMuted)
+		if !tsnap.Enabled {
+			return
+		}
+		zone := ui.Row(c).Wrap().Gap(4).AlignItems(ui.Center).Padding(8).MinHeight(54).Radius(12).
+			Background(t.Text.Alpha(0.04)).Border(1, t.Text.Alpha(0.12)).BorderStyle(ui.BorderDashed)
+		if id, over := ui.DragOver[string](zone); over {
+			if it, ok := find(snap.Items, id); ok && tray.CanHold(it.BundleID) {
+				zone.Border(2, Indigo.Color(c))
+			}
+		}
+		if id, ok := ui.Drop[string](zone); ok {
+			if it, ok := find(snap.Items, id); ok && tray.CanHold(it.BundleID) {
+				tray.Add(it.BundleID)
+			}
+		}
+		zone.Children(func() {
+			if len(tsnap.Entries) == 0 {
+				ui.Text(c, L("Drag icons here from the menu bar below, or right-click one there.", "从下方菜单栏把图标拖到这里，或在那里右键图标。")).
+					FontSize(11).TextColor(t.TextMuted).TextAlign(ui.Center).Grow(1)
+			}
+			for _, e := range tsnap.Entries {
+				managerTrayTile(c, tray, state, e)
+			}
+		})
+		managerTrayStatus(c, tray, tsnap)
+	})
+}
+
+func managerTrayTile(c *ui.Context, tray *barmanager.TrayStore, state *ManagerPageState, e barmanager.TrayEntry) {
+	t := c.Theme()
+	name := trayEntryName(e)
+	tile := ui.Box(c).Key("tray:"+e.ID).Size(36, 34).Center().Radius(8).Tooltip(name).Label(name).Drag(trayDrag{e.ID})
+	if tile.Hovered() {
+		tile.Background(t.Text.Alpha(0.08))
+	}
+	if !e.Running {
+		tile.Opacity(0.5)
+	}
+	tile.ContextMenu(func(m *ui.Menu) {
+		m.Item(name).Disabled(true)
+		if m.Item(L("Put Back in Menu Bar", "放回菜单栏")).Chosen() {
+			tray.Remove(e.ID, "")
+		}
+	})
+	tile.Children(func() { trayEntryLogo(c, tray, &state.icons, e, 22) })
+}
+
+// managerAllowListAccess sits in the tray's header: a badge once the list is allowed, else the button that asks for it.
+func managerAllowListAccess(c *ui.Context, tray *barmanager.TrayStore, snap barmanager.TraySnapshot) {
+	if snap.HasAllowListAccess {
+		Pill(c, "badge-check", L("Switch file allowed", "开关文件已授权"), Green).
+			Tooltip(L("Using the Allow in the Menu Bar list of System Settings to switch icons on and off.",
+				"正在使用系统设置中「允许在菜单栏中显示」的列表来开关图标。"))
+		return
+	}
+	if ui.Button(c, L("Allow Switch File…", "授权开关文件…")).
+		Tooltip(L("Allow the Allow in the Menu Bar list, which the tray switches apps' icons with. Apple's own icons need no file.",
+			"授权「允许在菜单栏中显示」的列表，托盘用它开关 app 的图标。系统自带的图标不需要这个文件。")).Clicked() {
+		tray.RequestAllowListAccess()
+	}
+}
+
+func managerTrayStatus(c *ui.Context, tray *barmanager.TrayStore, snap barmanager.TraySnapshot) {
+	switch snap.Error {
+	case barmanager.ErrTrayNoAccess:
+		Status(c, "lock", Orange, L("PowerfulTop can't read the Allow in the Menu Bar list yet. Allow the switch file above.",
+			"PowerfulTop 还无法读取「允许在菜单栏中显示」的列表，请先授权上方的开关文件。"), "")
+	case barmanager.ErrTrayUntracked:
+		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
+			ui.Row(c).Grow(1).Shrink(1).Children(func() {
+				Status(c, "triangle-alert", Orange, L("macOS hasn't listed this app under Allow in the Menu Bar yet.", "macOS 还没有把这个 app 列进「允许在菜单栏中显示」。"), "")
+			})
+			if ui.Button(c, L("Refresh Menu Bar", "刷新菜单栏")).
+				Tooltip(L("Restarts the menu bar so macOS lists the app; the menu bar blinks once.", "重启菜单栏让 macOS 列出这个 app，菜单栏会闪一下。")).Clicked() {
+				tray.RefreshMenuBar()
+			}
+		})
+	case barmanager.ErrTrayCannotOpen:
+		Status(c, "triangle-alert", Orange, L("That icon couldn't be opened.", "这个图标没能打开。"),
+			L("It didn't come back to the menu bar; there may not be room for it.", "它没能回到菜单栏，可能是菜单栏放不下了。"))
+	}
+}
+
+func find(items []barmanager.Item, id string) (barmanager.Item, bool) {
+	for _, it := range items {
+		if it.ID == id {
+			return it, true
+		}
+	}
+	return barmanager.Item{}, false
+}
+
+func managerLayoutPanel(c *ui.Context, store *barmanager.ItemStore, tray *barmanager.TrayStore, snap barmanager.StoreSnapshot, state *ManagerPageState) {
 	Surface(c, ui.Column(c).Padding(18).Gap(14), 18).Children(func() {
 		PanelHeader(c, "layout-panel-top", L("Menu Bar Order", "菜单栏排序"), Purple, func() {
 			if snap.Supported && snap.Trusted {
@@ -63,7 +178,8 @@ func managerLayoutPanel(c *ui.Context, store *barmanager.ItemStore, snap barmana
 				ui.Text(c, L("Reading the menu bar…", "正在读取菜单栏…")).FontSize(12).TextColor(c.Theme().TextMuted)
 			})
 		default:
-			managerBar(c, store, snap, state)
+			managerBar(c, store, tray, snap, state)
+			managerDisplay(c, snap)
 			managerStatus(c, snap)
 			ui.Row(c).Gap(16).Wrap().Children(func() {
 				managerTip(c, "move", L("Drop on an icon to place it to its left", "拖到图标上，放在它的左边"))
@@ -112,6 +228,20 @@ func managerStatus(c *ui.Context, snap barmanager.StoreSnapshot) {
 	}
 }
 
+// managerDisplay names the display whose menu bar the editor shows: apps report the bar of the
+// active display, and « differs between displays, so the editor changes as the user moves.
+func managerDisplay(c *ui.Context, snap barmanager.StoreSnapshot) {
+	if snap.BarRow == nil {
+		return
+	}
+	r := snap.BarRow
+	d := mygo.Screen.DisplayMatching(mygo.Rectangle{X: int(r.X), Y: int(r.Y), Width: max(int(r.W), 1), Height: max(int(r.H), 1)})
+	if d.Label == "" {
+		return
+	}
+	managerTip(c, "monitor", fmt.Sprintf(L("Showing the menu bar of %s; it follows the display you're using.", "显示的是「%s」上的菜单栏，会随你正在使用的屏幕切换。"), d.Label))
+}
+
 func managerTip(c *ui.Context, icon, text string) {
 	t := c.Theme()
 	ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
@@ -143,7 +273,7 @@ func managerWallpaper(c *ui.Context) ui.LinearGradient {
 
 // managerBar draws the bar as macOS lays it out: what « holds, then the icons in sight, then the
 // clock standing in for Apple's own items, along the top of a strip of wallpaper.
-func managerBar(c *ui.Context, store *barmanager.ItemStore, snap barmanager.StoreSnapshot, state *ManagerPageState) {
+func managerBar(c *ui.Context, store *barmanager.ItemStore, tray *barmanager.TrayStore, snap barmanager.StoreSnapshot, state *ManagerPageState) {
 	var overflow, shown []barmanager.Item
 	for _, it := range snap.Items {
 		switch it.Section {
@@ -159,12 +289,18 @@ func managerBar(c *ui.Context, store *barmanager.ItemStore, snap barmanager.Stor
 	}
 	white := func(a float32) ui.Color { return ui.RGBA(255, 255, 255, a) }
 	frame := ui.Column(c).Radius(12).Clip().LinearGradient(managerWallpaper(c))
-	if _, over := ui.DragOver[string](frame); over {
+	_, over := ui.DragOver[string](frame)
+	_, overFromTray := ui.DragOver[trayDrag](frame)
+	if over || overFromTray {
 		frame.Border(2, white(0.9))
 	}
 	// Dropping anywhere but on an icon sends it to the right end, where it stays in sight longest.
 	if id, ok := ui.Drop[string](frame); ok {
 		store.Move(id, "")
+	}
+	// A tray icon dropped on the bar but not on an icon goes back where it was.
+	if d, ok := ui.Drop[trayDrag](frame); ok {
+		tray.Remove(d.id, "")
 	}
 	frame.Children(func() {
 		ui.Row(c).Wrap().Gap(2).AlignItems(ui.Center).Justify(ui.End).PaddingX(10).PaddingY(3).MinHeight(36).
@@ -175,12 +311,12 @@ func managerBar(c *ui.Context, store *barmanager.ItemStore, snap barmanager.Stor
 					Children(func() {
 						ui.Text(c, "«").FontSize(14).Bold().TextColor(white(0.85)).PaddingEnd(4)
 						for _, item := range overflow {
-							managerItemTile(c, store, state, item, leftmost)
+							managerItemTile(c, store, tray, state, item, leftmost)
 						}
 					})
 			}
 			for _, item := range shown {
-				managerItemTile(c, store, state, item, leftmost)
+				managerItemTile(c, store, tray, state, item, leftmost)
 			}
 			ui.Text(c, "9:41").FontSize(12).FontWeight(600).TextColor(white(0.7)).PaddingStart(10).PaddingEnd(2)
 		})
@@ -188,7 +324,7 @@ func managerBar(c *ui.Context, store *barmanager.ItemStore, snap barmanager.Stor
 	})
 }
 
-func managerItemTile(c *ui.Context, store *barmanager.ItemStore, state *ManagerPageState, item barmanager.Item, leftmost string) {
+func managerItemTile(c *ui.Context, store *barmanager.ItemStore, tray *barmanager.TrayStore, state *ManagerPageState, item barmanager.Item, leftmost string) {
 	title := item.Name
 	if item.Detail != "" {
 		title += " · " + item.Detail
@@ -205,8 +341,12 @@ func managerItemTile(c *ui.Context, store *barmanager.ItemStore, state *ManagerP
 	if !movable {
 		tile.Opacity(0.45)
 	}
-	if movable {
+	holdable := tray.Snapshot().Enabled && tray.CanHold(item.BundleID)
+	if movable || holdable {
+		// The tray takes icons that can't be moved too: it switches them off rather than dragging them.
 		tile.Drag(item.ID)
+	}
+	if movable {
 		// Shows where the dragged icon will land: just left of this one.
 		if id, over := ui.DragOver[string](tile); over && id != item.ID {
 			tile.Border(2, ui.RGBA(255, 255, 255, 0.9))
@@ -214,12 +354,23 @@ func managerItemTile(c *ui.Context, store *barmanager.ItemStore, state *ManagerP
 		if id, ok := ui.Drop[string](tile); ok && id != item.ID {
 			store.Move(id, item.ID)
 		}
+	}
+	if _, over := ui.DragOver[trayDrag](tile); over {
+		tile.Border(2, ui.RGBA(255, 255, 255, 0.9))
+	}
+	if d, ok := ui.Drop[trayDrag](tile); ok {
+		tray.Remove(d.id, item.LayoutKey)
+	}
+	if movable || holdable {
 		tile.ContextMenu(func(menu *ui.Menu) {
 			menu.Item(title).Disabled(true)
-			if menu.Item(L("Move to Right End (Stays in Sight)", "移到最右（优先显示）")).Chosen() {
+			if holdable && menu.Item(L("Move to Tray", "收进托盘")).Chosen() {
+				tray.Add(item.BundleID)
+			}
+			if movable && menu.Item(L("Move to Right End (Stays in Sight)", "移到最右（优先显示）")).Chosen() {
 				store.Move(item.ID, "")
 			}
-			if leftmost != "" && leftmost != item.ID && menu.Item(L("Move to Left End (Tucked Away First)", "移到最左（优先收起）")).Chosen() {
+			if movable && leftmost != "" && leftmost != item.ID && menu.Item(L("Move to Left End (Tucked Away First)", "移到最左（优先收起）")).Chosen() {
 				store.Move(item.ID, leftmost)
 			}
 		})
@@ -228,6 +379,10 @@ func managerItemTile(c *ui.Context, store *barmanager.ItemStore, state *ManagerP
 }
 
 func managerLogo(c *ui.Context, store *barmanager.ItemStore, state *ManagerPageState, item barmanager.Item, fallback ui.Color) {
+	if item.Icon != "" {
+		ui.Icon(c, icons.Get(item.Icon)).Size(17, 17).TextColor(fallback)
+		return
+	}
 	if bitmap := managerAppLogo(store, state, item); bitmap != nil {
 		ui.Image(c, bitmap).Size(20, 20)
 	} else {
@@ -236,25 +391,7 @@ func managerLogo(c *ui.Context, store *barmanager.ItemStore, state *ManagerPageS
 }
 
 func managerAppLogo(store *barmanager.ItemStore, state *ManagerPageState, item barmanager.Item) *ui.Bitmap {
-	if item.AppPath == "" {
-		return nil
-	}
-	if bitmap, ok := state.icons[item.AppPath]; ok {
-		return bitmap
-	}
-	png := store.Icon(item)
-	if png == nil {
-		return nil
-	}
-	bitmap, err := ui.DecodeBitmap(png)
-	if err != nil {
-		bitmap = nil
-	}
-	if state.icons == nil {
-		state.icons = map[string]*ui.Bitmap{}
-	}
-	state.icons[item.AppPath] = bitmap
-	return bitmap
+	return cachedLogo(&state.icons, item.AppPath, func() []byte { return store.Icon(item) })
 }
 
 // managerAbsentPanel lists icons the bar doesn't draw at all; macOS switches them on and off, not the order.

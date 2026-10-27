@@ -31,7 +31,7 @@ func sections(items []Item) map[string]Section {
 }
 
 func TestClassifyWideBar(t *testing.T) {
-	items := classify(testApps, wideRaw(), wideBar, nil, ownItem{1, "PowerfulTop.status"})
+	items := classify(testApps, wideRaw(), wideBar, nil, ownItem{1, []string{"PowerfulTop.status"}}, nil, nil)
 	want := map[string]Section{
 		"io.github.mieluoxxx.PowerfulTop#0": Shown, "com.finetuneapp.FineTune#0": Shown,
 		"eu.exelban.Stats#0": Shown, "eu.exelban.Stats#1": Shown, "com.tencent.qq#0": Absent,
@@ -68,7 +68,7 @@ func TestClassifyOverflowWithLayoutFile(t *testing.T) {
 	raw[2].Frame, raw[3].Frame = Rect{1124, 4.5, 33, 24}, Rect{1171, 4.5, 33, 24}
 	bar := barAnchors{overflow: &Rect{877, 1, 17.5, 30}, row: &Rect{1400, 4.5, 30, 24}}
 	byID := map[string]Item{}
-	for _, it := range classify(testApps, raw, bar, positions, ownItem{1, "PowerfulTop.status"}) {
+	for _, it := range classify(testApps, raw, bar, positions, ownItem{1, []string{"PowerfulTop.status"}}, nil, nil) {
 		byID[it.ID] = it
 	}
 	if it := byID["com.finetuneapp.FineTune#0"]; it.Section != Overflow || it.Reachable || it.LayoutKey == "" || !it.CanMove() {
@@ -98,5 +98,41 @@ func TestSortItemsInterpolatesUnmatched(t *testing.T) {
 	}
 	if got := order; got[0] != "finetune" || got[1] != "stats" || got[2] != "aldente" || got[3] != "hidden" {
 		t.Errorf("order %v", got)
+	}
+}
+
+// Apps report frames on the active display, while MenuBarAgent's row may come from another one or
+// not at all; what MenuBarAgent draws keeps switched-off items out of the bar and the rest in.
+func TestClassifyAbsentFollowsWhatMenuBarAgentDraws(t *testing.T) {
+	drawn := map[string]Rect{
+		"io.github.mieluoxxx.PowerfulTop": {}, "com.finetuneapp.FineTune": {}, "eu.exelban.Stats": {},
+	}
+	own := ownItem{1, []string{"PowerfulTop.status"}}
+	want := map[string]Section{
+		"io.github.mieluoxxx.PowerfulTop#0": Shown, "com.finetuneapp.FineTune#0": Shown,
+		"eu.exelban.Stats#0": Shown, "eu.exelban.Stats#1": Shown, "com.tencent.qq#0": Absent,
+	}
+	for name, bar := range map[string]barAnchors{
+		"row on the other display": {row: &Rect{1600, 0, 30, 33}},
+		"no row read":              {},
+	} {
+		got := sections(classify(testApps, wideRaw(), bar, nil, own, drawn, nil))
+		for id, s := range want {
+			if got[id] != s {
+				t.Errorf("%s: %s got %v, want %v", name, id, got[id], s)
+			}
+		}
+	}
+}
+
+// Measured with two displays: a switched-off item reports a frame on the row of whichever
+// display last drew it, which is the bar's row as often as not.
+func TestClassifySwitchedOffIsAbsentWhereverItReports(t *testing.T) {
+	raw := wideRaw()
+	raw[4].Frame = Rect{1240, -1076.5, 34, 24}
+	drawn := map[string]Rect{"io.github.mieluoxxx.PowerfulTop": {}, "com.finetuneapp.FineTune": {}, "eu.exelban.Stats": {}}
+	got := sections(classify(testApps, raw, wideBar, nil, ownItem{1, []string{"PowerfulTop.status"}}, drawn, map[string]bool{"com.tencent.qq": true}))
+	if got["com.tencent.qq#0"] != Absent {
+		t.Errorf("qq: %v", got["com.tencent.qq#0"])
 	}
 }

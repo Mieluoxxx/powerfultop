@@ -23,6 +23,8 @@ type Item struct {
 	HasPosition bool
 	// Reachable: on screen right now, so a ⌘-drag can reach it.
 	Reachable bool
+	// Icon is a lucide icon for Apple's items, which have no app logo.
+	Icon string
 }
 
 func (i Item) CanMove() bool {
@@ -34,6 +36,8 @@ type appRef struct {
 	Name     string
 	BundleID string
 	Path     string
+	// Executable is what the allow list names an ad-hoc signed app by.
+	Executable string
 	// Owners are every name macOS may file the app's layout keys under.
 	Owners []string
 }
@@ -55,16 +59,17 @@ type barAnchors struct {
 	row *Rect
 }
 
-// ownItem is PowerfulTop's own status item: earlier versions left other keys of this app in the
-// layout file, and only the one with this autosave name is live.
+// ownItem is PowerfulTop's own status items: earlier versions left other keys of this app in the
+// layout file, and only those with these autosave names are live.
 type ownItem struct {
-	pid  int32
-	name string
+	pid   int32
+	names []string
 }
 
 // classify turns what Accessibility and the layout file report into the editor's list, left to
-// right. positions is nil without layout-file access.
-func classify(apps []appRef, raw []rawItem, bar barAnchors, positions map[string]float64, own ownItem) []Item {
+// right. positions is nil without layout-file access; drawn, what MenuBarAgent draws by bundle
+// identifier, is nil when it couldn't be read; off are the apps switched off in the allow list.
+func classify(apps []appRef, raw []rawItem, bar barAnchors, positions map[string]float64, own ownItem, drawn map[string]Rect, off map[string]bool) []Item {
 	onRow := func(f Rect) bool {
 		// macOS 27 parks items it isn't drawing at a fixed spot off the bar's row, e.g. (-1, 970).
 		return bar.row == nil || math.Abs(f.MidY()-bar.row.MidY()) <= bar.row.H/2
@@ -72,6 +77,21 @@ func classify(apps []appRef, raw []rawItem, bar barAnchors, positions map[string
 	// Items behind « report stacked placeholder frames, so only those right of it are real.
 	reachable := func(f Rect) bool {
 		return onRow(f) && (bar.overflow == nil || f.MidX() > bar.overflow.MaxX())
+	}
+	// A switched-off item reports a frame on whichever display last drew it, and MenuBarAgent's
+	// own items are read from whichever display is active, or not at all, so geometry flips such
+	// items in and out of the bar. Its switch and what MenuBarAgent draws settle it.
+	absent := func(app appRef, f Rect) bool {
+		if off[app.BundleID] {
+			return true
+		}
+		if len(drawn) > 0 {
+			if _, ok := drawn[app.BundleID]; ok {
+				return false
+			}
+			return bar.row == nil || !onRow(f)
+		}
+		return !onRow(f)
 	}
 
 	appsByPID := map[int32]appRef{}
@@ -107,7 +127,7 @@ func classify(apps []appRef, raw []rawItem, bar barAnchors, positions map[string
 		live := byPID[pid]
 		var entries []entry
 		for _, e := range parsed {
-			if contains(app.Owners, e.owner) && (pid != own.pid || e.name == own.name) {
+			if contains(app.Owners, e.owner) && (pid != own.pid || contains(own.names, e.name)) {
 				entries = append(entries, e)
 			}
 		}
@@ -130,9 +150,9 @@ func classify(apps []appRef, raw []rawItem, bar barAnchors, positions map[string
 			e, keyed := keys[r.Index]
 			section := Shown
 			switch {
-			case !onRow(r.Frame):
+			case absent(app, r.Frame):
 				section = Absent
-			case !reachable(r.Frame):
+			case onRow(r.Frame) && !reachable(r.Frame):
 				section = Overflow
 			}
 			id := app.BundleID
@@ -158,6 +178,29 @@ func classify(apps []appRef, raw []rawItem, bar barAnchors, positions map[string
 		}
 	}
 	return sortItems(items)
+}
+
+// systemBarItems are Apple's items with a switch, which MenuBarAgent draws itself and Accessibility
+// lists under its windows rather than an app's extras menu bar.
+func systemBarItems(drawn map[string]Rect, bar barAnchors, positions map[string]float64) []Item {
+	var items []Item
+	for _, sys := range SystemItems {
+		f, ok := drawn[sys.ID]
+		if !ok || sys.Flag != nil || sys.LoginItem != nil {
+			// The others are apps' items and come from classify.
+			continue
+		}
+		reachable := bar.overflow == nil || f.MidX() > bar.overflow.MaxX()
+		item := Item{ID: sys.ID + "#0", Name: sys.Name, BundleID: sys.ID, Frame: f, Section: Shown, Reachable: reachable, Icon: sys.Icon}
+		if !reachable {
+			item.Section = Overflow
+		}
+		if v, ok := positions[sys.PositionKey()]; ok {
+			item.LayoutKey, item.Position, item.HasPosition = sys.PositionKey(), v, true
+		}
+		items = append(items, item)
+	}
+	return items
 }
 
 var sectionRank = map[Section]int{Overflow: 0, Shown: 1, Absent: 2}

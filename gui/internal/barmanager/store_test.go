@@ -28,6 +28,8 @@ func (f *fakeItems) barAnchors([]appRef) barAnchors { return wideBar }
 func (f *fakeItems) requestLayoutAccess() bool      { return false }
 func (f *fakeItems) appIcon(string) []byte          { return nil }
 func (f *fakeItems) ownPID() int32                  { return 1 }
+func (f *fakeItems) drawn() map[string]Rect         { return nil }
+func (f *fakeItems) allowList() []any               { return nil }
 func (f *fakeItems) readItems([]int32) []rawItem {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -90,7 +92,7 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 
 func visibleStore(t *testing.T, p *fakeItems) *ItemStore {
 	t.Helper()
-	s := newItemStore(p, true, "PowerfulTop.status")
+	s := newItemStore(p, true, []string{"PowerfulTop.status"})
 	s.SetVisible(true)
 	t.Cleanup(func() { s.SetVisible(false) })
 	waitFor(t, "items", func() bool { return len(s.Snapshot().Items) > 0 })
@@ -108,7 +110,7 @@ func filePositions() map[string]float64 {
 }
 
 func TestStoreListsOnlyWhileVisibleAndTrusted(t *testing.T) {
-	s := newItemStore(&fakeItems{raw: wideRaw()}, true, "")
+	s := newItemStore(&fakeItems{raw: wideRaw()}, true, nil)
 	s.SetVisible(true)
 	time.Sleep(50 * time.Millisecond)
 	if snap := s.Snapshot(); snap.Trusted || len(snap.Items) != 0 {
@@ -116,7 +118,7 @@ func TestStoreListsOnlyWhileVisibleAndTrusted(t *testing.T) {
 	}
 	s.SetVisible(false)
 
-	trusted := newItemStore(&fakeItems{raw: wideRaw(), isTrusted: true}, true, "")
+	trusted := newItemStore(&fakeItems{raw: wideRaw(), isTrusted: true}, true, nil)
 	trusted.SetVisible(true)
 	waitFor(t, "items", func() bool { return len(trusted.Snapshot().Items) == 5 })
 	trusted.SetVisible(false)
@@ -179,7 +181,7 @@ func TestStoreReportsMovesThatDidNotLand(t *testing.T) {
 }
 
 func TestStoreUnsupportedNeverScans(t *testing.T) {
-	s := newItemStore(&fakeItems{raw: wideRaw(), isTrusted: true}, false, "")
+	s := newItemStore(&fakeItems{raw: wideRaw(), isTrusted: true}, false, nil)
 	s.SetVisible(true)
 	time.Sleep(50 * time.Millisecond)
 	if len(s.Snapshot().Items) != 0 {

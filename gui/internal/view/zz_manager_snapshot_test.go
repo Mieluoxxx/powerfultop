@@ -34,11 +34,20 @@ func TestManagerSnapshot(t *testing.T) {
 			s.SetPreviewIcon(it.AppPath, data)
 		}
 	}
+	tray := barmanager.NewTrayPreview(barmanager.TraySnapshot{Supported: true, Enabled: true, HasAllowListAccess: true,
+		Entries: []barmanager.TrayEntry{
+			{ID: "com.tencent.qq", Name: "QQ", AppPath: "/Applications/QQ.app", Running: true},
+			{ID: "com.apple.menuextra.wifi", Name: "Wi-Fi", NameZh: "Wi-Fi", Icon: "wifi", Running: true},
+			{ID: "com.apple.menuextra.sound", Name: "Sound", NameZh: "声音", Icon: "volume-2", Running: true},
+		}})
+	if data, err := os.ReadFile(filepath.Join(os.Getenv("MANAGER_ICONS"), "QQ.png")); err == nil {
+		tray.SetPreviewIcon("/Applications/QQ.app", data)
+	}
 	state := &ManagerPageState{}
 	for _, dark := range []bool{false, true} {
 		tt := ui.NewTester(func(c *ui.Context) {
 			ui.Column(c).Fill().Padding(24).Background(c.Theme().Background).Children(func() {
-				MenuBarManagerPage(c, s, state, 760)
+				MenuBarManagerPage(c, s, tray, state, 760)
 			})
 		}, 820, 1250)
 		tt.SetDark(dark)

@@ -115,7 +115,7 @@ func (a *app) detailsView(c *ui.Context) {
 			view.MenuBarPage(c, a.menuSettings, menuBarContext(p, a.power.Available(), th, sys), &a.menuBarState, width)
 		}},
 		{ID: view.PageMenuBarManager, Title: view.L("Menu Bar Manager", "菜单栏管理"), Icon: "app-window", Body: func(c *ui.Context, width float32) {
-			view.MenuBarManagerPage(c, a.store, &a.managerState, width)
+			view.MenuBarManagerPage(c, a.store, a.trayStore, &a.managerState, width)
 		}},
 		{ID: view.PageSettings, Title: view.L("Settings", "设置"), Icon: "settings", Body: func(c *ui.Context, _ float32) {
 			view.SettingsPage(c, a.settingsData(p), a.settingsActions())

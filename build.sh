@@ -20,6 +20,10 @@ rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 # Keep the bundle where the release workflow and the README expect it.
 ditto "$APP_DIR/build/darwin-arm64/$APP_NAME.app" "$APP_BUNDLE"
+# An ad-hoc signature's designated requirement is the binary's hash, so every build would lose the
+# Accessibility grant; naming the bundle identifier keeps it across builds.
+BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_BUNDLE/Contents/Info.plist")"
+codesign --force --sign - -r="designated => identifier \"$BUNDLE_ID\"" "$APP_BUNDLE"
 
 ZIP_PATH="$BUILD_DIR/$APP_NAME.zip"
 ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$ZIP_PATH"
