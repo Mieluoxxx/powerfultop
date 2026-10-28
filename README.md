@@ -84,17 +84,25 @@ open build/PowerfulTop.app
 
 | **AC Powered** | **Battery Discharging** |
 |----------------|--------------------------|
-| <a href="screenshot/popover-ac-powered.png" target="_blank"><img src="screenshot/popover-ac-powered.png" width="260" alt="AC Powered"></a> | <a href="screenshot/popover-battery-discharging.png" target="_blank"><img src="screenshot/popover-battery-discharging.png" width="260" alt="Battery Discharging"></a> |
+| <a href="screenshot/popover-ac-powered.png" target="_blank"><img src="screenshot/popover-ac-powered.png" width="280" alt="AC Powered"></a> | <a href="screenshot/popover-battery-discharging.png" target="_blank"><img src="screenshot/popover-battery-discharging.png" width="280" alt="Battery Discharging"></a> |
 
 | **AC Charging** | **AC + Battery Supplement** |
 |-----------------|------------------------------|
-| <a href="screenshot/popover-ac-charging.png" target="_blank"><img src="screenshot/popover-ac-charging.png" width="260" alt="AC Charging"></a> | <a href="screenshot/popover-ac-supplement.png" target="_blank"><img src="screenshot/popover-ac-supplement.png" width="260" alt="AC + Battery Supplement"></a> |
+| <a href="screenshot/popover-ac-charging.png" target="_blank"><img src="screenshot/popover-ac-charging.png" width="280" alt="AC Charging"></a> | <a href="screenshot/popover-ac-supplement.png" target="_blank"><img src="screenshot/popover-ac-supplement.png" width="280" alt="AC + Battery Supplement"></a> |
 
-### Detail Window
+### Details Window
 
-| **Power & Battery Health** | **Cell Data** |
-|----------------------------|---------------|
-| <a href="screenshot/detail-window-health.png" target="_blank"><img src="screenshot/detail-window-health.png" width="400" alt="Power and battery health"></a> | <a href="screenshot/detail-window-cells.png" target="_blank"><img src="screenshot/detail-window-cells.png" width="400" alt="Cell topology and balance"></a> |
+| **Overview** | **Menu Bar Manager** |
+|--------------|----------------------|
+| <a href="screenshot/detail-overview.png" target="_blank"><img src="screenshot/detail-overview.png" width="480" alt="Overview"></a> | <a href="screenshot/detail-menuBarManager.png" target="_blank"><img src="screenshot/detail-menuBarManager.png" width="480" alt="Menu Bar Manager"></a> |
+
+| **Battery** | **Cooling** |
+|-------------|-------------|
+| <a href="screenshot/detail-battery.png" target="_blank"><img src="screenshot/detail-battery.png" width="480" alt="Battery"></a> | <a href="screenshot/detail-cooling.png" target="_blank"><img src="screenshot/detail-cooling.png" width="480" alt="Cooling"></a> |
+
+| **System** | **Menu Bar** |
+|------------|--------------|
+| <a href="screenshot/detail-system.png" target="_blank"><img src="screenshot/detail-system.png" width="480" alt="System"></a> | <a href="screenshot/detail-menuBar.png" target="_blank"><img src="screenshot/detail-menuBar.png" width="480" alt="Menu Bar"></a> |
 
 ## What's New
 

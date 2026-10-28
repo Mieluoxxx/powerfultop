@@ -84,17 +84,25 @@ open build/PowerfulTop.app
 
 | **AC 供电** | **电池放电** |
 |-------------|---------------|
-| <a href="screenshot/popover-ac-powered.png" target="_blank"><img src="screenshot/popover-ac-powered.png" width="260" alt="AC 供电"></a> | <a href="screenshot/popover-battery-discharging.png" target="_blank"><img src="screenshot/popover-battery-discharging.png" width="260" alt="电池放电"></a> |
+| <a href="screenshot/zh/popover-ac-powered.png" target="_blank"><img src="screenshot/zh/popover-ac-powered.png" width="280" alt="AC 供电"></a> | <a href="screenshot/zh/popover-battery-discharging.png" target="_blank"><img src="screenshot/zh/popover-battery-discharging.png" width="280" alt="电池放电"></a> |
 
 | **AC 充电中** | **AC + 电池补充供电** |
 |---------------|------------------------|
-| <a href="screenshot/popover-ac-charging.png" target="_blank"><img src="screenshot/popover-ac-charging.png" width="260" alt="AC 充电中"></a> | <a href="screenshot/popover-ac-supplement.png" target="_blank"><img src="screenshot/popover-ac-supplement.png" width="260" alt="AC + 电池补充供电"></a> |
+| <a href="screenshot/zh/popover-ac-charging.png" target="_blank"><img src="screenshot/zh/popover-ac-charging.png" width="280" alt="AC 充电中"></a> | <a href="screenshot/zh/popover-ac-supplement.png" target="_blank"><img src="screenshot/zh/popover-ac-supplement.png" width="280" alt="AC + 电池补充供电"></a> |
 
 ### 详细参数窗口
 
-| **功率与电池健康** | **电芯数据** |
-|---------------------|---------------|
-| <a href="screenshot/detail-window-health.png" target="_blank"><img src="screenshot/detail-window-health.png" width="400" alt="功率与电池健康"></a> | <a href="screenshot/detail-window-cells.png" target="_blank"><img src="screenshot/detail-window-cells.png" width="400" alt="电芯拓扑与均衡"></a> |
+| **概览** | **菜单栏管理** |
+|----------|----------------|
+| <a href="screenshot/zh/detail-overview.png" target="_blank"><img src="screenshot/zh/detail-overview.png" width="480" alt="概览"></a> | <a href="screenshot/zh/detail-menuBarManager.png" target="_blank"><img src="screenshot/zh/detail-menuBarManager.png" width="480" alt="菜单栏管理"></a> |
+
+| **电池** | **散热** |
+|----------|----------|
+| <a href="screenshot/zh/detail-battery.png" target="_blank"><img src="screenshot/zh/detail-battery.png" width="480" alt="电池"></a> | <a href="screenshot/zh/detail-cooling.png" target="_blank"><img src="screenshot/zh/detail-cooling.png" width="480" alt="散热"></a> |
+
+| **系统** | **菜单栏** |
+|----------|------------|
+| <a href="screenshot/zh/detail-system.png" target="_blank"><img src="screenshot/zh/detail-system.png" width="480" alt="系统"></a> | <a href="screenshot/zh/detail-menuBar.png" target="_blank"><img src="screenshot/zh/detail-menuBar.png" width="480" alt="菜单栏"></a> |
 
 ## 更新内容
 

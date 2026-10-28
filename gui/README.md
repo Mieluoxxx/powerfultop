@@ -34,3 +34,8 @@ go test ./...        # views and parsers, without a window
   activated when its popover opens, so AppKit's transient dismissal never fires.
 - MenuBarAgent doesn't always notice writes to its layout file; the layout editor checks the bar
   after each move and restarts the agent when the write didn't take.
+- The README's screenshots are rendered from these views, with one Mac's readings, so they can be
+  regenerated without a window or a charger to plug in:
+  `README_SCREENSHOTS=$PWD/../screenshot go test ./internal/view -run TestReadmeScreenshots`.
+  `README_LOCALE=zh-Hans` renders them in Chinese, and the Menu Bar Manager shot takes app logos
+  as `<app>.png` from `README_ICONS=<dir>`.
