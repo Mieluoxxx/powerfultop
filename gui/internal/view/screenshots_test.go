@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -61,6 +62,9 @@ type demo struct {
 
 	now time.Time
 }
+
+// documentedPages are the pages the README shows; the others are covered by the text.
+var documentedPages = []PageID{PageOverview, PageCooling, PageBattery, PageMenuBarManager}
 
 // demoTime is when the screenshots were taken.
 func demoTime() time.Time { return time.Date(2026, 10, 28, 14, 30, 0, 0, time.Local) }
@@ -125,8 +129,11 @@ func renderDemo(locale, dir, iconDir string) error {
 	}
 	d.menuCtx = demoMenuBarContext(d.power, d.thermal, d.system)
 
-	// The details window on each page, with the title bar a window would draw.
+	// The details window on the pages the README shows, with the title bar a window would draw.
 	for _, page := range d.pages() {
+		if !slices.Contains(documentedPages, page.ID) {
+			continue
+		}
 		selected := page.ID
 		pages := d.pages()
 		for i := range pages {
