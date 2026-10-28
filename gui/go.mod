@@ -7,7 +7,7 @@ tool github.com/egoist/mygo/cmd/mygo
 require (
 	github.com/ELY-Open-Source/CrychicUI v0.0.0-20261027050735-bf15ddf6600a
 	github.com/ebitengine/purego v0.11.1
-	github.com/egoist/mygo v0.6.4
+	github.com/egoist/mygo v0.7.1
 )
 
 require (
