@@ -23,18 +23,30 @@ It gives you clear, real-time power information directly in the menu bar and a s
 
 ## Key Features
 
-- **Optional menu bar wattage** — Show live power like `23W` right in the menu bar when you want it.
+### In the menu bar
+
+- **Optional menu bar wattage** — Show live power like `23W` right in the menu bar, beside any of the readings below.
+- **Your own set of readings** — Percentage, time remaining, temperature, current, voltage, power, health, cycle count, CPU and memory use, CPU temperature or fan speed, in the order you like, with seven icon styles.
+- **A menu bar that fits (macOS 27)** — When the menu bar runs out of room, macOS 27 tucks the leftmost icons behind its «. Details › Menu Bar Manager shows every app's icon in its real order, marks what « holds, and reorders them by drag and drop so the ones you need stay in sight; with several displays, pick the one whose menu bar it shows. It needs Accessibility access, and moves icons without the pointer, even those behind «, once you allow the menu bar layout file.
+- **Tray (macOS 27)** — Like the overflow of Windows' taskbar: icons you put in the tray leave the menu bar, and PowerfulTop's chevron opens them in a grid; click one for its menu. It uses macOS's own switches under System Settings › Menu Bar, so Focus and the camera and microphone indicators stay, and works for apps and Apple's Control Center items (Wi-Fi, Sound, Display, …). Apps go in whole, since macOS switches an app's icons together. Quitting PowerfulTop puts every icon back. Off by default; turn it on under Details › Menu Bar Manager, and allow the Allow in the Menu Bar list there.
+
+### In the popover
+
 - **Power flow diagram** — See at a glance whether power is coming from the charger, the battery, or both at the same time.
 - **Instant power numbers** — System power, charger output, and battery charge or discharge rate.
 - **Charger load** — Know your adapter's wattage and how much of it is being used.
-- **Battery overview** — Quick view of battery level, health, temperature, and cycle count.
-- **Estimated battery time** — Time to empty or full in the popover and detail view; respects macOS charge limits (80/85/90/95%) and third-party apps like AlDente.
-- **Charge limit** — Set the macOS charge limit (80/85/90/95/100%) right on the Battery page, without visiting System Settings. It is the same setting, enforced by firmware, so it holds while PowerfulTop is closed or the Mac sleeps; no admin password needed.
-- **Detailed information** — Auto-detected cell topology (e.g. 3S2P), series-group voltage, parallel cell currents, charging status, and lifetime stats.
-- **Menu bar order (macOS 27)** — macOS 27 tucks the leftmost icons behind its « when the menu bar runs out of room; Details › Menu Bar Manager shows every app's icon in its real order, marks what « holds, and reorders them by drag and drop so the ones you need stay in sight; with several displays, pick the one whose menu bar it shows. It needs Accessibility access, and moves icons without the pointer, even those behind «, once you allow the menu bar layout file.
-- **Tray (macOS 27)** — Like the overflow of Windows' taskbar: icons you put in the tray leave the menu bar, and PowerfulTop's chevron opens them in a grid; click one for its menu. It uses macOS's own switches under System Settings › Menu Bar, so Focus and the camera and microphone indicators stay, and works for apps and Apple's Control Center items (Wi-Fi, Sound, Display, …). Apps go in whole, since macOS switches an app's icons together. Quitting PowerfulTop puts every icon back. Off by default; turn it on under Details › Menu Bar Manager, and allow the Allow in the Menu Bar list there.
+- **Screens and brightness** — A slider per display, with the built-in panel's own draw beside it; external monitors are driven over DDC/CI.
+- **Fans** — Their speed, who is driving them, and the Auto / Full Blast / Custom switch without opening the window.
+- **Battery overview** — Battery level, health, temperature and cycle count, plus the charge limit.
+- **Estimated battery time** — Time to empty or full; respects macOS charge limits (80/85/90/95%) and third-party apps like AlDente.
 
-Everything updates live and stays accurate even when you plug in or unplug your charger.
+### In the details window
+
+- **Overview** — The last 30 minutes of battery level, system power, CPU, memory, CPU temperature and fan speed as charts.
+- **Battery** — Health and capacity, the charge limit, the charger's negotiation, cell topology (e.g. 3S2P) with series-group voltage and parallel cell currents, and lifetime statistics.
+- **Cooling** — CPU, GPU and battery sensor groups, the fans' own speeds, and fan control: Auto hands the fans back to macOS, Full Blast pins them, and Custom holds a fixed RPM or ramps with CPU or GPU temperature. Controlling fans needs a small helper that runs as root, installed with one administrator prompt; it hands the fans back to macOS when PowerfulTop quits, the Mac sleeps, or the chip gets too hot.
+- **System** — CPU use per cluster, the composition of memory, load average, uptime, swap, and the busiest processes.
+- **Settings** — Launch at login, and the battery's own chip, manufacture date and serial number.
 
 ## Why People Use PowerfulTop
 
@@ -49,11 +61,10 @@ It's a small, native app that does one thing well — no bloat, no subscriptions
 
 ### Download (Recommended)
 
-Download the latest `PowerfulTop.zip` from the [Releases](https://github.com/Mieluoxxx/powerfultop/releases) page:
+Download the latest `PowerfulTop-v…-arm64.dmg` from the [Releases](https://github.com/Mieluoxxx/powerfultop/releases) page — each release also publishes a `PowerfulTop.zip` and a checksum file:
 
-1. Unzip the file
-2. Drag `PowerfulTop.app` into your `/Applications` folder
-3. First launch: right-click the app → **Open** (the app is not signed)
+1. Open the disk image and drag `PowerfulTop.app` into your `Applications` folder
+2. First launch: right-click the app → **Open** (the app is not signed)
 
 ### Build from Source
 
@@ -61,22 +72,25 @@ Requires Go 1.27.3 or later (`go` fetches the right toolchain on its own).
 
 ```bash
 git clone https://github.com/Mieluoxxx/powerfultop.git
-cd PowerfulTop
-bash build.sh
+cd powerfultop
+bash test.sh   # formatting, vet, locales and the unit tests
+bash build.sh  # build/PowerfulTop.app and build/PowerfulTop.zip
 open build/PowerfulTop.app
 ```
 
 ## Requirements
 
-- Apple Silicon MacBook (M-series)
-- macOS 14 (Sonoma) or later
+- Apple Silicon MacBook (M-series), with its built-in battery
+- macOS 14 (Sonoma) or later; the menu bar manager and the tray need macOS 27
+- Fan control writes the SMC, so it asks for an administrator password once to install its helper
 
 ## How to Use
 
 1. Open PowerfulTop — the icon appears in your menu bar.
-2. Click the icon to open the popover with the power flow diagram and current readings.
+2. Click the icon for the popover: power flow, current readings, brightness and fans.
 3. Choose what the menu bar shows under **Details › Menu Bar**.
-4. Click **Details** for a full breakdown of power and battery information.
+4. The details window keeps the depth: charts on **Overview**, the pack on **Battery**, temperatures and fans on **Cooling**, load and processes on **System**.
+5. To control fans, install the helper from **Cooling › Fan Helper** once; macOS asks for an administrator password.
 
 ## Screenshots
 
@@ -106,48 +120,15 @@ open build/PowerfulTop.app
 
 ## What's New
 
-### v1.3.7
+### v2.0.0
 
-- **AC power-gap classification** — When system load exceeds AC input, only treat the battery as discharging if amperage or BatteryPower shows discharge; do not invent supplement power from the load gap alone (reduces false “battery supplement” during telemetry lag; issue #8)
-
-### v1.3.6
-
-- **Manufacture date parsing** — Prefer length-prefixed fields in `ManufacturerData` and reject far-future week codes (avoids bogus dates such as 2035-W14 on some machines; issue #7)
-
-### v1.3.5
-
-- **Popover type consistency** — Battery level and health rows use the same 12pt system font as other metric rows (no shrink-to-fit, no rounded digits)
-
-### v1.3.4
-
-- **Aligned metric bars** — Popover battery level/health rows use a fixed label column and icons so progress bars line up in both Chinese and English
-- **Detail window layout** — Shared fixed label/bar columns for overview metrics and key–value rows; window width set to 480pt
-- **Cell Data icon** — Uses a broadly available SF Symbol so the section icon is not missing on some macOS versions (thanks @YangFong)
-
-### v1.3.3
-
-- **Charge-limit-aware estimates** — Time-to-full now targets your effective charge limit (macOS Settings, AlDente, or Optimized Charging hold) instead of always assuming 100%
-- **Smarter limit detection** — Ignores stale AlDente configs when `useTahoeNativeLimit` is enabled; only uses Optimized Charging `DailyMaxSoc` when the pause flag is active
-
-### v1.3.2
-
-- **Battery health fix** — Reads design capacity, full charge, and health % from `BatteryData` on Apple Silicon; reorganized detail view with aligned overview bars and clearer capacity labels
-- **Compact detail window** — Fixed width for a tighter layout
-
-### v1.3.1
-
-- **Adaptive cell topology** — Detects each MacBook's actual S×P layout from IOKit (e.g. 2S2P on Air, 3S2P on Pro); no hardcoded topology
-
-### v1.3.0
-
-- **Estimated battery time** — Computes time to empty or full from remaining energy and smoothed power when macOS stops reporting `AvgTimeToEmpty` / `AvgTimeToFull`; shown in popover and detail view
-- **Cell data fix (Apple Silicon)** — Reads per-series-group voltage/Qmax and per-parallel-cell current from IOKit bank/cell nodes; topology is detected per machine
-- **Clearer cell balance** — Separate series voltage balance and parallel current balance
-- **Detail window polish** — Fixed duplicate rows, moved manufacture date to device info, improved labels
-
-### v1.2.0
-
-- Redesigned detail window, flat layout, instant menu bar updates after wake, 0 W idle fix, cell balance summary
+- **Rewritten in Go** — The app is a Go program now, drawn by [MyGo](https://github.com/egoist/mygo)'s native UI from [CrychicUI](https://github.com/ELY-Open-Source/CrychicUI) components; its settings keep the keys the Swift app used, so an update keeps your menu bar setup.
+- **Cooling** — Sensor groups, fan speeds, and fan control: Auto, Full Blast, or Custom with a fixed RPM or a temperature ramp, with a root helper that hands the fans back to macOS when PowerfulTop quits, the Mac sleeps, or the chip gets too hot.
+- **System** — CPU use per cluster, memory composition, load average, uptime, swap and the busiest processes.
+- **Menu bar manager and tray (macOS 27)** — Every icon in its real order, reorderable by drag and drop, and a taskbar-style overflow that keeps icons reachable while macOS switches them off.
+- **Charge limit** — Set the macOS limit (80/85/90/95/100%) on the Battery page or right in the popover.
+- **Brightness** — Sliders for the built-in panel and for DDC/CI monitors, next to the built-in panel's own power draw.
+- **Charts** — The last 30 minutes of every reading, drawn as the library's area charts on Overview and Cooling.
 
 [Older releases →](https://github.com/Mieluoxxx/powerfultop/releases)
 
