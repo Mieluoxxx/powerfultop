@@ -5,10 +5,11 @@ import (
 	"math"
 	"time"
 
+	"github.com/ELY-Open-Source/CrychicUI/layout"
 	"github.com/egoist/mygo/ui"
 
+	lucide "github.com/ELY-Open-Source/CrychicUI/icon"
 	"powerfultop/internal/history"
-	"powerfultop/internal/icons"
 	"powerfultop/internal/system"
 )
 
@@ -17,19 +18,21 @@ import (
 // while sampling is on: the caller turns system.Monitor.SetProcessSamplingActive on while this
 // page is on screen.
 func SystemPage(c *ui.Context, s system.Snapshot, cpuTempC func() (float64, bool), hist *history.History, width float32) {
-	columns := 1
-	if width >= 760 {
-		columns = 2
-	}
 	ui.Column(c).Gap(16).Children(func() {
-		ui.Grid(c).Columns(columns).Gap(16).Children(func() {
-			sysCPUPanel(c, s, cpuTempC, hist)
-			sysMemoryPanel(c, s, hist)
+		layout.Columns(c, []func(){
+			func() { sysCPUPanel(c, s, cpuTempC, hist) },
+			func() { sysMemoryPanel(c, s, hist) },
 		})
-		ui.Grid(c).Columns(3).Gap(16).Children(func() { sysStatTiles(c, s) })
-		ui.Grid(c).Columns(columns).Gap(16).AlignItems(ui.Start).Children(func() {
-			sysProcessPanel(c, L("Top CPU", "CPU 占用最高"), "cpu", Blue, s.TopCPU, func(v float64) string { return fmt.Sprintf("%.1f%%", v) })
-			sysProcessPanel(c, L("Top Memory", "内存占用最高"), "memory-stick", Green, s.TopMemory, system.FormatBytes)
+		if tiles := sysStatTiles(c, s); len(tiles) > 0 {
+			layout.Columns(c, tiles)
+		}
+		layout.Columns(c, []func(){
+			func() {
+				sysProcessPanel(c, L("Top CPU", "CPU 占用最高"), "cpu", Blue, s.TopCPU, func(v float64) string { return fmt.Sprintf("%.1f%%", v) })
+			},
+			func() {
+				sysProcessPanel(c, L("Top Memory", "内存占用最高"), "memory-stick", Green, s.TopMemory, system.FormatBytes)
+			},
 		})
 	})
 }
@@ -91,7 +94,8 @@ func sysMemoryPanel(c *ui.Context, s system.Snapshot, hist *history.History) {
 }
 
 // sysStatTiles are the secondary figures that don't need a chart of their own.
-func sysStatTiles(c *ui.Context, s system.Snapshot) {
+func sysStatTiles(c *ui.Context, s system.Snapshot) []func() {
+	var tiles []func()
 	cores := max(len(s.CPU.PerCore), 1)
 	if len(s.LoadAverage) == 3 {
 		tint := Green
@@ -100,23 +104,30 @@ func sysStatTiles(c *ui.Context, s system.Snapshot) {
 		} else if perCore >= 0.7 {
 			tint = Orange
 		}
-		sysTile(c, "activity", tint, L("Load Average", "平均负载"), fmt.Sprintf("%.2f", s.LoadAverage[0]),
-			Lf("5 min %.2f · 15 min %.2f", "5 分钟 %.2f · 15 分钟 %.2f", s.LoadAverage[1], s.LoadAverage[2]),
-			Lf("Runnable threads averaged over 1, 5 and 15 minutes; %d cores keep up with a load of %d.",
-				"1、5、15 分钟内可运行线程的平均数；%d 个核心可承载 %d 的负载。", cores, cores))
+		tiles = append(tiles, func() {
+			sysTile(c, "activity", tint, L("Load Average", "平均负载"), fmt.Sprintf("%.2f", s.LoadAverage[0]),
+				Lf("5 min %.2f · 15 min %.2f", "5 分钟 %.2f · 15 分钟 %.2f", s.LoadAverage[1], s.LoadAverage[2]),
+				Lf("Runnable threads averaged over 1, 5 and 15 minutes; %d cores keep up with a load of %d.",
+					"1、5、15 分钟内可运行线程的平均数；%d 个核心可承载 %d 的负载。", cores, cores))
+		})
 	}
 	if !s.BootTime.IsZero() {
-		sysTile(c, "clock", Blue, L("Uptime", "已运行"), sysUptimeText(time.Since(s.BootTime)),
-			Lf("Since %s", "启动于 %s", s.BootTime.Format("01-02 15:04")), "")
+		tiles = append(tiles, func() {
+			sysTile(c, "clock", Blue, L("Uptime", "已运行"), sysUptimeText(time.Since(s.BootTime)),
+				Lf("Since %s", "启动于 %s", s.BootTime.Format("01-02 15:04")), "")
+		})
 	}
 	if m := s.Memory; m != nil {
 		tint := Gray
 		if m.SwapUsedBytes > 0 {
 			tint = Orange
 		}
-		sysTile(c, "hard-drive", tint, L("Swap Used", "交换区"), system.FormatBytes(float64(m.SwapUsedBytes)),
-			L("Memory paged out to disk", "换出到磁盘的内存"), "")
+		tiles = append(tiles, func() {
+			sysTile(c, "hard-drive", tint, L("Swap Used", "交换区"), system.FormatBytes(float64(m.SwapUsedBytes)),
+				L("Memory paged out to disk", "换出到磁盘的内存"), "")
+		})
 	}
+	return tiles
 }
 
 func sysTile(c *ui.Context, icon string, tint Tint, label, value, detail, tooltip string) {
@@ -127,7 +138,7 @@ func sysTile(c *ui.Context, icon string, tint Tint, label, value, detail, toolti
 	}
 	tile.Children(func() {
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-			ui.Icon(c, icons.Get(icon)).Size(12, 12).TextColor(tint.Color(c))
+			ui.Icon(c, lucide.Must(icon)).Size(12, 12).TextColor(tint.Color(c))
 			ui.Text(c, label).FontSize(11).TextColor(t.TextMuted).NoWrap()
 		})
 		ui.Text(c, value).FontSize(20).Bold().FontFeatures("tnum").NoWrap()
@@ -179,7 +190,7 @@ func sysSeries(hist *history.History, m history.Metric) []Point {
 
 func sysChart(c *ui.Context, points []Point, tint Tint) {
 	if len(points) >= 2 {
-		AreaChart(c, points, tint, &[2]float64{0, 100}, 96)
+		AreaChart(c, L("CPU and memory history", "CPU 与内存历史"), points, tint, 96)
 		return
 	}
 	ui.Column(c).Height(96).Center().Radius(10).Background(c.Theme().Text.Alpha(0.03)).Children(func() {

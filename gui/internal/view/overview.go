@@ -43,7 +43,6 @@ func OverviewPage(c *ui.Context, d OverviewData, width float32) {
 			}
 			return h.Series(m)
 		}
-		percentDomain := &[2]float64{0, 100}
 		var panels []func()
 		panels = append(panels, func() {
 			detail := ""
@@ -51,34 +50,34 @@ func OverviewPage(c *ui.Context, d OverviewData, width float32) {
 				detail = p.EstimatedTimeRemainingLabel() + " " + t
 			}
 			ChartPanel(c, L("Battery Level", "电量"), fmt.Sprintf("%d%%", p.DisplayBatteryPercent()), detail,
-				BatteryLevelIcon(p.DisplayBatteryPercent()), Green, series(history.BatteryPercent), percentDomain, collecting)
+				BatteryLevelIcon(p.DisplayBatteryPercent()), Green, series(history.BatteryPercent), collecting)
 		}, func() {
 			detail := ""
 			if avg := p.AverageSystemPowerW; avg != nil {
 				detail = Lf("Average System Power: %s", "平均系统功耗：%s", fmt.Sprintf("%.1f W", *avg))
 			}
 			ChartPanel(c, L("System Power", "系统功耗"), fmt.Sprintf("%.1f W", p.SystemPowerW), detail,
-				"zap", Purple, series(history.SystemPower), nil, collecting)
+				"zap", Purple, series(history.SystemPower), collecting)
 		}, func() {
 			detail := ""
 			if len(d.System.LoadAverage) > 0 {
 				detail = Lf("Load %.2f", "负载 %.2f", d.System.LoadAverage[0])
 			}
 			ChartPanel(c, L("CPU Usage", "CPU 占用"), fmt.Sprintf("%.0f%%", d.System.CPU.Usage()*100), detail,
-				"cpu", Blue, series(history.CPUUsage), percentDomain, collecting)
+				"cpu", Blue, series(history.CPUUsage), collecting)
 		})
 		if m := d.System.Memory; m != nil {
 			panels = append(panels, func() {
 				ChartPanel(c, L("Memory", "内存"), fmt.Sprintf("%.0f%%", m.UsedFraction()*100),
 					system.FormatBytes(float64(m.UsedBytes()))+" / "+system.FormatBytes(float64(m.TotalBytes)),
-					"memory-stick", Green, series(history.MemoryUsage), percentDomain, collecting)
+					"memory-stick", Green, series(history.MemoryUsage), collecting)
 			})
 		}
 		if cpu, ok := d.Thermal.Temperatures[thermal.GroupCPU]; ok {
 			panels = append(panels, func() {
 				ChartPanel(c, L("CPU Average", "CPU 平均温度"), fmt.Sprintf("%.1f°C", cpu.AverageC),
 					Lf("Hottest core %s", "最热核心 %s", fmt.Sprintf("%.0f°C", cpu.MaximumC)),
-					"cpu", Orange, series(history.CPUTemperature), nil, collecting)
+					"cpu", Orange, series(history.CPUTemperature), collecting)
 			})
 		}
 		if d.Thermal.HasFans() {
@@ -92,12 +91,12 @@ func OverviewPage(c *ui.Context, d OverviewData, width float32) {
 					maxRPM = max(maxRPM, f.MaxRPM)
 				}
 				ChartPanel(c, L("Fan Speed", "风扇转速"), fmt.Sprintf("%.0f RPM", d.Thermal.MaxActualRPM()), detail,
-					"fan", Teal, series(history.FanRPM), &[2]float64{0, maxRPM}, collecting)
+					"fan", Teal, series(history.FanRPM), collecting)
 			})
 		} else if temp, ok := BatteryTemperatureC(p, d.Thermal); ok {
 			panels = append(panels, func() {
 				ChartPanel(c, L("Battery Temp", "电池温度"), fmt.Sprintf("%.1f°C", temp), "",
-					"thermometer", Blue, series(history.BatteryTemp), nil, collecting)
+					"thermometer", Blue, series(history.BatteryTemp), collecting)
 			})
 		}
 		for i := 0; i < len(panels); i += 2 {

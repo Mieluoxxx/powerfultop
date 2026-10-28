@@ -3,10 +3,11 @@ package view
 import (
 	"fmt"
 
+	"github.com/ELY-Open-Source/CrychicUI/choice"
 	"github.com/egoist/mygo/ui"
 
+	lucide "github.com/ELY-Open-Source/CrychicUI/icon"
 	"powerfultop/internal/display"
-	"powerfultop/internal/icons"
 )
 
 // BrightnessSection is one BrightnessRow per display, as the popover shows them. builtInPowerW is the
@@ -38,7 +39,7 @@ func BrightnessRow(c *ui.Context, d display.Brightness, powerW *float64, onChang
 	}
 	ui.Column(c).Gap(4).Children(func() {
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-			ui.Icon(c, icons.Get(icon)).Size(13, 13).TextColor(Yellow.Color(c)).Shrink(0)
+			ui.Icon(c, lucide.Must(icon)).Size(13, 13).TextColor(Yellow.Color(c)).Shrink(0)
 			ui.Text(c, name).FontSize(12).SingleLine().Shrink(1)
 			badge := ui.Row(c).PaddingX(5).PaddingY(1).Radius(8).Background(t.Text.Alpha(0.08)).Tooltip(brightnessMethodHelp(d.Method))
 			badge.Children(func() {
@@ -57,12 +58,12 @@ func BrightnessRow(c *ui.Context, d display.Brightness, powerW *float64, onChang
 			ui.Text(c, fmt.Sprintf("%.0f%%", d.Level*100)).FontSize(12).Bold().FontFeatures("tnum").NoWrap()
 		})
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-			ui.Icon(c, icons.Get("sun-dim")).Size(11, 11).TextColor(t.TextMuted).Shrink(0)
-			level := d.Level
-			if ui.Slider(c, &level, 0, 1).Grow(1).Label(name).Changed() {
-				onChange(level)
+			ui.Icon(c, lucide.Must("sun-dim")).Size(11, 11).TextColor(t.TextMuted).Shrink(0)
+			percent := d.Level * 100
+			if choice.ValueSlider(c, name, &percent, 0, 100, choice.ValueSliderOptions{Step: 1, Format: "%.0f%%"}).Grow(1).Changed() {
+				onChange(percent / 100)
 			}
-			ui.Icon(c, icons.Get("sun")).Size(12, 12).TextColor(t.TextMuted).Shrink(0)
+			ui.Icon(c, lucide.Must("sun")).Size(12, 12).TextColor(t.TextMuted).Shrink(0)
 		})
 	})
 }

@@ -11,7 +11,8 @@ go test ./...        # views and parsers, without a window
 ## Layout
 
 - `main.go`, `tray.go`, `details.go`, `context.go`: the app — monitors, the menu bar item and its
-  popover, the details window, and what connects them.
+  popover, the details window, and what connects them. The views are put together from
+  [CrychicUI](https://github.com/ELY-Open-Source/CrychicUI) components on MyGo's native UI.
 - `internal/macos`: macOS APIs MyGo doesn't wrap, through purego (no cgo): the IOKit registry,
   CF ↔ Go conversion over XML property lists, cfprefsd preferences, and a global click monitor.
 - `internal/power`, `internal/thermal`, `internal/system`, `internal/display`: the monitors, each
@@ -20,7 +21,6 @@ go test ./...        # views and parsers, without a window
   attributed titles.
 - `internal/barmanager`: the macOS 27 menu bar manager and its layout editor.
 - `internal/view`: the dashboard components and every page; text goes through `view.L(en, zh)`.
-- `internal/icons`: Lucide icons standing in for SF Symbols.
 - `cmd/fanhelper`: the root fan helper, built by `scripts/build-helper.sh` into `resources/`.
 
 ## Notes

@@ -1,15 +1,20 @@
-// Package view holds the dashboard's building blocks, ported from the Swift app's
-// DashboardComponents, and the pages built from them.
+// Package view holds the dashboard's building blocks, built from CrychicUI's components, and the
+// pages put together from them.
 package view
 
 import (
 	"math"
+	"time"
 
+	"github.com/ELY-Open-Source/CrychicUI/chart"
+	"github.com/ELY-Open-Source/CrychicUI/display"
+	"github.com/ELY-Open-Source/CrychicUI/feedback"
+	lucide "github.com/ELY-Open-Source/CrychicUI/icon"
+	"github.com/ELY-Open-Source/CrychicUI/kit"
+	"github.com/ELY-Open-Source/CrychicUI/layout"
 	"github.com/egoist/mygo/ui"
-	"github.com/egoist/mygo/ui/chart"
 
 	"powerfultop/internal/history"
-	"powerfultop/internal/icons"
 )
 
 // Tint is one of macOS's system colors, which differ between light and dark appearances.
@@ -54,7 +59,20 @@ func (t Tint) Color(c *ui.Context) ui.Color {
 	return ui.Hex(pair[0])
 }
 
-// CardSurface is the raised card face: white on the light window background, a faint lift in dark mode.
+// tone maps a tint onto the library's semantic message tones, which color a message's icon.
+func (t Tint) tone() feedback.Tone {
+	switch t {
+	case Red:
+		return feedback.ToneDanger
+	case Orange, Yellow:
+		return feedback.ToneWarning
+	case Green, Mint:
+		return feedback.ToneSuccess
+	}
+	return feedback.ToneInfo
+}
+
+// CardSurface is the raised face the segmented controls lift their chosen segment onto.
 func CardSurface(c *ui.Context) ui.Color {
 	if c.Theme().Dark {
 		return ui.RGBA(255, 255, 255, 0.055)
@@ -62,30 +80,21 @@ func CardSurface(c *ui.Context) ui.Color {
 	return ui.RGBA(255, 255, 255, 0.85)
 }
 
-// CardBorder outlines cards.
-func CardBorder(c *ui.Context) ui.Color {
-	if c.Theme().Dark {
-		return ui.RGBA(255, 255, 255, 0.07)
-	}
-	return ui.RGBA(0, 0, 0, 0.07)
-}
+// CardBorder outlines panels and separates rows.
+func CardBorder(c *ui.Context) ui.Color { return c.Theme().Border }
 
-// Surface gives an element the card face and outline.
+// Surface gives an element the card face and outline, at the caller's radius.
 func Surface(c *ui.Context, e ui.Element, radius float32) ui.Element {
-	return e.Background(CardSurface(c)).Border(1, CardBorder(c)).Radius(radius)
+	return e.Background(c.Theme().Background).Border(1, c.Theme().Border).Radius(radius).
+		Shadow(0, 1, 3, 0, kit.Shade(0.06))
 }
 
 // Card is a titled card: a tinted icon badge, the title, then content.
 func Card(c *ui.Context, title, icon string, tint Tint, content func()) ui.Element {
-	col := tint.Color(c)
-	return Surface(c, ui.Column(c).Padding(18).Gap(10), 18).Children(func() {
-		ui.Row(c).Gap(8).AlignItems(ui.Center).PaddingY(1).Children(func() {
-			ui.Row(c).Width(24).Height(24).Center().Radius(7).Background(col.Alpha(0.16)).Children(func() {
-				ui.Icon(c, icons.Get(icon)).Size(13, 13).TextColor(col)
-			})
-			ui.Text(c, title).FontSize(13).Bold()
-		})
-		content()
+	t := c.Theme()
+	return layout.Card(c, func() {
+		PanelHeader(c, icon, title, tint, nil)
+		ui.Column(c).Gap(t.Space(2)).Children(content)
 	})
 }
 
@@ -93,17 +102,17 @@ func Card(c *ui.Context, title, icon string, tint Tint, content func()) ui.Eleme
 func Hero(c *ui.Context, value, rated, caption string, size float32) {
 	t := c.Theme()
 	if size == 0 {
-		size = 28
+		size = t.Rem(1.8)
 	}
-	ui.Column(c).Gap(2).Children(func() {
-		ui.Row(c).Gap(4).AlignItems(ui.End).Children(func() {
-			ui.Text(c, value).FontSize(size).Bold().FontFeatures("tnum").NoWrap()
+	ui.Column(c).Gap(t.Space(0.5)).Children(func() {
+		ui.Row(c).Gap(t.Space(1)).AlignItems(ui.End).Children(func() {
+			kit.Numeric(c, value).FontSize(size).Bold().NoWrap()
 			if rated != "" {
-				ui.Text(c, "/ "+rated).FontSize(size * 0.5).TextColor(t.TextMuted).FontFeatures("tnum").NoWrap()
+				kit.Muted(c, "/ "+rated).FontSize(size * 0.5).NoWrap()
 			}
 		})
 		if caption != "" {
-			ui.Text(c, caption).FontSize(11).TextColor(t.TextMuted)
+			kit.Muted(c, caption).FontSize(t.Rem(0.8))
 		}
 	})
 }
@@ -111,17 +120,17 @@ func Hero(c *ui.Context, value, rated, caption string, size float32) {
 // Row is "Label    value / rated", rated being the limit the value is measured against.
 func Row(c *ui.Context, label, value, rated string, emphasized bool) {
 	t := c.Theme()
-	ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-		ui.Text(c, label).FontSize(12).TextColor(t.TextMuted).NoWrap().Grow(1).Shrink(0)
-		ui.Row(c).Gap(3).Shrink(1).Children(func() {
-			v := ui.Text(c, value).FontSize(12).FontFeatures("tnum").SingleLine()
+	ui.Row(c).Gap(t.Space(2)).AlignItems(ui.Center).Children(func() {
+		kit.Muted(c, label).FontSize(t.Rem(0.8)).Grow(1).Shrink(1)
+		ui.Row(c).Gap(t.Space(0.75)).Shrink(1).Children(func() {
+			v := kit.Numeric(c, value).FontSize(t.Rem(0.85)).ContentTransition(ui.ContentTransition{Numeric: true})
 			if emphasized {
 				v.Bold()
 			} else {
 				v.FontWeight(500)
 			}
 			if rated != "" {
-				ui.Text(c, "/ "+rated).FontSize(12).TextColor(t.TextMuted).FontFeatures("tnum").NoWrap()
+				kit.Muted(c, "/ "+rated).FontSize(t.Rem(0.85)).NoWrap()
 			}
 		})
 	})
@@ -129,13 +138,14 @@ func Row(c *ui.Context, label, value, rated string, emphasized bool) {
 
 // BarRow is a Row with a level bar under it; a nil fraction keeps the bar's room but hides it.
 func BarRow(c *ui.Context, label, value string, fraction *float64, tint Tint) {
-	ui.Column(c).Gap(4).Children(func() {
+	t := c.Theme()
+	ui.Column(c).Gap(t.Space(1)).Children(func() {
 		Row(c, label, value, "", false)
 		f := 0.0
 		if fraction != nil {
 			f = *fraction
 		}
-		bar := LevelBar(c, f, tint, 5)
+		bar := LevelBar(c, f, tint, t.Space(1.5))
 		if fraction == nil {
 			bar.Opacity(0)
 		}
@@ -144,27 +154,33 @@ func BarRow(c *ui.Context, label, value string, fraction *float64, tint Tint) {
 
 // Note is a small, muted explanation under a card's content.
 func Note(c *ui.Context, text string) {
-	ui.Text(c, text).FontSize(10).TextColor(c.Theme().TextMuted.Alpha(0.75))
+	if text == "" {
+		return
+	}
+	feedback.Hint(c, text)
 }
 
 // Status is one short line with an icon; long explanations go into the tooltip.
 func Status(c *ui.Context, icon string, tint Tint, text, detail string) {
-	if detail == "" {
-		detail = text
+	if text == "" {
+		return
 	}
-	ui.Row(c).Gap(6).AlignItems(ui.Center).Tooltip(detail).Children(func() {
-		ui.Icon(c, icons.Get(icon)).Size(12, 12).TextColor(tint.Color(c)).Shrink(0)
-		ui.Text(c, text).FontSize(11).TextColor(c.Theme().TextMuted)
-	})
+	message := feedback.InlineMessage(c, tint.tone(), text)
+	if detail == "" || detail == text {
+		message.Tooltip(text)
+		return
+	}
+	message.Tooltip(detail)
 }
 
-// LevelBar is a capsule filled to fraction (0...1); the fill never shrinks below a circle.
+// LevelBar is a capsule filled to fraction (0...1); the fill never shrinks below a circle. The
+// library's bars are accent-only, and these encode severity, so the fill keeps its own color.
 func LevelBar(c *ui.Context, fraction float64, tint Tint, height float32) ui.Element {
 	if height == 0 {
-		height = 6
+		height = c.Theme().Space(1.5)
 	}
 	f := float32(math.Min(math.Max(fraction, 0), 1))
-	track := ui.RGBA(128, 128, 128, 0.18)
+	track := c.Theme().Text.Alpha(0.08)
 	fill := tint.Color(c)
 	return ui.Box(c).Height(height).Draw(func(p *ui.Painter, r ui.Rect) {
 		p.Fill(r, track, height/2)
@@ -183,104 +199,126 @@ func StripItem(c *ui.Context, icon string, tint Tint, label, value string, compa
 			help += "\n" + tooltip
 		}
 	}
-	e := ui.Row(c).Gap(6).AlignItems(ui.Center).PaddingX(10)
+	e := ui.Row(c).Gap(t.Space(1.5)).AlignItems(ui.Center).PaddingX(t.Space(2.5))
 	if help != "" {
 		e.Tooltip(help)
 	}
 	e.Children(func() {
-		ui.Icon(c, icons.Get(icon)).Size(12, 12).TextColor(tint.Color(c))
+		ui.Icon(c, lucide.Must(icon)).Size(12, 12).TextColor(tint.Color(c))
 		if !compact {
-			ui.Text(c, label).FontSize(12).TextColor(t.TextMuted).NoWrap()
+			kit.Muted(c, label).FontSize(t.Rem(0.85)).NoWrap()
 		}
-		ui.Text(c, value).FontSize(12).Bold().FontFeatures("tnum").NoWrap()
+		kit.Numeric(c, value).FontSize(t.Rem(0.85)).Bold().NoWrap()
 	})
 }
 
 // StripDivider separates strip items.
 func StripDivider(c *ui.Context) {
-	ui.Box(c).Width(1).Height(14).Background(CardBorder(c))
+	ui.Box(c).Width(1).Height(c.Theme().Space(3.5)).Background(CardBorder(c))
 }
 
 // Point is one sample of a chart.
 type Point = history.Point
 
-// ChartPanel is a live value over the recent past: title, value, icon and a gradient area chart.
-func ChartPanel(c *ui.Context, title, value, detail, icon string, tint Tint, points []Point, domain *[2]float64, collecting string) {
+// chartBuckets is how many samples a panel's chart shows: the library's charts label every sample,
+// so 30 minutes of five-second readings are averaged down to a dozen readable points.
+const chartBuckets = 6
+
+// ChartPanel is a live value over the recent past: title, value, icon and an area chart.
+func ChartPanel(c *ui.Context, title, value, detail, icon string, tint Tint, points []Point, collecting string) {
 	t := c.Theme()
-	Surface(c, ui.Column(c).Padding(16).Gap(10), 18).Children(func() {
+	card := kit.Card(c).FillWidth().Padding(t.Space(4)).Gap(t.Space(3))
+	resource := kit.Arrive(card, ui.Pose{Y: t.Space(1), Fade: 1}, 0)
+	resource.Children(func() {
 		ui.Row(c).AlignItems(ui.Start).Children(func() {
-			ui.Column(c).Gap(2).Grow(1).Children(func() {
-				ui.Text(c, title).FontSize(11).TextColor(t.TextMuted)
-				ui.Text(c, value).FontSize(22).Bold().FontFeatures("tnum").NoWrap()
+			ui.Column(c).Gap(t.Space(0.5)).Grow(1).Children(func() {
+				kit.Muted(c, title).FontSize(t.Rem(0.8))
+				kit.Numeric(c, value).FontSize(t.Rem(1.5)).Bold().NoWrap()
 			})
-			ui.Column(c).Gap(4).AlignItems(ui.End).Children(func() {
-				ui.Icon(c, icons.Get(icon)).Size(14, 14).TextColor(tint.Color(c))
+			ui.Column(c).Gap(t.Space(1)).AlignItems(ui.End).Children(func() {
+				ui.Icon(c, lucide.Must(icon)).Size(14, 14).TextColor(tint.Color(c))
 				if detail != "" {
-					ui.Text(c, detail).FontSize(10).TextColor(t.TextMuted).FontFeatures("tnum").NoWrap()
+					kit.Muted(c, detail).FontSize(t.Rem(0.7)).NoWrap()
 				}
 			})
 		})
-		if len(points) >= 2 {
-			AreaChart(c, points, tint, domain, 110)
-		} else {
-			ui.Row(c).Height(110).Center().Children(func() {
-				ui.Text(c, collecting).FontSize(11).TextColor(t.TextMuted)
+		if len(points) < 2 {
+			ui.Row(c).Height(t.Space(24)).Center().Children(func() {
+				kit.Muted(c, collecting).FontSize(t.Rem(0.8))
 			})
+			return
 		}
+		labels, values := chartSamples(points)
+		// A chart without a hover choice: each frame starts over, so a click leaves no marker behind.
+		at := -1
+		chart.Area(c, title, labels, []chart.Series{{Name: title, Values: values}}, &at,
+			chart.AreaOptions{Height: t.Space(24), Format: "%.1f"})
 	})
 }
 
-// AreaChart draws points as a gradient area under a smooth line, with a light grid on the right.
-func AreaChart(c *ui.Context, points []Point, tint Tint, domain *[2]float64, height float32) {
-	t := c.Theme()
-	lo, hi := autoDomain(points)
-	if domain != nil {
-		lo, hi = domain[0], domain[1]
+// chartLabels writes each sample's time; the library's charts need distinct labels, so samples
+// closer together than a minute keep their seconds.
+func chartLabels(times []time.Time) []string {
+	labels := make([]string, len(times))
+	layout := "15:04"
+	seen := map[string]bool{}
+	for _, t := range times {
+		label := t.Format(layout)
+		if seen[label] {
+			layout = "15:04:05"
+			break
+		}
+		seen[label] = true
 	}
-	y := chart.NewLinear(lo, hi)
-	x := chart.NewTime(points[0].Time, points[len(points)-1].Time)
-	xs := make([]float32, len(points))
-	ys := make([]float32, len(points))
-	for i, p := range points {
-		xs[i] = x.At(p.Time)
-		ys[i] = y.At(math.Min(math.Max(p.Value, lo), hi))
+	for i, t := range times {
+		labels[i] = t.Format(layout)
 	}
-	ticks := y.Ticks(3)
-	label := func(_ chart.Side, tick chart.Tick) {
-		ui.Text(c, tick.Label).NoWrap().FontSize(9).TextColor(t.TextMuted)
-	}
-	col := tint.Color(c)
-	chart.Plot(c, chart.Axes{Right: ticks, Label: label}, func(area ui.Element) {
-		area.Draw(func(p *ui.Painter, r ui.Rect) {
-			for _, tick := range ticks {
-				p.Line(r.X, chart.Y(r, tick.At), r.X+r.W, chart.Y(r, tick.At), 1, t.Text.Alpha(0.06))
-			}
-			p.FillPathGradient(chart.Area(r, xs, nil, ys, chart.CurveMonotone),
-				ui.LinearGradient{From: col.Alpha(0.35), To: col.Alpha(0.02), Angle: 180})
-			p.StrokePath(chart.Line(r, xs, ys, chart.CurveMonotone), 1.6, col)
-		})
-	}).Height(height).GapX(6)
+	return labels
 }
 
-// autoDomain pads flat series so a steady 11.1 W doesn't render as a noisy full-height line.
-func autoDomain(points []Point) (float64, float64) {
-	low, high := math.Inf(1), math.Inf(-1)
-	for _, p := range points {
-		low, high = math.Min(low, p.Value), math.Max(high, p.Value)
+// chartSamples averages points into chartBuckets samples with time labels.
+func chartSamples(points []Point) ([]string, []float64) {
+	if len(points) <= chartBuckets {
+		times := make([]time.Time, len(points))
+		values := make([]float64, len(points))
+		for i, p := range points {
+			times[i], values[i] = p.Time, p.Value
+		}
+		return chartLabels(times), values
 	}
-	pad := math.Max((high-low)*0.25, math.Max(math.Abs(high)*0.1, 1))
-	return math.Max(0, low-pad), high + pad
+	times := make([]time.Time, chartBuckets)
+	values := make([]float64, chartBuckets)
+	size := float64(len(points)) / chartBuckets
+	for i := range chartBuckets {
+		lo, hi := int(math.Floor(float64(i)*size)), int(math.Floor(float64(i+1)*size))
+		hi = min(max(hi, lo+1), len(points))
+		sum := 0.0
+		for _, p := range points[lo:hi] {
+			sum += p.Value
+		}
+		times[i] = points[lo].Time
+		values[i] = sum / float64(hi-lo)
+	}
+	return chartLabels(times), values
+}
+
+// AreaChart draws points as an area chart, for the pages that chart a series of their own.
+func AreaChart(c *ui.Context, label string, points []Point, tint Tint, height float32) {
+	labels, values := chartSamples(points)
+	at := -1
+	chart.Area(c, label, labels, []chart.Series{{Name: label, Values: values}}, &at,
+		chart.AreaOptions{Height: height, Format: "%.1f"})
 }
 
 // PanelHeader is a panel's tinted icon badge and title, with trailing content such as a Pill at the far end.
 func PanelHeader(c *ui.Context, icon, title string, tint Tint, trailing func()) {
-	col := tint.Color(c)
-	ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-		ui.Row(c).Width(24).Height(24).Center().Radius(7).Background(col.Alpha(0.16)).Children(func() {
-			ui.Icon(c, icons.Get(icon)).Size(13, 13).TextColor(col)
-		})
-		ui.Text(c, title).FontSize(13).Bold().Grow(1)
-		trailing()
+	t := c.Theme()
+	ui.Row(c).Gap(t.Space(2)).AlignItems(ui.Center).Children(func() {
+		display.IconBox(c, icon, display.IconBoxOptions{Color: tint.Color(c)})
+		ui.Text(c, title).FontSize(t.Rem(1)).Bold().Grow(1)
+		if trailing != nil {
+			trailing()
+		}
 	})
 }
 
@@ -290,8 +328,10 @@ func Pill(c *ui.Context, icon, text string, tint Tint) ui.Element {
 	if tint == Gray {
 		col = c.Theme().TextMuted
 	}
-	return ui.Row(c).Gap(4).AlignItems(ui.Center).Padding(3, 8).Radius(9).Background(col.Alpha(0.14)).Children(func() {
-		ui.Icon(c, icons.Get(icon)).Size(11, 11).TextColor(col)
-		ui.Text(c, text).FontSize(11).FontWeight(600).TextColor(col).FontFeatures("tnum").NoWrap()
+	t := c.Theme()
+	return ui.Row(c).AlignSelf(ui.Start).Gap(t.Space(1)).AlignItems(ui.Center).
+		Padding(t.Space(0.75), t.Space(2)).Radius(t.Radius).Background(col.Alpha(0.12)).Children(func() {
+		ui.Icon(c, lucide.Must(icon)).Size(12, 12).TextColor(col).Shrink(0)
+		kit.Numeric(c, text).FontSize(t.Rem(0.75)).Bold().TextColor(col).NoWrap()
 	})
 }

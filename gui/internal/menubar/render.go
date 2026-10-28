@@ -11,7 +11,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"powerfultop/internal/icons"
+	cryicon "github.com/ELY-Open-Source/CrychicUI/icon"
 )
 
 // MyGo's tray takes a PNG and scales it to 18 pt high, and can't show attributed titles or SF
@@ -261,7 +261,7 @@ func (r *renderer) icon(icon Icon, dark bool) *image.RGBA {
 		default:
 			name := LucideName(icon.Symbol)
 			return l.render(15, 15, nil, func(c *ui.Context) {
-				ui.Icon(c, icons.Get(name)).Size(15, 15).TextColor(black)
+				ui.Icon(c, cryicon.Must(name)).Size(15, 15).TextColor(black)
 			})
 		}
 	}
@@ -432,7 +432,7 @@ func newTextTester() *textTester {
 				for i, s := range tt.segments {
 					ui.Row(c).Key(i).AlignItems(ui.Center).Gap(thinSpacePt).Children(func() {
 						if s.Symbol != "" {
-							ui.Icon(c, icons.Get(LucideName(s.Symbol))).Size(10.5, 10.5).TextColor(tt.color)
+							ui.Icon(c, cryicon.Must(LucideName(s.Symbol))).Size(10.5, 10.5).TextColor(tt.color)
 						}
 						ui.Text(c, s.Text).FontSize(12).FontWeight(500).FontFeatures("tnum").TextColor(tt.color).NoWrap()
 					})

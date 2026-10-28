@@ -6,8 +6,11 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
+	"github.com/ELY-Open-Source/CrychicUI/button"
+	"github.com/ELY-Open-Source/CrychicUI/choice"
+	"github.com/ELY-Open-Source/CrychicUI/feedback"
+	lucide "github.com/ELY-Open-Source/CrychicUI/icon"
 	"powerfultop/internal/barmanager"
-	"powerfultop/internal/icons"
 )
 
 const managerControlCenterURL = "x-apple.systempreferences:com.apple.ControlCenter-Settings.extension"
@@ -54,7 +57,7 @@ func managerTrayPanel(c *ui.Context, tray *barmanager.TrayStore, snap barmanager
 				managerAllowListAccess(c, tray, tsnap)
 			}
 			on := tsnap.Enabled
-			if ui.Switch(c.Key("tray-enabled"), &on).Label(L("Use the Tray", "启用托盘")).Changed() {
+			if choice.Toggle(c, L("Use the Tray", "启用托盘"), &on).Changed() {
 				tray.SetEnabled(on)
 			}
 		})
@@ -129,7 +132,7 @@ func managerAllowListAccess(c *ui.Context, tray *barmanager.TrayStore, snap barm
 				"正在使用系统设置中「允许在菜单栏中显示」的列表来开关图标。"))
 		return
 	}
-	if ui.Button(c, L("Allow Switch File…", "授权开关文件…")).
+	if button.Outline(c, L("Allow Switch File…", "授权开关文件…")).
 		Tooltip(L("Allow the Allow in the Menu Bar list, which the tray switches apps' icons with. Apple's own icons need no file.",
 			"授权「允许在菜单栏中显示」的列表，托盘用它开关 app 的图标。系统自带的图标不需要这个文件。")).Clicked() {
 		tray.RequestAllowListAccess()
@@ -153,7 +156,7 @@ func managerTrayStatus(c *ui.Context, tray *barmanager.TrayStore, snap barmanage
 			ui.Row(c).Grow(1).Shrink(1).Children(func() {
 				Status(c, "triangle-alert", Orange, L("macOS hasn't listed this app under Allow in the Menu Bar yet.", "macOS 还没有把这个 app 列进「允许在菜单栏中显示」。"), "")
 			})
-			if ui.Button(c, L("Refresh Menu Bar", "刷新菜单栏")).
+			if button.Outline(c, L("Refresh Menu Bar", "刷新菜单栏")).
 				Tooltip(L("Restarts the menu bar so macOS lists the app; the menu bar blinks once.", "重启菜单栏让 macOS 列出这个 app，菜单栏会闪一下。")).Clicked() {
 				tray.RefreshMenuBar()
 			}
@@ -188,14 +191,13 @@ func managerLayoutPanel(c *ui.Context, store *barmanager.ItemStore, tray *barman
 				L("macOS has no API for other apps' menu bar icons, so PowerfulTop reads them through Accessibility and moves them with the same ⌘-drag you would do.",
 					"macOS 没有提供管理其他 app 菜单栏图标的接口，所以 PowerfulTop 通过辅助功能读取图标，并模拟你手动的 ⌘ 拖动来移动它们。"))
 			ui.Row(c).Justify(ui.Center).Children(func() {
-				if ui.PrimaryButton(c, L("Grant Accessibility Access…", "授予辅助功能权限…")).Clicked() {
+				if button.Solid(c, L("Grant Accessibility Access…", "授予辅助功能权限…")).Clicked() {
 					store.RequestAccessibility()
 				}
 			})
 		case len(snap.Items) == 0:
 			ui.Row(c).Gap(8).AlignItems(ui.Center).Justify(ui.Center).PaddingY(24).Children(func() {
-				ui.Spinner(c).Size(12, 12)
-				ui.Text(c, L("Reading the menu bar…", "正在读取菜单栏…")).FontSize(12).TextColor(c.Theme().TextMuted)
+				feedback.Spin(c, L("Reading the menu bar…", "正在读取菜单栏…"), feedback.SpinOptions{Size: feedback.SpinSmall})
 			})
 		default:
 			managerDisplays(c, store, snap)
@@ -218,7 +220,7 @@ func managerLayoutAccess(c *ui.Context, store *barmanager.ItemStore, snap barman
 				"已使用菜单栏布局文件：移动图标无需移动鼠标，收在 « 里的图标也能移动。"))
 		return
 	}
-	if ui.Button(c, L("Allow Layout File…", "授权布局文件…")).
+	if button.Outline(c, L("Allow Layout File…", "授权布局文件…")).
 		Tooltip(L("Allow the menu bar layout file to move icons without the pointer, including those behind «.",
 			"授权菜单栏布局文件后，移动图标不用移动鼠标，收在 « 里的图标也能移动。")).Clicked() {
 		store.RequestLayoutAccess()
@@ -226,22 +228,15 @@ func managerLayoutAccess(c *ui.Context, store *barmanager.ItemStore, snap barman
 }
 
 func managerEmptyState(c *ui.Context, icon, title, detail string) {
-	t := c.Theme()
-	ui.Column(c).Gap(8).AlignItems(ui.Center).PaddingY(18).PaddingX(24).Radius(12).Background(t.Text.Alpha(0.03)).Children(func() {
-		ui.Icon(c, icons.Get(icon)).Size(22, 22).TextColor(t.TextMuted)
-		ui.Text(c, title).FontSize(13).FontWeight(600).TextAlign(ui.Center)
-		if detail != "" {
-			ui.Text(c, detail).FontSize(11).TextColor(t.TextMuted).TextAlign(ui.Center).MaxWidth(520)
-		}
-	})
+	empty, _ := feedback.EmptyState(c, icon, title, detail, "")
+	empty.MaxWidth(560)
 }
 
 func managerStatus(c *ui.Context, snap barmanager.StoreSnapshot) {
 	switch {
 	case snap.Moving:
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-			ui.Spinner(c).Size(12, 12)
-			ui.Text(c, L("Moving…", "正在移动…")).FontSize(11).TextColor(c.Theme().TextMuted)
+			feedback.Spin(c, L("Moving…", "正在移动…"), feedback.SpinOptions{Size: feedback.SpinSmall})
 		})
 	case snap.Error != barmanager.NoError:
 		Status(c, "triangle-alert", Orange, managerErrorText(snap.Error), "")
@@ -274,7 +269,7 @@ func managerDisplays(c *ui.Context, store *barmanager.ItemStore, snap barmanager
 func managerTip(c *ui.Context, icon, text string) {
 	t := c.Theme()
 	ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
-		ui.Icon(c, icons.Get(icon)).Size(11, 11).TextColor(t.TextMuted.Alpha(0.8))
+		ui.Icon(c, lucide.Must(icon)).Size(11, 11).TextColor(t.TextMuted.Alpha(0.8))
 		ui.Text(c, text).FontSize(11).TextColor(t.TextMuted.Alpha(0.8)).NoWrap()
 	})
 }
@@ -409,13 +404,13 @@ func managerItemTile(c *ui.Context, store *barmanager.ItemStore, tray *barmanage
 
 func managerLogo(c *ui.Context, store *barmanager.ItemStore, state *ManagerPageState, item barmanager.Item, fallback ui.Color) {
 	if item.Icon != "" {
-		ui.Icon(c, icons.Get(item.Icon)).Size(17, 17).TextColor(fallback)
+		ui.Icon(c, lucide.Must(item.Icon)).Size(17, 17).TextColor(fallback)
 		return
 	}
 	if bitmap := managerAppLogo(store, state, item); bitmap != nil {
 		ui.Image(c, bitmap).Size(20, 20)
 	} else {
-		ui.Icon(c, icons.Get("app-window")).Size(18, 18).TextColor(fallback)
+		ui.Icon(c, lucide.Must("app-window")).Size(18, 18).TextColor(fallback)
 	}
 }
 
@@ -447,7 +442,7 @@ func managerAbsentPanel(c *ui.Context, store *barmanager.ItemStore, state *Manag
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			ui.Text(c, L("These apps' icons are switched off in System Settings › Menu Bar.", "这些 app 的图标在系统设置 › 菜单栏中被关闭了。")).
 				FontSize(11).TextColor(t.TextMuted).Grow(1).Shrink(1)
-			if ui.Button(c, L("Open System Settings…", "打开系统设置…")).Clicked() {
+			if button.Outline(c, L("Open System Settings…", "打开系统设置…")).Clicked() {
 				_ = mygo.Shell.OpenExternal(managerControlCenterURL)
 			}
 		})

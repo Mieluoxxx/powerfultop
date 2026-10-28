@@ -3,9 +3,11 @@ package view
 import (
 	"time"
 
+	lucide "github.com/ELY-Open-Source/CrychicUI/icon"
+	"github.com/ELY-Open-Source/CrychicUI/kit"
+	"github.com/ELY-Open-Source/CrychicUI/layout"
+	"github.com/ELY-Open-Source/CrychicUI/navigation"
 	"github.com/egoist/mygo/ui"
-
-	"powerfultop/internal/icons"
 )
 
 // PageID values match the Swift app's Page raw values, which "dashboardPage" stores.
@@ -46,32 +48,32 @@ type DetailsState struct {
 }
 
 const (
-	sidebarWidth        = 190
-	DetailsWidth        = 1000
+	sidebarWidth        = 224
+	DetailsWidth        = 1040
 	DetailsHeight       = 720
-	DetailsMinWidth     = 760
+	DetailsMinWidth     = 820
 	DetailsMinHeight    = 480
 	TwoColumnMinWidth   = 760
 	defaultContentWidth = DetailsWidth - sidebarWidth - 48
 )
 
-// Details is the details window: a sidebar of pages and the selected page under its title.
+// Details is the details window: the sidebar of pages and the selected page under its title.
 func Details(c *ui.Context, pages []WindowPage, s *DetailsState) {
 	t := c.Theme()
-	current := pages[0]
-	for _, p := range pages {
+	current, index := pages[0], 0
+	for i, p := range pages {
 		if p.ID == s.Selected {
-			current = p
+			current, index = p, i
 		}
 	}
 	ui.Row(c).Fill().AlignItems(ui.Stretch).Background(t.Background).Children(func() {
-		sidebar(c, pages, current.ID, s)
-		ui.Box(c).Width(1).Background(CardBorder(c))
+		sidebar(c, pages, index, s)
+		ui.Box(c).Width(1).Background(t.Border)
 		if !s.Available {
-			ui.Column(c).Grow(1).Center().Gap(12).Children(func() {
-				ui.Icon(c, icons.Get("triangle-alert")).Size(32, 32).TextColor(Orange.Color(c))
+			ui.Column(c).Grow(1).Center().Gap(t.Space(3)).Children(func() {
+				ui.Icon(c, lucide.Must("triangle-alert")).Size(32, 32).TextColor(Orange.Color(c))
 				ui.Text(c, L("Built-in battery not detected. PowerfulTop requires a MacBook.", "未检测到内置电池。PowerfulTop 仅支持 MacBook。")).
-					FontSize(13).TextColor(t.TextMuted).TextAlign(ui.Center)
+					FontSize(t.Rem(0.9)).TextColor(t.TextMuted).TextAlign(ui.Center)
 			})
 			return
 		}
@@ -84,48 +86,34 @@ func Details(c *ui.Context, pages []WindowPage, s *DetailsState) {
 			width = defaultContentWidth
 		}
 		scroll.Children(func() {
-			ui.Column(c).Padding(24).Gap(16).Children(func() {
-				ui.Text(c, current.Title).FontSize(22).Bold()
+			ui.Column(c).Padding(24).Gap(t.Space(4)).Children(func() {
+				layout.PageHeader(c, current.Title, layout.PageHeaderOptions{})
 				current.Body(c, width)
 			})
 		})
 	})
 }
 
-func sidebar(c *ui.Context, pages []WindowPage, selected PageID, s *DetailsState) {
+// sidebar is the library's navigation, with the readings' age under it.
+func sidebar(c *ui.Context, pages []WindowPage, selected int, s *DetailsState) {
 	t := c.Theme()
-	ui.Column(c).Width(sidebarWidth).Padding(12).PaddingY(20).Gap(4).Background(t.Text.Alpha(0.025)).Children(func() {
-		for _, p := range pages {
-			active := p.ID == selected
-			color := t.Text
-			if active {
-				color = t.Accent
+	active := selected
+	ui.Column(c).Width(sidebarWidth).PaddingY(t.Space(3)).Background(t.Text.Alpha(0.02)).Children(func() {
+		items := make([]navigation.NavItem, len(pages))
+		for i, p := range pages {
+			items[i] = navigation.NavItem{Label: p.Title, Icon: p.Icon}
+		}
+		navigation.SideNav(c, L("Pages", "页面"), items, &active)
+		if active != selected && active >= 0 && active < len(pages) {
+			s.Selected = pages[active].ID
+			if s.OnSelect != nil {
+				s.OnSelect(pages[active].ID)
 			}
-			item := ui.Row(c.Key(p.ID)).Gap(8).AlignItems(ui.Center).PaddingX(12).PaddingY(8).Radius(9)
-			if active {
-				item.Background(t.Accent.Alpha(0.14))
-			}
-			item.OnClick(func() {
-				s.Selected = p.ID
-				if s.OnSelect != nil {
-					s.OnSelect(p.ID)
-				}
-			})
-			item.Children(func() {
-				ui.Icon(c, icons.Get(p.Icon)).Size(15, 15).TextColor(color)
-				label := ui.Text(c, p.Title).FontSize(13).TextColor(color).Grow(1).NoWrap()
-				if active {
-					label.Bold()
-				}
-				if p.Attention {
-					ui.Icon(c, icons.Get("triangle-alert")).Size(13, 13).TextColor(Orange.Color(c)).Tooltip(p.Hint)
-				}
-			})
 		}
 		ui.Spacer(c)
 		if !s.UpdatedAt.IsZero() {
-			ui.Text(c, Lf("Updated at %s", "更新于 %s", s.UpdatedAt.Format("15:04:05"))).
-				FontSize(10).TextColor(t.TextMuted.Alpha(0.75)).FontFeatures("tnum").PaddingX(12)
+			kit.Muted(c, Lf("Updated at %s", "更新于 %s", s.UpdatedAt.Format("15:04:05"))).
+				FontSize(t.Rem(0.7)).TextColor(t.TextMuted.Alpha(0.75)).PaddingX(t.Space(3))
 		}
 	})
 }

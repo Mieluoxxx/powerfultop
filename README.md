@@ -43,7 +43,7 @@ Everything updates live and stays accurate even when you plug in or unplug your 
 - Like seeing when the battery is helping supply power
 - Want a simple, beautiful way to monitor battery health and charging behavior
 
-It's a small, native app that does one thing well — no bloat, no subscriptions. Since 2.0 it is written in Go, with its windows drawn by [MyGo](https://github.com/egoist/mygo)'s native UI.
+It's a small, native app that does one thing well — no bloat, no subscriptions. Since 2.0 it is written in Go, with its windows drawn by [MyGo](https://github.com/egoist/mygo)'s native UI from [CrychicUI](https://github.com/ELY-Open-Source/CrychicUI) components.
 
 ## Installation
 
@@ -155,6 +155,7 @@ open build/PowerfulTop.app
 
 PowerfulTop builds on the work of these projects:
 
+- [CrychicUI](https://github.com/ELY-Open-Source/CrychicUI) — the component library the views are built from (MIT)
 - [MonitorControl](https://github.com/MonitorControl/MonitorControl) — display brightness over DisplayServices and DDC/CI (MIT)
 - [macos-smc-fan](https://github.com/agoodkind/macos-smc-fan) — the `Ftst` unlock research behind manual fan control on Apple silicon (MIT)
 - [Stats](https://github.com/exelban/stats) — inspiration for the CPU and memory monitoring page (MIT)

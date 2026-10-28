@@ -24,8 +24,8 @@ func TestComponentsRender(t *testing.T) {
 				StripItem(c, "zap", Yellow, "Power", "12 W", false, "")
 				StripDivider(c)
 			})
-			ChartPanel(c, "System", "11 W", "avg", "activity", Blue, points, nil, "Collecting data…")
-			ChartPanel(c, "Empty", "–", "", "activity", Blue, nil, nil, "Collecting data…")
+			ChartPanel(c, "System", "11 W", "avg", "activity", Blue, points, "Collecting data…")
+			ChartPanel(c, "Empty", "–", "", "activity", Blue, nil, "Collecting data…")
 		})
 	}, 480, 900)
 	for _, want := range []string{"Battery", "48.2 W", "/ 90 W", "Health", "99%", "A note", "Warning", "12 W", "Collecting data…"} {

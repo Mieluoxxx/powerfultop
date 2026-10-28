@@ -3,7 +3,8 @@ package view
 import (
 	"github.com/egoist/mygo/ui"
 
-	"powerfultop/internal/icons"
+	"github.com/ELY-Open-Source/CrychicUI/button"
+	"github.com/ELY-Open-Source/CrychicUI/choice"
 )
 
 // SettingsData is what the settings page shows, gathered by the app from its monitors.
@@ -26,19 +27,11 @@ type SettingsActions struct {
 // SettingsPage lays out app-wide settings as System Settings does; the charge limit lives on the
 // Battery page and the fan helper on the Cooling page, next to what they control.
 func SettingsPage(c *ui.Context, d SettingsData, a SettingsActions) {
-	t := c.Theme()
 	ui.Column(c).Gap(22).MaxWidth(600).Children(func() {
 		ui.Column(c).Gap(6).Children(func() {
 			Section(c, L("General", "通用"), "", func() {
-				label := L("Launch at Login", "开机启动")
-				// Clicking the label toggles, as a labeled switch does in System Settings.
-				SectionLabel(c, label).OnClick(func() {
-					if a.SetLaunchAtLogin != nil {
-						a.SetLaunchAtLogin(!d.LaunchAtLogin)
-					}
-				})
 				on := d.LaunchAtLogin
-				if ui.Switch(c.Key("login"), &on).Label(label).Changed() && a.SetLaunchAtLogin != nil {
+				if choice.ToggleRow(c, L("Launch at Login", "开机启动"), "", &on).Changed() && a.SetLaunchAtLogin != nil {
 					a.SetLaunchAtLogin(on)
 				}
 			})
@@ -70,12 +63,7 @@ func SettingsPage(c *ui.Context, d SettingsData, a SettingsActions) {
 				SectionLabel(c, L("Battery Serial Number", "电池序列号"))
 				ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
 					SectionValue(c, d.Serial)
-					copy := ui.ButtonBase(c).Padding(4).Radius(5).Label(L("Copy", "复制")).
-						Tooltip(L("Copy serial number", "复制序列号")).
-						Children(func() {
-							ui.Icon(c, icons.Get("copy")).Size(13, 13).TextColor(t.TextMuted)
-						})
-					if copy.Clicked() && a.CopySerial != nil {
+					if button.TextButton(c, L("Copy", "复制")).Tooltip(L("Copy serial number", "复制序列号")).Clicked() && a.CopySerial != nil {
 						a.CopySerial(d.Serial)
 					}
 				})

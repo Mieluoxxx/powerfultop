@@ -7,10 +7,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ELY-Open-Source/CrychicUI/layout"
 	"github.com/egoist/mygo/ui"
 
+	"github.com/ELY-Open-Source/CrychicUI/button"
+	"github.com/ELY-Open-Source/CrychicUI/choice"
+	"github.com/ELY-Open-Source/CrychicUI/feedback"
+	lucide "github.com/ELY-Open-Source/CrychicUI/icon"
 	"powerfultop/internal/history"
-	"powerfultop/internal/icons"
 	"powerfultop/internal/thermal"
 )
 
@@ -28,35 +32,39 @@ const sliderSettle = 400 * time.Millisecond
 // CoolingPage shows temperatures, fans and their control, and the recent history of both.
 func CoolingPage(c *ui.Context, m *thermal.Monitor, h *history.History, state *CoolingState, width float32) {
 	s := m.Snapshot()
-	columns := 1
-	if width >= 680 {
-		columns = 2
-	}
 	ui.Column(c).Gap(16).Children(func() {
-		ui.Grid(c).Columns(columns).Gap(16).Children(func() {
-			if len(s.Temperatures) > 0 {
-				temperatureCard(c, s)
-			}
-			if s.HasFans() {
-				FanControlCard(c, m, s, state)
-			}
-		})
-		ui.Grid(c).Columns(columns).Gap(16).Children(func() {
-			if cpu, ok := s.Temperatures[thermal.GroupCPU]; ok {
-				ChartPanel(c, L("CPU Average", "CPU 平均温度"), thermal.FormatCelsius(cpu.AverageC, 1), "", "cpu", Orange,
-					h.Series(history.CPUTemperature), nil, L("Collecting data…", "正在收集数据…"))
-			}
-			if s.HasFans() {
-				top := 1.0
-				for _, f := range s.Fans {
-					top = math.Max(top, f.MaxRPM)
-				}
-				ChartPanel(c, L("Fan Speed", "风扇转速"), thermal.FormatRPM(s.MaxActualRPM()), "", "fan", Teal,
-					h.Series(history.FanRPM), &[2]float64{0, top}, L("Collecting data…", "正在收集数据…"))
-			}
-		})
+		var first []func()
+		if len(s.Temperatures) > 0 {
+			first = append(first, func() { temperatureCard(c, s) })
+		}
 		if s.HasFans() {
-			ui.Grid(c).Columns(columns).Gap(16).Children(func() { FanHelperCard(c, m) })
+			first = append(first, func() { FanControlCard(c, m, s, state) })
+		}
+		if len(first) > 0 {
+			layout.Columns(c, first)
+		}
+		var charts []func()
+		if cpu, ok := s.Temperatures[thermal.GroupCPU]; ok {
+			charts = append(charts, func() {
+				ChartPanel(c, L("CPU Average", "CPU 平均温度"), thermal.FormatCelsius(cpu.AverageC, 1), "", "cpu", Orange,
+					h.Series(history.CPUTemperature), L("Collecting data…", "正在收集数据…"))
+			})
+		}
+		if s.HasFans() {
+			top := 1.0
+			for _, f := range s.Fans {
+				top = math.Max(top, f.MaxRPM)
+			}
+			charts = append(charts, func() {
+				ChartPanel(c, L("Fan Speed", "风扇转速"), thermal.FormatRPM(s.MaxActualRPM()), "", "fan", Teal,
+					h.Series(history.FanRPM), L("Collecting data…", "正在收集数据…"))
+			})
+		}
+		if len(charts) > 0 {
+			layout.Columns(c, charts)
+		}
+		if s.HasFans() {
+			layout.Columns(c, []func(){func() { FanHelperCard(c, m) }})
 		}
 	})
 }
@@ -156,7 +164,7 @@ func segmented(c *ui.Context, label string, selected *int, segments []segment, f
 						color = t.Text
 					}
 					if sg.icon != "" {
-						ui.Icon(c, icons.Get(sg.icon)).Size(12, 12).TextColor(color)
+						ui.Icon(c, lucide.Must(sg.icon)).Size(12, 12).TextColor(color)
 					}
 					text := ui.Text(c, sg.label).FontSize(12).TextColor(color).NoWrap()
 					if chosen {
@@ -191,14 +199,9 @@ func FanConflictBanner(c *ui.Context, s thermal.Snapshot) {
 	if s.ConflictingTool != "" {
 		text = Lf("%s is running, so PowerfulTop leaves the fans alone", "%s 正在运行，PowerfulTop 暂不接管风扇", s.ConflictingTool)
 	}
-	col := Orange.Color(c)
-	ui.Row(c).Gap(6).AlignItems(ui.Center).Padding(6, 8).Radius(7).Background(col.Alpha(0.12)).
+	feedback.Alert(c, feedback.ToneWarning, text, "").
 		Tooltip(L("Another fan tool (such as Macs Fan Control) is controlling the fans. Quit it to let PowerfulTop take over; until then PowerfulTop only monitors.",
-			"检测到其他风扇工具（如 Macs Fan Control）正在控制风扇。退出它之后 PowerfulTop 才会接管，在此之前只做监控。")).
-		Children(func() {
-			ui.Icon(c, icons.Get("triangle-alert")).Size(12, 12).TextColor(col).Shrink(0)
-			ui.Text(c, text).FontSize(11).TextColor(c.Theme().Text.Alpha(0.85))
-		})
+			"检测到其他风扇工具（如 Macs Fan Control）正在控制风扇。退出它之后 PowerfulTop 才会接管，在此之前只做监控。"))
 }
 
 // FanControlCard mirrors Macs Fan Control: Auto hands fans to macOS; Custom is a constant RPM or a temperature ramp.
@@ -250,7 +253,7 @@ func customControlsBody(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot, s
 		lo, hi := fanSpan(s)
 		rpm := state.draft(s.Mode.RPM)
 		Row(c, L("Target Speed", "目标转速"), thermal.FormatRPM(rpm), "", true)
-		if ui.StepSlider(c, &rpm, lo, math.Max(hi, lo+100), 100).Label(L("Target Speed", "目标转速")).Changed() {
+		if choice.ValueSlider(c, L("Target Speed", "目标转速"), &rpm, lo, math.Max(hi, lo+100), choice.ValueSliderOptions{Step: 100, Format: "%.0f RPM"}).Changed() {
 			state.setDraft(rpm, func() { m.SetMode(thermal.Constant(rpm)) })
 		}
 	case thermal.ModeSensor:
@@ -261,7 +264,7 @@ func customControlsBody(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot, s
 		}
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			ui.Text(c, L("Sensor", "传感器")).FontSize(12).TextColor(c.Theme().TextMuted).Grow(1)
-			if e := segmented(c, L("Sensor", "传感器"), &group, []segment{{"", "CPU"}, {"", "GPU"}}, false, locked); !locked && e.Changed() {
+			if !locked && choice.Segments(c, L("Sensor", "传感器"), []string{"CPU", "GPU"}, &group).Changed() {
 				mode.Group = []thermal.SensorGroup{thermal.GroupCPU, thermal.GroupGPU}[group]
 				m.SetMode(mode)
 			}
@@ -279,7 +282,7 @@ func customControlsBody(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot, s
 func stepperRow(c *ui.Context, label string, value *float64, lo, hi float64, changed func()) {
 	ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 		ui.Text(c, label).FontSize(12).Grow(1)
-		if ui.Stepper(c, value, lo, hi, 5).Label(label).Changed() {
+		if choice.NumberStepper(c, label, value, lo, hi, 5, choice.NumberStepperOptions{Format: "%.0f°C"}).Changed() {
 			changed()
 		}
 	})
@@ -365,11 +368,11 @@ func allFansResting(s thermal.Snapshot) bool {
 func FanHelperInstallButton(c *ui.Context, m *thermal.Monitor, s thermal.Snapshot) {
 	ui.Column(c).Gap(6).Children(func() {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-			if ui.PrimaryButton(c, HelperActionText(s.HelperStatus)).Disabled(s.Installing).Clicked() {
+			if button.Solid(c, HelperActionText(s.HelperStatus)).Disabled(s.Installing).Clicked() {
 				m.InstallHelper()
 			}
 			if s.Installing {
-				ui.Spinner(c)
+				feedback.Spin(c, L("Installing the fan helper…", "正在安装风扇控制组件…"), feedback.SpinOptions{Size: feedback.SpinSmall})
 			}
 		})
 		if s.HelperStatus == thermal.HelperNeedsUpdate {
@@ -426,7 +429,7 @@ func FanSection(c *ui.Context, m *thermal.Monitor) {
 	t := c.Theme()
 	ui.Column(c).Gap(8).Children(func() {
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-			ui.Icon(c, icons.Get("fan")).Size(14, 14).TextColor(Teal.Color(c))
+			ui.Icon(c, lucide.Must("fan")).Size(14, 14).TextColor(Teal.Color(c))
 			ui.Text(c, thermal.FormatRPM(s.MaxActualRPM())).FontSize(14).Bold().FontFeatures("tnum").NoWrap().Grow(1)
 			// Who drives the fans, as a pill: tinted while PowerfulTop does.
 			pill, pillText := t.Text.Alpha(0.07), t.TextMuted
@@ -442,12 +445,7 @@ func FanSection(c *ui.Context, m *thermal.Monitor) {
 			FanConflictBanner(c, s)
 		case !s.Mode.IsAutomatic() && s.HelperStatus != thermal.HelperReady:
 			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-				if ui.Button(c, HelperActionText(s.HelperStatus)).Disabled(s.Installing).Clicked() {
-					m.InstallHelper()
-				}
-				if s.Installing {
-					ui.Spinner(c)
-				}
+				feedback.Spin(c, L("Installing the fan helper…", "正在安装风扇控制组件…"), feedback.SpinOptions{Size: feedback.SpinSmall})
 			})
 		case s.LastError != nil:
 			Status(c, "octagon-x", Red, HelperErrorText(s.LastError), "")
@@ -471,17 +469,17 @@ func FanHelperCard(c *ui.Context, m *thermal.Monitor) {
 		Row(c, L("Status", "状态"), HelperStatusText(s.HelperStatus), "", true)
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			if s.HelperStatus != thermal.HelperReady {
-				if ui.Button(c, HelperActionText(s.HelperStatus)).Disabled(s.Installing).Clicked() {
+				if button.Outline(c, HelperActionText(s.HelperStatus)).Disabled(s.Installing).Clicked() {
 					m.InstallHelper()
 				}
 			}
 			if s.HelperStatus != thermal.HelperNotInstalled {
-				if ui.Button(c, L("Uninstall", "卸载")).Disabled(s.Installing).Clicked() {
+				if button.Outline(c, L("Uninstall", "卸载")).Disabled(s.Installing).Clicked() {
 					m.UninstallHelper()
 				}
 			}
 			if s.Installing {
-				ui.Spinner(c)
+				feedback.Spin(c, L("Installing the fan helper…", "正在安装风扇控制组件…"), feedback.SpinOptions{Size: feedback.SpinSmall})
 			}
 		})
 		if s.LastError != nil {

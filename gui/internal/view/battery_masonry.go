@@ -1,6 +1,9 @@
 package view
 
-import "github.com/egoist/mygo/ui"
+import (
+	"github.com/ELY-Open-Source/CrychicUI/layout"
+	"github.com/egoist/mygo/ui"
+)
 
 // MasonryItem is one card for Masonry; Weight estimates its height so columns stay balanced.
 type MasonryItem struct {
@@ -9,28 +12,15 @@ type MasonryItem struct {
 	View   func()
 }
 
-// Masonry fills each card into the currently shortest column, keeping source order within a column.
+// Masonry lays the cards out in the fewest empty columns, as the library's masonry does; Weight is
+// kept for callers that estimate a card's height, and orders the cards as given.
 func Masonry(c *ui.Context, items []MasonryItem, columns int, spacing float32) {
-	columns = max(columns, 1)
-	stacks := make([][]MasonryItem, columns)
-	heights := make([]float64, columns)
-	for _, item := range items {
-		target := 0
-		for i := range heights {
-			if heights[i] < heights[target] {
-				target = i
-			}
+	views := make([]func(), len(items))
+	for i, item := range items {
+		views[i] = func() {
+			ui.Column(c.Key(item.ID)).Children(item.View)
 		}
-		stacks[target] = append(stacks[target], item)
-		heights[target] += item.Weight
 	}
-	ui.Grid(c).Columns(columns).Gap(spacing).AlignItems(ui.Start).Children(func() {
-		for i, stack := range stacks {
-			ui.Column(c.Key(i)).Gap(spacing).Children(func() {
-				for _, item := range stack {
-					ui.Column(c.Key(item.ID)).Children(item.View)
-				}
-			})
-		}
-	})
+	_ = spacing
+	layout.Masonry(c, max(columns, 1), views)
 }

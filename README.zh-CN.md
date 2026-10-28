@@ -43,7 +43,7 @@ macOS 从来不会直接告诉你「现在系统正在消耗多少瓦」。Power
 - 想看到电池什么时候在帮忙供电
 - 希望有一个简单漂亮的方式查看电池健康和充电行为
 
-它是一个小巧的原生 Mac 应用，只做好一件事 —— 没有多余功能，没有订阅。自 2.0 起改用 Go 编写，窗口界面由 [MyGo](https://github.com/egoist/mygo) 的原生 UI 绘制。
+它是一个小巧的原生 Mac 应用，只做好一件事 —— 没有多余功能，没有订阅。自 2.0 起改用 Go 编写，窗口界面由 [MyGo](https://github.com/egoist/mygo) 的原生 UI 配合 [CrychicUI](https://github.com/ELY-Open-Source/CrychicUI) 组件绘制。
 
 ## 安装方式
 
@@ -155,6 +155,7 @@ open build/PowerfulTop.app
 
 PowerfulTop 借鉴了以下项目：
 
+- [CrychicUI](https://github.com/ELY-Open-Source/CrychicUI) — 界面所用的组件库（MIT）
 - [MonitorControl](https://github.com/MonitorControl/MonitorControl) — 通过 DisplayServices 和 DDC/CI 调节显示器亮度（MIT）
 - [macos-smc-fan](https://github.com/agoodkind/macos-smc-fan) — Apple 芯片手动控制风扇所依据的 `Ftst` 解锁研究（MIT）
 - [Stats](https://github.com/exelban/stats) — CPU 和内存监控页面的设计参考（MIT）

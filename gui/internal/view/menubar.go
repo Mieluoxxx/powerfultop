@@ -6,7 +6,10 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"powerfultop/internal/icons"
+	"github.com/ELY-Open-Source/CrychicUI/button"
+	"github.com/ELY-Open-Source/CrychicUI/choice"
+	lucide "github.com/ELY-Open-Source/CrychicUI/icon"
+	"github.com/ELY-Open-Source/CrychicUI/layout"
 	"powerfultop/internal/menubar"
 )
 
@@ -193,13 +196,13 @@ func menuBarCatalog(c *ui.Context, settings *menubar.Settings, cfg menubar.Confi
 				}
 			})
 		}
-		ui.Divider(c)
+		layout.Divider(c, layout.DividerOptions{})
 		ui.Row(c).Gap(8).Children(func() {
 			ui.Spacer(c)
-			if ui.Button(c, L("Reset", "重置")).Clicked() {
+			if button.Outline(c, L("Reset", "重置")).Clicked() {
 				settings.Set(menubar.DefaultConfiguration())
 			}
-			if ui.Button(c, L("Clear All", "全部清除")).Clicked() {
+			if button.Destructive(c, L("Clear All", "全部清除")).Clicked() {
 				settings.Update(func(c *menubar.Configuration) { c.Items = nil })
 			}
 		})
@@ -236,7 +239,7 @@ func menuBarTuning(c *ui.Context, settings *menubar.Settings, cfg menubar.Config
 func sliderRow(c *ui.Context, title string, value *float64, bounds [2]float64, formatted string) {
 	ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
 		ui.Text(c, title).FontSize(12).TextColor(c.Theme().TextMuted).Width(120).NoWrap()
-		ui.StepSlider(c, value, bounds[0], bounds[1], 1).Grow(1).Label(title)
+		choice.ValueSlider(c, title, value, bounds[0], bounds[1], choice.ValueSliderOptions{Step: 1}).Grow(1)
 		ui.Text(c, formatted).FontSize(12).FontWeight(500).FontFeatures("tnum").Width(48).TextAlign(ui.End).NoWrap()
 	})
 }
@@ -258,11 +261,11 @@ func menuBarChip(c *ui.Context, state *MenuBarPageState, spec chipSpec) ui.Eleme
 	if spec.filled {
 		fg = t.AccentText
 	}
-	chip := ui.ButtonBase(c).Key(spec.key).PaddingX(12).PaddingY(6).Radius(999)
+	chip := ui.ButtonBase(c).Key(spec.key).PaddingX(t.Space(3)).PaddingY(t.Space(1.5)).Radius(999)
 	if spec.filled {
 		chip.Background(t.Accent)
 	} else {
-		chip.Border(1.5, t.Accent)
+		chip.Background(t.Surface).Border(1, t.Border)
 	}
 	chip.Children(func() {
 		ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
@@ -283,15 +286,15 @@ func menuBarChip(c *ui.Context, state *MenuBarPageState, spec chipSpec) ui.Eleme
 					ui.Image(c, b).Size(float32(w)/menubar.Scale, float32(h)/menubar.Scale)
 				}
 			} else if spec.symbol != "" {
-				ui.Icon(c, icons.Get(menubar.LucideName(spec.symbol))).Size(12, 12).TextColor(fg)
+				ui.Icon(c, lucide.Must(menubar.LucideName(spec.symbol))).Size(12, 12).TextColor(fg)
 			}
 			if spec.text != "" {
 				ui.Text(c, spec.text).FontSize(12).FontWeight(500).FontFeatures("tnum").TextColor(fg).NoWrap()
 			}
 			if spec.onRemove != nil {
-				remove := ui.ButtonBase(c).Padding(2).Label(L("Remove", "移除")).Children(func() {
-					ui.Icon(c, icons.Get("x")).Size(9, 9).TextColor(fg.Alpha(0.7))
-				})
+				// The chip's own small cross: the library's CloseButton is a panel-sized control.
+				remove := ui.ButtonBase(c).Padding(t.Space(0.5)).Radius(999).Label(L("Remove", "移除")).Tooltip(L("Remove", "移除")).
+					Children(func() { ui.Text(c, "×").FontSize(t.Rem(0.8)).TextColor(fg.Alpha(0.7)) })
 				if remove.Clicked() {
 					spec.onRemove()
 				}

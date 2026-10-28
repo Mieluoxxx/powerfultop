@@ -448,6 +448,9 @@ func writeShot(path string, width, height int, view func(*ui.Context)) error {
 	tt := ui.NewTester(func(c *ui.Context) {
 		ui.Column(c).Fill().Background(c.Theme().Background).Children(func() { view(c) })
 	}, width, height)
+	// Let the library's arrivals and chart growth finish before the shot.
+	tt.Advance(2 * time.Second)
+	tt.Frame()
 	f, err := os.Create(path)
 	if err != nil {
 		return err

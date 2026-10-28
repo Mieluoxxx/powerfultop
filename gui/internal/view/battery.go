@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/ELY-Open-Source/CrychicUI/choice"
+	"github.com/ELY-Open-Source/CrychicUI/feedback"
+	"github.com/ELY-Open-Source/CrychicUI/layout"
 	"github.com/egoist/mygo/ui"
 
 	"powerfultop/internal/power"
@@ -94,16 +97,19 @@ func ChargeLimitCard(c *ui.Context, d power.Data, limit *power.ChargeLimiter) {
 		ui.Row(c).Gap(8).AlignItems(ui.End).Children(func() {
 			ui.Column(c).Grow(1).Children(func() { Hero(c, value, "", caption, 0) })
 			if s.Pending {
-				ui.Spinner(c)
+				feedback.Spin(c, L("Applying the charge limit…", "正在应用充电上限…"), feedback.SpinOptions{Size: feedback.SpinSmall})
 			}
 		})
+		// A limit macOS reports outside its own choices is shown above but not offered as a choice.
 		selected := slices.Index(s.Choices, s.Percent)
-		segments := make([]segment, len(s.Choices))
-		for i, choice := range s.Choices {
-			segments[i] = segment{label: fmt.Sprintf("%d%%", choice)}
-		}
-		if e := segmented(c, L("Charge Limit", "充电上限"), &selected, segments, true, s.Pending); !s.Pending && e.Changed() {
-			limit.Set(s.Choices[selected])
+		if selected >= 0 && !s.Pending {
+			labels := make([]string, len(s.Choices))
+			for i, choice := range s.Choices {
+				labels[i] = fmt.Sprintf("%d%%", choice)
+			}
+			if choice.Segments(c, L("Charge Limit", "充电上限"), labels, &selected).Changed() {
+				limit.Set(s.Choices[selected])
+			}
 		}
 		switch {
 		case s.Err != nil:
@@ -153,7 +159,7 @@ func batteryChargerCard(c *ui.Context, d power.Data) {
 		if d.AdapterEfficiencyLossW != nil {
 			Row(c, L("Adapter Loss", "充电器转换损耗"), watts(*d.AdapterEfficiencyLossW), "", false)
 		}
-		ui.Column(c).PaddingY(2).Children(func() { ui.Divider(c) })
+		ui.Column(c).PaddingY(2).Children(func() { layout.Divider(c, layout.DividerOptions{}) })
 		status := L("Not Charging", "未在充电")
 		if d.IsBatteryCharging() {
 			status = L("Charging", "充电")

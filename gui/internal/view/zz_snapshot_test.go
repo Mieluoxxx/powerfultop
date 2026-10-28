@@ -28,7 +28,7 @@ func TestSnapshot(t *testing.T) {
 				Note(c, "macOS 在固件中执行充电上限。")
 				Status(c, "triangle-alert", Orange, "其他风扇工具正在控制", "")
 			})
-			ChartPanel(c, "系统功耗", "11.2 W", "均值 10 W", "activity", Blue, points, nil, "")
+			ChartPanel(c, "系统功耗", "11.2 W", "均值 10 W", "activity", Blue, points, "")
 		})
 	}, 420, 520)
 	f, _ := os.Create(os.Getenv("SNAPSHOT"))

@@ -6,8 +6,12 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
+	"github.com/ELY-Open-Source/CrychicUI/button"
+	"github.com/ELY-Open-Source/CrychicUI/choice"
+	"github.com/ELY-Open-Source/CrychicUI/feedback"
+	lucide "github.com/ELY-Open-Source/CrychicUI/icon"
+	"github.com/ELY-Open-Source/CrychicUI/layout"
 	"powerfultop/internal/display"
-	"powerfultop/internal/icons"
 	"powerfultop/internal/power"
 	"powerfultop/internal/system"
 	"powerfultop/internal/thermal"
@@ -57,7 +61,7 @@ func Popover(c *ui.Context, d PopoverData, a PopoverActions) ui.Element {
 	return ui.Column(c).Width(PopoverWidth).Children(func() {
 		if !d.Available {
 			ui.Row(c).Gap(6).Padding(10, 14).AlignItems(ui.Center).Children(func() {
-				ui.Icon(c, icons.Get("triangle-alert")).Size(13, 13).TextColor(Orange.Color(c))
+				ui.Icon(c, lucide.Must("triangle-alert")).Size(13, 13).TextColor(Orange.Color(c))
 				ui.Text(c, L("Built-in battery not detected. PowerfulTop requires a MacBook.", "未检测到内置电池。PowerfulTop 仅支持 MacBook。")).
 					FontSize(11).TextColor(c.Theme().TextMuted)
 			})
@@ -65,7 +69,7 @@ func Popover(c *ui.Context, d PopoverData, a PopoverActions) ui.Element {
 		section := func(top, bottom float32, fn func()) {
 			ui.Column(c).Padding(top, 14, bottom, 14).Children(fn)
 		}
-		divider := func() { ui.Divider(c).PaddingX(12) }
+		divider := func() { ui.Column(c).PaddingX(12).Children(func() { layout.Divider(c, layout.DividerOptions{}) }) }
 
 		section(14, 12, func() { popoverHeader(c, d.Power, a) })
 		divider()
@@ -118,16 +122,13 @@ func popoverHeader(c *ui.Context, p power.Data, a PopoverActions) {
 	ui.Column(c).Gap(8).Children(func() {
 		ui.Row(c).AlignItems(ui.Start).Children(func() {
 			ui.Textf(c, "%d%%", p.DisplayBatteryPercent()).FontSize(30).Bold().FontFeatures("tnum").Grow(1)
-			gear := ui.ButtonBase(c).Label(L("Details", "详细参数")).Tooltip(L("Details", "详细参数")).Padding(5).Radius(6).Children(func() {
-				ui.Icon(c, icons.Get("settings")).Size(14, 14).TextColor(t.TextMuted)
-			})
-			if gear.Clicked() && a.OpenDetails != nil {
+			if button.Ghost(c, L("Details", "详细参数")).Clicked() && a.OpenDetails != nil {
 				a.OpenDetails(PageOverview)
 			}
 		})
 		LevelBar(c, float64(p.DisplayBatteryPercent())/100, BatteryLevelTint(p), 6)
 		ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
-			ui.Icon(c, icons.Get(icon)).Size(12, 12).TextColor(tint.Color(c)).Shrink(0)
+			ui.Icon(c, lucide.Must(icon)).Size(12, 12).TextColor(tint.Color(c)).Shrink(0)
 			ui.Text(c, status).FontSize(12).TextColor(t.TextMuted)
 		})
 		if reason := p.NotChargingReasonDescription(); reason != "" && (state.Kind == power.StateACIdle || p.IsSupplementalDischarge()) {
@@ -177,7 +178,7 @@ func popoverFlow(c *ui.Context, p power.Data) {
 				})
 			}
 			column(sources)
-			ui.Icon(c, icons.Get("arrow-right")).Size(11, 11).TextColor(c.Theme().TextMuted.Alpha(0.6))
+			ui.Icon(c, lucide.Must("arrow-right")).Size(11, 11).TextColor(c.Theme().TextMuted.Alpha(0.6))
 			column(destinations)
 		})
 		if p.DataSource == power.SourceLegacy {
@@ -194,7 +195,7 @@ func popoverFlowNode(c *ui.Context, n flowNode) {
 	}
 	// Value-less nodes (battery-only source) must line up with their valued counterpart.
 	ui.Row(c.Key(n.icon+n.title)).Gap(6).AlignItems(ui.Center).Padding(7, 8).MinHeight(46).Radius(8).Background(col.Alpha(0.1)).Children(func() {
-		ui.Icon(c, icons.Get(n.icon)).Size(14, 14).TextColor(col).Shrink(0)
+		ui.Icon(c, lucide.Must(n.icon)).Size(14, 14).TextColor(col).Shrink(0)
 		ui.Column(c).Gap(1).Grow(1).Children(func() {
 			ui.Row(c).Gap(4).Children(func() {
 				ui.Text(c, n.title).FontSize(10).TextColor(t.TextMuted).NoWrap().Grow(1)
@@ -233,7 +234,7 @@ func usageMeter(c *ui.Context, icon, title string, fraction float64, tint Tint, 
 	t := c.Theme()
 	ui.Column(c.Key(icon)).Gap(5).Grow(1).Width(0).Children(func() {
 		ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
-			ui.Icon(c, icons.Get(icon)).Size(12, 12).TextColor(tint.Color(c))
+			ui.Icon(c, lucide.Must(icon)).Size(12, 12).TextColor(tint.Color(c))
 			ui.Text(c, title).FontSize(12).TextColor(t.TextMuted).Grow(1).NoWrap()
 			ui.Textf(c, "%.0f%%", fraction*100).FontSize(12).Bold().FontFeatures("tnum").NoWrap()
 		})
@@ -288,10 +289,10 @@ func popoverChargeLimit(c *ui.Context, p power.Data, limit *power.ChargeLimiter,
 		Tooltip(L("Adjust the charge limit on the Battery page", "在电池页调整充电上限")).
 		Children(func() {
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Grow(1).Children(func() {
-				ui.Icon(c, icons.Get("battery-charging")).Size(12, 12).TextColor(Green.Color(c))
+				ui.Icon(c, lucide.Must("battery-charging")).Size(12, 12).TextColor(Green.Color(c))
 				ui.Text(c, L("Charge Limit", "充电上限")).FontSize(12).TextColor(t.TextMuted).Grow(1)
 				ui.Text(c, p.ChargeLimitText()).FontSize(12).FontWeight(500).NoWrap()
-				ui.Icon(c, icons.Get("chevron-right")).Size(9, 9).TextColor(t.TextMuted.Alpha(0.6))
+				ui.Icon(c, lucide.Must("chevron-right")).Size(9, 9).TextColor(t.TextMuted.Alpha(0.6))
 			})
 		})
 	if row.Clicked() && a.OpenDetails != nil {
@@ -304,10 +305,10 @@ func popoverChargeLimitControl(c *ui.Context, s power.ChargeLimitState, limit *p
 	t := c.Theme()
 	ui.Column(c).Gap(7).Children(func() {
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-			ui.Icon(c, icons.Get("battery-charging")).Size(12, 12).TextColor(Green.Color(c))
+			ui.Icon(c, lucide.Must("battery-charging")).Size(12, 12).TextColor(Green.Color(c))
 			ui.Text(c, L("Charge Limit", "充电上限")).FontSize(12).TextColor(t.TextMuted).Grow(1)
 			if s.Pending {
-				ui.Spinner(c).Size(10, 10)
+				feedback.Spin(c, L("Applying the charge limit…", "正在应用充电上限…"), feedback.SpinOptions{Size: feedback.SpinSmall})
 			}
 			value := fmt.Sprintf("%d%%", s.Percent)
 			if s.Percent >= 100 {
@@ -315,13 +316,16 @@ func popoverChargeLimitControl(c *ui.Context, s power.ChargeLimitState, limit *p
 			}
 			ui.Text(c, value).FontSize(12).FontWeight(600).FontFeatures("tnum").NoWrap()
 		})
+		// A limit macOS reports outside its own choices is shown above but not offered as a choice.
 		selected := slices.Index(s.Choices, s.Percent)
-		segments := make([]segment, len(s.Choices))
-		for i, choice := range s.Choices {
-			segments[i] = segment{label: fmt.Sprintf("%d%%", choice)}
-		}
-		if e := segmented(c, L("Charge Limit", "充电上限"), &selected, segments, true, s.Pending); !s.Pending && e.Changed() {
-			limit.Set(s.Choices[selected])
+		if selected >= 0 && !s.Pending {
+			labels := make([]string, len(s.Choices))
+			for i, choice := range s.Choices {
+				labels[i] = fmt.Sprintf("%d%%", choice)
+			}
+			if choice.Segments(c, L("Charge Limit", "充电上限"), labels, &selected).Changed() {
+				limit.Set(s.Choices[selected])
+			}
 		}
 		switch {
 		case s.Err != nil:
@@ -333,24 +337,15 @@ func popoverChargeLimitControl(c *ui.Context, s power.ChargeLimitState, limit *p
 }
 
 func popoverFooter(c *ui.Context, d PopoverData, a PopoverActions) {
-	t := c.Theme()
 	ui.Column(c).Gap(4).Children(func() {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).PaddingStart(4).Children(func() {
 			label := L("Launch at Login", "开机自启")
 			on := d.LaunchAtLogin
-			if ui.Switch(c.Key("login"), &on).Label(label).Changed() && a.SetLaunchAtLogin != nil {
+			if choice.Toggle(c, label, &on).Changed() && a.SetLaunchAtLogin != nil {
 				a.SetLaunchAtLogin(on)
 			}
-			// Clicking the label toggles, as a labeled switch does in System Settings.
-			ui.Text(c, label).FontSize(12).TextColor(t.TextMuted).Grow(1).OnClick(func() {
-				if a.SetLaunchAtLogin != nil {
-					a.SetLaunchAtLogin(!d.LaunchAtLogin)
-				}
-			})
-			quit := ui.ButtonBase(c).Label(L("Quit", "退出")).Tooltip(L("Quit", "退出")).Padding(4, 6).Radius(5).Children(func() {
-				ui.Icon(c, icons.Get("power")).Size(13, 13).TextColor(t.TextMuted)
-			})
-			if quit.Clicked() && a.Quit != nil {
+			ui.Spacer(c)
+			if button.Ghost(c, L("Quit", "退出")).Clicked() && a.Quit != nil {
 				a.Quit()
 			}
 		})

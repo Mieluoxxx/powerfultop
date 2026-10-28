@@ -3,8 +3,10 @@ package view
 import (
 	"github.com/egoist/mygo/ui"
 
+	"github.com/ELY-Open-Source/CrychicUI/button"
+	"github.com/ELY-Open-Source/CrychicUI/feedback"
+	lucide "github.com/ELY-Open-Source/CrychicUI/icon"
 	"powerfultop/internal/barmanager"
-	"powerfultop/internal/icons"
 )
 
 const (
@@ -32,15 +34,10 @@ type TrayFlyoutActions struct {
 
 // TrayFlyout is the grid of the tray's icons that hangs under its chevron.
 func TrayFlyout(c *ui.Context, tray *barmanager.TrayStore, state *TrayFlyoutState, a TrayFlyoutActions) ui.Element {
-	t := c.Theme()
 	snap := tray.Snapshot()
 	return ui.Column(c).Width(TrayFlyoutWidth).Padding(trayPadding).Gap(8).Children(func() {
 		if len(snap.Entries) == 0 {
-			ui.Column(c).Gap(6).AlignItems(ui.Center).PaddingY(10).Children(func() {
-				ui.Icon(c, icons.Get("archive")).Size(20, 20).TextColor(t.TextMuted)
-				ui.Text(c, L("No icons in the tray", "托盘里还没有图标")).FontSize(12).FontWeight(600)
-				ui.Text(c, L("Add them in Menu Bar Manager.", "在「菜单栏管理」中添加。")).FontSize(11).TextColor(t.TextMuted).TextAlign(ui.Center)
-			})
+			feedback.EmptyState(c, "archive", L("No icons in the tray", "托盘里还没有图标"), L("Add them in Menu Bar Manager.", "在「菜单栏管理」中添加。"), "")
 		} else {
 			ui.Row(c).Wrap().Gap(trayGap).Children(func() {
 				for _, e := range snap.Entries {
@@ -56,13 +53,7 @@ func TrayFlyout(c *ui.Context, tray *barmanager.TrayStore, state *TrayFlyoutStat
 			Status(c, "lock", Orange, L("Allow the switch file in Menu Bar Manager.", "请在「菜单栏管理」中授权开关文件。"), "")
 		}
 		ui.Row(c).Justify(ui.End).Children(func() {
-			manage := ui.ButtonBase(c).Padding(2, 6).Radius(5).Children(func() {
-				ui.Text(c, L("Menu Bar Manager…", "菜单栏管理…")).FontSize(11).TextColor(t.TextMuted)
-			})
-			if manage.Hovered() {
-				manage.Background(t.Text.Alpha(0.06))
-			}
-			if manage.Clicked() && a.OpenManager != nil {
+			if button.TextButton(c, L("Menu Bar Manager…", "菜单栏管理…")).Clicked() && a.OpenManager != nil {
 				a.OpenManager()
 			}
 		})
@@ -108,14 +99,14 @@ func trayEntryName(e barmanager.TrayEntry) string {
 // trayEntryLogo draws the app's logo, or the lucide icon standing in for one of Apple's items.
 func trayEntryLogo(c *ui.Context, tray *barmanager.TrayStore, cache *map[string]*ui.Bitmap, e barmanager.TrayEntry, size float32) {
 	if e.Icon != "" {
-		ui.Icon(c, icons.Get(e.Icon)).Size(size-4, size-4).TextColor(c.Theme().Text)
+		ui.Icon(c, lucide.Must(e.Icon)).Size(size-4, size-4).TextColor(c.Theme().Text)
 		return
 	}
 	if bitmap := cachedLogo(cache, e.AppPath, func() []byte { return tray.Icon(e) }); bitmap != nil {
 		ui.Image(c, bitmap).Size(size, size)
 		return
 	}
-	ui.Icon(c, icons.Get("app-window")).Size(size-4, size-4).TextColor(c.Theme().TextMuted)
+	ui.Icon(c, lucide.Must("app-window")).Size(size-4, size-4).TextColor(c.Theme().TextMuted)
 }
 
 // cachedLogo decodes an app's logo once; a logo that hasn't arrived yet is asked for again.
