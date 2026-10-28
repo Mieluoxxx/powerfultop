@@ -49,7 +49,7 @@ It's a small, native app that does one thing well — no bloat, no subscriptions
 
 ### Download (Recommended)
 
-Download the latest `PowerfulTop.zip` from the [Releases](https://github.com/kDolphin/PowerTop/releases) page:
+Download the latest `PowerfulTop.zip` from the [Releases](https://github.com/Mieluoxxx/powerfultop/releases) page:
 
 1. Unzip the file
 2. Drag `PowerfulTop.app` into your `/Applications` folder
@@ -60,7 +60,7 @@ Download the latest `PowerfulTop.zip` from the [Releases](https://github.com/kDo
 Requires Go 1.27.3 or later (`go` fetches the right toolchain on its own).
 
 ```bash
-git clone https://github.com/kDolphin/PowerTop.git
+git clone https://github.com/Mieluoxxx/powerfultop.git
 cd PowerfulTop
 bash build.sh
 open build/PowerfulTop.app
@@ -141,7 +141,7 @@ open build/PowerfulTop.app
 
 - Redesigned detail window, flat layout, instant menu bar updates after wake, 0 W idle fix, cell balance summary
 
-[Older releases →](https://github.com/kDolphin/PowerTop/releases)
+[Older releases →](https://github.com/Mieluoxxx/powerfultop/releases)
 
 ## Acknowledgements
 

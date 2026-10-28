@@ -49,7 +49,7 @@ macOS 从来不会直接告诉你「现在系统正在消耗多少瓦」。Power
 
 ### 下载安装（推荐）
 
-从 [Releases](https://github.com/kDolphin/PowerTop/releases) 页面下载最新的 `PowerfulTop.zip`：
+从 [Releases](https://github.com/Mieluoxxx/powerfultop/releases) 页面下载最新的 `PowerfulTop.zip`：
 
 1. 解压文件
 2. 把 `PowerfulTop.app` 拖到「应用程序」文件夹
@@ -60,7 +60,7 @@ macOS 从来不会直接告诉你「现在系统正在消耗多少瓦」。Power
 需要 Go 1.27.3 或更高版本（`go` 会自动下载所需的工具链）。
 
 ```bash
-git clone https://github.com/kDolphin/PowerTop.git
+git clone https://github.com/Mieluoxxx/powerfultop.git
 cd PowerfulTop
 bash build.sh
 open build/PowerfulTop.app
@@ -141,7 +141,7 @@ open build/PowerfulTop.app
 
 - 详细参数窗口重设计、平铺布局、休眠唤醒后菜单栏即时刷新、0W idle 修复、电芯压差摘要
 
-[更早版本 →](https://github.com/kDolphin/PowerTop/releases)
+[更早版本 →](https://github.com/Mieluoxxx/powerfultop/releases)
 
 ## 致谢
 

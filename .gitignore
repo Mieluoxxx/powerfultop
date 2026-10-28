@@ -23,3 +23,7 @@ xcuserdata/
 
 # Local-only agent notes
 AGENTS.md
+
+# Local agent scratch
+.claude/
+.codegraph/
