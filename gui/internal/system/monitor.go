@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"powerfultop/internal/notify"
 	"powerfultop/internal/system/sysapi"
 )
 
@@ -32,9 +33,9 @@ type Snapshot struct {
 
 // Monitor samples every refreshInterval while started.
 type Monitor struct {
-	mu        sync.Mutex
-	snap      Snapshot
-	listeners []func()
+	mu      sync.Mutex
+	snap    Snapshot
+	changes notify.Listeners
 
 	previous       []CoreTicks
 	stop           chan struct{}
@@ -101,9 +102,7 @@ func (m *Monitor) Snapshot() Snapshot {
 }
 
 func (m *Monitor) OnChange(fn func()) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.listeners = append(m.listeners, fn)
+	m.changes.Add(fn)
 }
 
 // SetProcessSamplingActive turns the process lists on while they are on screen: they cost a
@@ -115,15 +114,6 @@ func (m *Monitor) SetProcessSamplingActive(active bool) {
 	m.mu.Unlock()
 	if active && !was {
 		go m.sampleProcesses(true)
-	}
-}
-
-func (m *Monitor) changed() {
-	m.mu.Lock()
-	listeners := append([]func(){}, m.listeners...)
-	m.mu.Unlock()
-	for _, fn := range listeners {
-		fn()
 	}
 }
 
@@ -149,7 +139,7 @@ func (m *Monitor) refresh() {
 	if active {
 		go m.sampleProcesses(false)
 	}
-	m.changed()
+	m.changes.Notify()
 }
 
 func (m *Monitor) sampleProcesses(force bool) {
@@ -191,7 +181,7 @@ func (m *Monitor) sampleProcesses(force bool) {
 		m.mu.Unlock()
 	}
 	if wantCPU || wantMemory {
-		m.changed()
+		m.changes.Notify()
 	}
 }
 

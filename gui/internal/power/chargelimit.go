@@ -6,13 +6,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/ebitengine/purego/objc"
-
+	"powerfultop/internal/lang"
 	"powerfultop/internal/macos"
 )
 
@@ -62,9 +60,9 @@ func resolveChargeLimit(macOS, alDente, dailyMaxSoc, notChargingReason *int) Res
 func ChargeLimitSourceLabel(source ChargeLimitSource) string {
 	switch source {
 	case ChargeLimitMacOSSetting:
-		return l("macOS setting", "系统设置")
+		return lang.L("macOS setting", "系统设置")
 	case ChargeLimitOptimizedCharging:
-		return l("Optimized Charging", "优化充电")
+		return lang.L("Optimized Charging", "优化充电")
 	case ChargeLimitAlDente:
 		return "AlDente"
 	}
@@ -136,7 +134,7 @@ const (
 // AlDenteRunning reports whether either AlDente edition runs; it keeps its last limit in
 // preferences after it quits, so only a running AlDente's limit counts.
 func AlDenteRunning() bool {
-	return isRunning(alDenteProBundleID) || isRunning(alDenteBundleID)
+	return macos.AppRunning(alDenteProBundleID) || macos.AppRunning(alDenteBundleID)
 }
 
 func readAlDenteChargeLimit() *int {
@@ -149,19 +147,6 @@ func readAlDenteChargeLimit() *int {
 		}
 	}
 	return normalizedChargeLimit(preferenceNumber(alDenteBundleID, "chargeVal"))
-}
-
-func isRunning(bundleID string) bool {
-	// Autoreleased objects belong to the thread's pool, which must be popped on the thread that pushed it.
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-	pool := objc.ID(objc.GetClass("NSAutoreleasePool")).Send(objc.RegisterName("new"))
-	defer pool.Send(objc.RegisterName("drain"))
-	cstr := append([]byte(bundleID), 0)
-	id := objc.ID(objc.GetClass("NSString")).Send(objc.RegisterName("stringWithUTF8String:"), &cstr[0])
-	runtime.KeepAlive(cstr)
-	apps := objc.ID(objc.GetClass("NSRunningApplication")).Send(objc.RegisterName("runningApplicationsWithBundleIdentifier:"), id)
-	return apps != 0 && objc.Send[uint](apps, objc.RegisterName("count")) > 0
 }
 
 // Third-party apps may write their plists directly without cfprefsd seeing it, so the file is a fallback.

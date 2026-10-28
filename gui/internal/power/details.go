@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"strings"
+
+	"powerfultop/internal/lang"
 )
 
 // Derived descriptions for the details window, kept out of the views so they can be tested.
@@ -17,11 +19,11 @@ func (d Data) CapacityFractionOfDesign(value *int) *float64 {
 
 // BatteryCurrentText formats raw IOKit amperage: positive = charging, negative = discharging.
 func BatteryCurrentText(milliamps int) string {
-	direction := l("Idle", "空闲")
+	direction := lang.L("Idle", "空闲")
 	if milliamps > 0 {
-		direction = l("Charging", "充电")
+		direction = lang.L("Charging", "充电")
 	} else if milliamps < 0 {
-		direction = l("Discharging", "放电")
+		direction = lang.L("Discharging", "放电")
 	}
 	return fmt.Sprintf("%.2f A (%s)", math.Abs(float64(milliamps))/1000, direction)
 }
@@ -46,13 +48,13 @@ func (d Data) CellTopologyDescription() string {
 	}
 	if layout.Kind == SeriesParallel {
 		if layout.ParallelCountKnown && layout.ParallelCount > 1 {
-			return lf("Battery topology: %dS%dP (%d cells)", "电芯拓扑：%d 串 × %d 并（共 %d 节）",
+			return lang.Lf("Battery topology: %dS%dP (%d cells)", "电芯拓扑：%d 串 × %d 并（共 %d 节）",
 				layout.SeriesCount, layout.ParallelCount, layout.SeriesCount*layout.ParallelCount)
 		}
-		return lf("Battery topology: %d series groups", "电芯拓扑：%d 个串联组", layout.SeriesCount)
+		return lang.Lf("Battery topology: %d series groups", "电芯拓扑：%d 个串联组", layout.SeriesCount)
 	}
 	if n := len(d.CellVoltagesMV); n > 0 {
-		return lf("Battery topology: %d cells", "电芯拓扑：共 %d 节", n)
+		return lang.Lf("Battery topology: %d cells", "电芯拓扑：共 %d 节", n)
 	}
 	return ""
 }
@@ -92,7 +94,7 @@ func CellSummary(e CellEntry) string {
 }
 
 func ParallelCellLabel(bankID, cellID int) string {
-	return lf("Series Group %d · Cell %d", "串联组 %d · 并联节 %d", bankID+1, cellID+1)
+	return lang.Lf("Series Group %d · Cell %d", "串联组 %d · 并联节 %d", bankID+1, cellID+1)
 }
 
 func (d Data) HasLifetimeData() bool {
@@ -104,7 +106,7 @@ func (d Data) HasLifetimeData() bool {
 // ChargeLimitText reads "85% (macOS setting)", or "Off" when nothing caps charging.
 func (d Data) ChargeLimitText() string {
 	if d.ChargeLimitPercent >= 100 {
-		return l("Off", "关闭")
+		return lang.L("Off", "关闭")
 	}
 	if source := ChargeLimitSourceLabel(d.ChargeLimitSource); source != "" {
 		return fmt.Sprintf("%d%% (%s)", d.ChargeLimitPercent, source)
@@ -121,7 +123,7 @@ func SeriesVoltageBalanceSummary(voltagesMV []int) string {
 		lo, hi = min(lo, v), max(hi, v)
 	}
 	delta := hi - lo
-	return lf("%d mV spread — %s", "压差 %d mV — %s", delta, balanceStatus(delta, 50, 100))
+	return lang.Lf("%d mV spread — %s", "压差 %d mV — %s", delta, balanceStatus(delta, 50, 100))
 }
 
 func ParallelCurrentBalanceSummary(currents []ParallelCellCurrent) string {
@@ -143,22 +145,22 @@ func ParallelCurrentBalanceSummary(currents []ParallelCellCurrent) string {
 	if worst < 0 {
 		return ""
 	}
-	return lf("%d mA max within-group spread — %s", "组内最大电流差 %d mA — %s", worst, balanceStatus(worst, 80, 150))
+	return lang.Lf("%d mA max within-group spread — %s", "组内最大电流差 %d mA — %s", worst, balanceStatus(worst, 80, 150))
 }
 
 func balanceStatus(delta, normal, fair int) string {
 	switch {
 	case delta <= normal:
-		return l("Normal", "正常")
+		return lang.L("Normal", "正常")
 	case delta <= fair:
-		return l("Fair", "一般")
+		return lang.L("Fair", "一般")
 	}
-	return l("Worth Checking", "建议关注")
+	return lang.L("Worth Checking", "建议关注")
 }
 
 func ProtectionTriggerLabel(count int) string {
 	if count == 0 {
-		return l("0 (normal)", "0（正常）")
+		return lang.L("0 (normal)", "0（正常）")
 	}
 	return fmt.Sprint(count)
 }

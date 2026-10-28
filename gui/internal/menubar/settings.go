@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"powerfultop/internal/macos"
+	"powerfultop/internal/notify"
 )
 
 // Keys of the Swift app's UserDefaults, read from the same domain so settings carry over.
@@ -17,10 +18,10 @@ const (
 
 // Settings holds the configuration, persisted as the Swift app did. Safe for concurrent use.
 type Settings struct {
-	prefs     macos.Preferences
-	mu        sync.Mutex
-	cfg       Configuration
-	listeners []func()
+	prefs   macos.Preferences
+	mu      sync.Mutex
+	cfg     Configuration
+	changes notify.Listeners
 }
 
 // NewSettings loads the configuration from prefs, usually macos.AppPreferences().
@@ -86,12 +87,9 @@ func (s *Settings) Update(change func(*Configuration)) {
 		return
 	}
 	s.cfg = next
-	listeners := append([]func(){}, s.listeners...)
 	s.mu.Unlock()
 	_ = s.Save()
-	for _, fn := range listeners {
-		fn()
-	}
+	s.changes.Notify()
 }
 
 // Set replaces the configuration, as Reset does.
@@ -102,7 +100,5 @@ func (s *Settings) Set(cfg Configuration) {
 // OnChange registers fn, called on the goroutine that changed the configuration, so the app can
 // redraw the tray and reschedule its refresh at the new interval.
 func (s *Settings) OnChange(fn func()) {
-	s.mu.Lock()
-	s.listeners = append(s.listeners, fn)
-	s.mu.Unlock()
+	s.changes.Add(fn)
 }

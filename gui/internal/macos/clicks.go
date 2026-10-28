@@ -19,7 +19,7 @@ type ClickMonitor struct {
 
 // StartClickMonitor must be called on the main thread; fn runs there, before the click is handled.
 func StartClickMonitor(fn func()) *ClickMonitor {
-	event := objc.ID(objc.GetClass("NSEvent"))
+	event := Class("NSEvent")
 	global := objc.NewBlock(func(_ objc.Block, _ objc.ID) { fn() })
 	local := objc.NewBlock(func(_ objc.Block, e objc.ID) objc.ID {
 		fn()
@@ -33,8 +33,8 @@ func StartClickMonitor(fn func()) *ClickMonitor {
 		{"addGlobalMonitorForEventsMatchingMask:handler:", global},
 		{"addLocalMonitorForEventsMatchingMask:handler:", local},
 	} {
-		if monitor := event.Send(objc.RegisterName(add.selector), mouseDownMask, add.block); monitor != 0 {
-			m.monitors = append(m.monitors, monitor.Send(objc.RegisterName("retain")))
+		if monitor := Send(event, add.selector, mouseDownMask, add.block); monitor != 0 {
+			m.monitors = append(m.monitors, Send(monitor, "retain"))
 		}
 	}
 	return m
@@ -42,10 +42,10 @@ func StartClickMonitor(fn func()) *ClickMonitor {
 
 // Stop removes the monitors; call it on the main thread.
 func (m *ClickMonitor) Stop() {
-	event := objc.ID(objc.GetClass("NSEvent"))
+	event := Class("NSEvent")
 	for _, monitor := range m.monitors {
-		event.Send(objc.RegisterName("removeMonitor:"), monitor)
-		monitor.Send(objc.RegisterName("release"))
+		Send(event, "removeMonitor:", monitor)
+		Send(monitor, "release")
 	}
 	for _, block := range m.blocks {
 		block.Release()

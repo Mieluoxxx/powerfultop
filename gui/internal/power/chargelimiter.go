@@ -3,6 +3,8 @@ package power
 import (
 	"slices"
 	"sync"
+
+	"powerfultop/internal/notify"
 )
 
 // nativeLimitState is what PowerUIAgent reports: the limits it accepts and the configured one.
@@ -40,9 +42,9 @@ type ChargeLimitState struct {
 type ChargeLimiter struct {
 	native nativeLimit
 
-	mu        sync.Mutex
-	state     ChargeLimitState
-	listeners []func()
+	mu      sync.Mutex
+	state   ChargeLimitState
+	changes notify.Listeners
 }
 
 // NewChargeLimiter talks to PowerUIAgent; call Refresh to load the current limit.
@@ -66,18 +68,7 @@ func (l *ChargeLimiter) State() ChargeLimitState {
 
 // OnChange registers fn, called on any goroutine after the state changes.
 func (l *ChargeLimiter) OnChange(fn func()) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.listeners = append(l.listeners, fn)
-}
-
-func (l *ChargeLimiter) notify() {
-	l.mu.Lock()
-	listeners := slices.Clone(l.listeners)
-	l.mu.Unlock()
-	for _, fn := range listeners {
-		fn()
-	}
+	l.changes.Add(fn)
 }
 
 // Refresh rereads the limit in the background; System Settings or another tool may have changed it.
@@ -95,7 +86,7 @@ func (l *ChargeLimiter) Set(percent int) {
 	l.state.Pending = true
 	l.state.Percent = percent
 	l.mu.Unlock()
-	l.notify()
+	l.changes.Notify()
 	go func() {
 		err := l.native.set(percent)
 		// powerd's cached limit drives the time-to-full estimate, so it must not outlive the change.
@@ -127,7 +118,7 @@ func (l *ChargeLimiter) reload(setErr error) {
 		l.state.Err = err
 	}
 	l.mu.Unlock()
-	l.notify()
+	l.changes.Notify()
 }
 
 type memoryLimit struct {

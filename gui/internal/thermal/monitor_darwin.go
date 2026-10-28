@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"powerfultop/internal/macos"
+	"powerfultop/internal/notify"
 )
 
 const (
@@ -35,7 +36,7 @@ type Monitor struct {
 	weEngaged   bool
 	applying    bool
 	lastRefresh time.Time
-	listeners   []func()
+	changes     notify.Listeners
 	stop        chan struct{}
 }
 
@@ -131,18 +132,7 @@ func (m *Monitor) HandleSleep() { m.releaseFans() }
 
 // OnChange registers fn, called on any goroutine after the snapshot changes.
 func (m *Monitor) OnChange(fn func()) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.listeners = append(m.listeners, fn)
-}
-
-func (m *Monitor) notify() {
-	m.mu.Lock()
-	listeners := slices.Clone(m.listeners)
-	m.mu.Unlock()
-	for _, fn := range listeners {
-		fn()
-	}
+	m.changes.Add(fn)
 }
 
 // Snapshot returns a copy of the latest reading and control state.
@@ -174,7 +164,7 @@ func (m *Monitor) SetMode(mode FanControlMode) {
 	} else {
 		go m.refresh()
 	}
-	m.notify()
+	m.changes.Notify()
 }
 
 // SelectPreset maps the Auto / Full Blast / Custom control to a mode.
@@ -198,7 +188,7 @@ func (m *Monitor) InstallHelper() {
 	}
 	m.snap.Installing = true
 	m.mu.Unlock()
-	m.notify()
+	m.changes.Notify()
 	go func() {
 		err := m.helper.Install()
 		status := m.helper.Status()
@@ -235,7 +225,7 @@ func (m *Monitor) UninstallHelper() {
 		}
 		m.snap.LastError = err
 		m.mu.Unlock()
-		m.notify()
+		m.changes.Notify()
 	}()
 }
 
@@ -259,7 +249,7 @@ func (m *Monitor) releaseFans() {
 		m.mu.Lock()
 		m.snap.LastError = err
 		m.mu.Unlock()
-		m.notify()
+		m.changes.Notify()
 	}()
 }
 
@@ -289,7 +279,7 @@ func (m *Monitor) refresh() {
 	m.snap.ConflictingTool = tool
 	m.mu.Unlock()
 	m.applyControl()
-	m.notify()
+	m.changes.Notify()
 }
 
 func (m *Monitor) applyControl() {
@@ -320,7 +310,7 @@ func (m *Monitor) applyControl() {
 			m.weEngaged = false
 		}
 		m.mu.Unlock()
-		m.notify()
+		m.changes.Notify()
 	}()
 }
 

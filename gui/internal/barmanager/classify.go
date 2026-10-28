@@ -115,16 +115,6 @@ func sortItems(items []Item) []Item {
 // menuBarAgentID owns Apple's own controls and the « button, which the editor doesn't manage.
 const menuBarAgentID = "com.apple.MenuBarAgent"
 
-func withoutAgent(apps []appRef) []appRef {
-	out := apps[:0:0]
-	for _, a := range apps {
-		if a.BundleID != menuBarAgentID {
-			out = append(out, a)
-		}
-	}
-	return out
-}
-
 func contains(list []string, s string) bool {
 	for _, v := range list {
 		if v == s {

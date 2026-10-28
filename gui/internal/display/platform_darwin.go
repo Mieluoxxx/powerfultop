@@ -9,6 +9,7 @@ import (
 	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
 
+	"powerfultop/internal/macos"
 	"powerfultop/internal/system/sysapi"
 )
 
@@ -36,8 +37,6 @@ var (
 
 func bind() {
 	bindOnce.Do(func() {
-		// NSScreen lives in AppKit, which a test binary doesn't load on its own.
-		_, _ = purego.Dlopen("/System/Library/Frameworks/AppKit.framework/AppKit", purego.RTLD_NOW|purego.RTLD_GLOBAL)
 		if cg, err := purego.Dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", purego.RTLD_NOW|purego.RTLD_GLOBAL); err == nil {
 			purego.RegisterLibFunc(&cgGetOnlineDisplayList, cg, "CGGetOnlineDisplayList")
 			purego.RegisterLibFunc(&cgDisplayMirrorsDisplay, cg, "CGDisplayMirrorsDisplay")
@@ -318,75 +317,43 @@ func transact(service uintptr, packet []byte, replyLength int) []byte {
 
 // MARK: screens
 
-var (
-	selScreens           = objc.RegisterName("screens")
-	selCount             = objc.RegisterName("count")
-	selObjectAtIndex     = objc.RegisterName("objectAtIndex:")
-	selDeviceDescription = objc.RegisterName("deviceDescription")
-	selObjectForKey      = objc.RegisterName("objectForKey:")
-	selUnsignedIntValue  = objc.RegisterName("unsignedIntValue")
-	selLocalizedName     = objc.RegisterName("localizedName")
-	selUTF8String        = objc.RegisterName("UTF8String")
-	selStringWithUTF8    = objc.RegisterName("stringWithUTF8String:")
-)
-
 // screenNames maps display IDs to NSScreen.localizedName.
 func screenNames() map[uint32]string {
 	bind()
 	names := map[uint32]string{}
-	screenClass := objc.GetClass("NSScreen")
-	if screenClass == 0 {
-		return names
-	}
-	pool := objc.ID(objc.GetClass("NSAutoreleasePool")).Send(objc.RegisterName("new"))
-	defer pool.Send(objc.RegisterName("drain"))
-	key := objc.ID(objc.GetClass("NSString")).Send(selStringWithUTF8, "NSScreenNumber")
-	screens := objc.ID(screenClass).Send(selScreens)
-	n := objc.Send[uint64](screens, selCount)
-	for i := range n {
-		screen := screens.Send(selObjectAtIndex, i)
-		number := screen.Send(selDeviceDescription).Send(selObjectForKey, key)
-		if number == 0 {
-			continue
+	macos.WithPool(func() {
+		key := macos.NSString("NSScreenNumber")
+		screens := macos.Send(macos.Class("NSScreen"), "screens")
+		for i := range objc.Send[uint64](screens, macos.Sel("count")) {
+			screen := macos.Send(screens, "objectAtIndex:", i)
+			number := macos.Send(macos.Send(screen, "deviceDescription"), "objectForKey:", key)
+			if number == 0 {
+				continue
+			}
+			id := objc.Send[uint32](number, macos.Sel("unsignedIntValue"))
+			if name := macos.GoString(macos.Send(screen, "localizedName")); name != "" {
+				names[id] = name
+			}
 		}
-		id := objc.Send[uint32](number, selUnsignedIntValue)
-		if name := goString(screen.Send(selLocalizedName)); name != "" {
-			names[id] = name
-		}
-	}
+	})
 	return names
-}
-
-func goString(s objc.ID) string {
-	if s == 0 {
-		return ""
-	}
-	p := objc.Send[*byte](s, selUTF8String)
-	if p == nil {
-		return ""
-	}
-	var b []byte
-	for ptr := p; *ptr != 0; ptr = nextByte(ptr) {
-		b = append(b, *ptr)
-	}
-	return string(b)
 }
 
 // observeScreenChanges calls fn on the main queue after display parameters change, as
 // NSApplication.didChangeScreenParametersNotification does; the returned func removes the observer.
 func observeScreenChanges(fn func()) func() {
-	center := objc.ID(objc.GetClass("NSNotificationCenter")).Send(objc.RegisterName("defaultCenter"))
-	queue := objc.ID(objc.GetClass("NSOperationQueue")).Send(objc.RegisterName("mainQueue"))
-	name := objc.ID(objc.GetClass("NSString")).Send(selStringWithUTF8, "NSApplicationDidChangeScreenParametersNotification")
+	center := macos.Send(macos.Class("NSNotificationCenter"), "defaultCenter")
+	queue := macos.Send(macos.Class("NSOperationQueue"), "mainQueue")
+	name := macos.NSString("NSApplicationDidChangeScreenParametersNotification")
 	if center == 0 || queue == 0 {
 		return func() {}
 	}
 	block := objc.NewBlock(func(_ objc.Block, _ objc.ID) { fn() })
-	token := center.Send(objc.RegisterName("addObserverForName:object:queue:usingBlock:"), name, objc.ID(0), queue, block)
-	token.Send(objc.RegisterName("retain"))
+	token := macos.Send(center, "addObserverForName:object:queue:usingBlock:", name, objc.ID(0), queue, block)
+	macos.Send(token, "retain")
 	return func() {
-		center.Send(objc.RegisterName("removeObserver:"), token)
-		token.Send(objc.RegisterName("release"))
+		macos.Send(center, "removeObserver:", token)
+		macos.Send(token, "release")
 		block.Release()
 	}
 }

@@ -17,8 +17,8 @@ import (
 	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
 	"github.com/egoist/mygo"
-	"github.com/egoist/mygo/i18n"
 
+	"powerfultop/internal/lang"
 	"powerfultop/internal/macos"
 )
 
@@ -81,14 +81,6 @@ func majorVersion() int {
 	}
 	major, _ := strconv.Atoi(strings.SplitN(version, ".", 2)[0])
 	return major
-}
-
-// tr picks the text for the language the app shows; this package can't use view.L, which imports it.
-func tr(en, zh string) string {
-	if strings.HasPrefix(i18n.Locale(), "zh") {
-		return zh
-	}
-	return en
 }
 
 const (
@@ -162,11 +154,11 @@ func (d *darwinItems) requestTrust() bool {
 func (d *darwinItems) runningApps() []appRef {
 	var apps []appRef
 	d.onMain(func() {
-		withPool(func() {
-			list := send(send(class("NSWorkspace"), "sharedWorkspace"), "runningApplications")
-			n := objc.Send[uint](list, sel("count"))
+		macos.WithPool(func() {
+			list := macos.Send(macos.Send(macos.Class("NSWorkspace"), "sharedWorkspace"), "runningApplications")
+			n := objc.Send[uint](list, macos.Sel("count"))
 			for i := range n {
-				apps = append(apps, appRefOf(send(list, "objectAtIndex:", i)))
+				apps = append(apps, appRefOf(macos.Send(list, "objectAtIndex:", i)))
 			}
 		})
 	})
@@ -178,10 +170,10 @@ func (d *darwinItems) runningApp(bundleID string) (appRef, bool) {
 	var ref appRef
 	found := false
 	d.onMain(func() {
-		withPool(func() {
-			list := send(class("NSRunningApplication"), "runningApplicationsWithBundleIdentifier:", nsString(bundleID))
-			if objc.Send[uint](list, sel("count")) > 0 {
-				ref, found = appRefOf(send(list, "objectAtIndex:", uint(0))), true
+		macos.WithPool(func() {
+			list := macos.Send(macos.Class("NSRunningApplication"), "runningApplicationsWithBundleIdentifier:", macos.NSString(bundleID))
+			if objc.Send[uint](list, macos.Sel("count")) > 0 {
+				ref, found = appRefOf(macos.Send(list, "objectAtIndex:", uint(0))), true
 			}
 		})
 	})
@@ -192,9 +184,9 @@ func (d *darwinItems) runningApp(bundleID string) (appRef, bool) {
 func (d *darwinItems) appPath(bundleID string) string {
 	var path string
 	d.onMain(func() {
-		withPool(func() {
-			url := send(send(class("NSWorkspace"), "sharedWorkspace"), "URLForApplicationWithBundleIdentifier:", nsString(bundleID))
-			path = goString(send(url, "path"))
+		macos.WithPool(func() {
+			url := macos.Send(macos.Send(macos.Class("NSWorkspace"), "sharedWorkspace"), "URLForApplicationWithBundleIdentifier:", macos.NSString(bundleID))
+			path = macos.GoString(macos.Send(url, "path"))
 		})
 	})
 	return path
@@ -202,12 +194,12 @@ func (d *darwinItems) appPath(bundleID string) string {
 
 func appRefOf(app objc.ID) appRef {
 	ref := appRef{
-		PID:      objc.Send[int32](app, sel("processIdentifier")),
-		Name:     goString(send(app, "localizedName")),
-		BundleID: goString(send(app, "bundleIdentifier")),
-		Path:     goString(send(send(app, "bundleURL"), "path")),
+		PID:      objc.Send[int32](app, macos.Sel("processIdentifier")),
+		Name:     macos.GoString(macos.Send(app, "localizedName")),
+		BundleID: macos.GoString(macos.Send(app, "bundleIdentifier")),
+		Path:     macos.GoString(macos.Send(macos.Send(app, "bundleURL"), "path")),
 	}
-	ref.Executable = goString(send(send(app, "executableURL"), "path"))
+	ref.Executable = macos.GoString(macos.Send(macos.Send(app, "executableURL"), "path"))
 	executable := ""
 	if ref.Executable != "" {
 		executable = filepath.Base(ref.Executable)
@@ -331,8 +323,8 @@ func (d *darwinItems) positions() map[string]float64 {
 	if err != nil {
 		return nil
 	}
-	value, ok := plistFromBytes(data)
-	if !ok {
+	value, err := macos.DecodePlistData(data)
+	if err != nil {
 		return nil
 	}
 	dict, _ := value.(map[string]any)
@@ -416,7 +408,7 @@ func (d *darwinItems) menuBarAgentPID() int32 {
 }
 
 func (d *darwinItems) requestLayoutAccess() bool {
-	granted := d.requestFileAccess(layoutPath, bookmarkKey, tr(
+	granted := d.requestFileAccess(layoutPath, bookmarkKey, lang.L(
 		"Choose com.apple.MenuBar.plist so PowerfulTop can arrange the menu bar without moving the pointer.",
 		"请选择 com.apple.MenuBar.plist，PowerfulTop 就能在不移动鼠标的情况下整理菜单栏。"))
 	return granted && d.positions() != nil
@@ -431,7 +423,7 @@ func (d *darwinItems) requestFileAccess(path, bookmarkKey, message string) bool 
 		// The file's own folder, so the panel lists it in sight; given the file itself, it scrolls away.
 		DefaultPath:     filepath.Dir(path),
 		Message:         message,
-		ButtonLabel:     tr("Allow", "允许"),
+		ButtonLabel:     lang.L("Allow", "允许"),
 		ShowHiddenFiles: true,
 	})
 	if err != nil || len(picked) != 1 {
@@ -444,15 +436,15 @@ func (d *darwinItems) requestFileAccess(path, bookmarkKey, message string) bool 
 		log.Printf("file access: picked %q, want %q", picked[0], path)
 		return false
 	}
-	withPool(func() {
-		url := send(class("NSURL"), "fileURLWithPath:", nsString(path))
-		send(url, "startAccessingSecurityScopedResource")
+	macos.WithPool(func() {
+		url := macos.Send(macos.Class("NSURL"), "fileURLWithPath:", macos.NSString(path))
+		macos.Send(url, "startAccessingSecurityScopedResource")
 		const withSecurityScope = 1 << 11 // NSURLBookmarkCreationWithSecurityScope
-		bookmark := send(url, "bookmarkDataWithOptions:includingResourceValuesForKeys:relativeToURL:error:", uint64(withSecurityScope), objc.ID(0), objc.ID(0), objc.ID(0))
+		bookmark := macos.Send(url, "bookmarkDataWithOptions:includingResourceValuesForKeys:relativeToURL:error:", uint64(withSecurityScope), objc.ID(0), objc.ID(0), objc.ID(0))
 		if bookmark == 0 {
-			bookmark = send(url, "bookmarkDataWithOptions:includingResourceValuesForKeys:relativeToURL:error:", uint64(0), objc.ID(0), objc.ID(0), objc.ID(0))
+			bookmark = macos.Send(url, "bookmarkDataWithOptions:includingResourceValuesForKeys:relativeToURL:error:", uint64(0), objc.ID(0), objc.ID(0), objc.ID(0))
 		}
-		if b := dataBytes(bookmark); len(b) > 0 {
+		if b := macos.DataBytes(bookmark); len(b) > 0 {
 			_ = macos.AppPreferences().Set(bookmarkKey, b)
 		} else {
 			log.Printf("file access: no bookmark for %q", path)
@@ -467,19 +459,19 @@ func (d *darwinItems) restoreFileAccess(bookmarkKey string) {
 	if !ok {
 		return
 	}
-	withPool(func() {
+	macos.WithPool(func() {
 		const withSecurityScope = 1 << 10 // NSURLBookmarkResolutionWithSecurityScope
 		var stale bool
 		resolve := func(options uint64) objc.ID {
-			return send(class("NSURL"), "URLByResolvingBookmarkData:options:relativeToURL:bookmarkDataIsStale:error:",
-				nsData(bookmark), options, objc.ID(0), unsafe.Pointer(&stale), objc.ID(0))
+			return macos.Send(macos.Class("NSURL"), "URLByResolvingBookmarkData:options:relativeToURL:bookmarkDataIsStale:error:",
+				macos.NSData(bookmark), options, objc.ID(0), unsafe.Pointer(&stale), objc.ID(0))
 		}
 		url := resolve(withSecurityScope)
 		if url == 0 {
 			url = resolve(0)
 		}
 		if url != 0 {
-			send(url, "startAccessingSecurityScopedResource")
+			macos.Send(url, "startAccessingSecurityScopedResource")
 		}
 	})
 }

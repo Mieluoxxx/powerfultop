@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"github.com/ebitengine/purego"
-
-	"powerfultop/internal/macos"
 )
+
+type nsPoint struct{ X, Y float64 }
+type nsSize struct{ W, H float64 }
 
 var (
 	cgOnce sync.Once
@@ -25,12 +26,10 @@ var (
 	cgWindowListCopyWindowInfo  func(options uint32, relativeTo uint32) uintptr
 	cgWindowLevelForKey         func(key int32) int32
 
-	cfRelease                    func(ref uintptr)
-	cfRetain                     func(ref uintptr) uintptr
-	cfArrayGetCount              func(array uintptr) int
-	cfArrayGetValueAtIndex       func(array uintptr, index int) uintptr
-	cfDataCreate                 func(allocator uintptr, bytes []byte, length int) uintptr
-	cfPropertyListCreateWithData func(allocator, data uintptr, options uint, format, err uintptr) uintptr
+	cfRelease              func(ref uintptr)
+	cfRetain               func(ref uintptr) uintptr
+	cfArrayGetCount        func(array uintptr) int
+	cfArrayGetValueAtIndex func(array uintptr, index int) uintptr
 )
 
 func loadCG() {
@@ -57,8 +56,6 @@ func loadCG() {
 		purego.RegisterLibFunc(&cfRetain, cf, "CFRetain")
 		purego.RegisterLibFunc(&cfArrayGetCount, cf, "CFArrayGetCount")
 		purego.RegisterLibFunc(&cfArrayGetValueAtIndex, cf, "CFArrayGetValueAtIndex")
-		purego.RegisterLibFunc(&cfDataCreate, cf, "CFDataCreate")
-		purego.RegisterLibFunc(&cfPropertyListCreateWithData, cf, "CFPropertyListCreateWithData")
 	})
 }
 
@@ -103,24 +100,4 @@ func commandDrag(start, end Point) {
 	if restore != nil {
 		cgWarpMouseCursorPosition(*restore)
 	}
-}
-
-// plistFromBytes parses XML or binary property lists, which macos.ParsePlist (XML only) can't.
-func plistFromBytes(data []byte) (any, bool) {
-	loadCG()
-	if len(data) == 0 {
-		return nil, false
-	}
-	cfData := cfDataCreate(0, data, len(data))
-	if cfData == 0 {
-		return nil, false
-	}
-	defer cfRelease(cfData)
-	ref := cfPropertyListCreateWithData(0, cfData, 0, 0, 0)
-	if ref == 0 {
-		return nil, false
-	}
-	defer cfRelease(ref)
-	value, err := macos.FromCF(ref)
-	return value, err == nil
 }

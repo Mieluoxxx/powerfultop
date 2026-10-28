@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"powerfultop/internal/macos"
+	"powerfultop/internal/notify"
 )
 
 // ddcRetryInterval: DDC/CI can be switched on in the monitor's own menu without any display
@@ -25,7 +26,7 @@ type Controller struct {
 	ddcFailedAt map[uint32]time.Time
 	probing     map[uint32]bool
 	baseline    map[uint32]*gammaTable
-	listeners   []func()
+	changes     notify.Listeners
 	started     bool
 	active      bool
 	pollStop    chan struct{}
@@ -81,18 +82,7 @@ func (d *Controller) Snapshot() []Brightness {
 }
 
 func (d *Controller) OnChange(fn func()) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.listeners = append(d.listeners, fn)
-}
-
-func (d *Controller) changed() {
-	d.mu.Lock()
-	listeners := append([]func(){}, d.listeners...)
-	d.mu.Unlock()
-	for _, fn := range listeners {
-		fn()
-	}
+	d.changes.Add(fn)
 }
 
 // SetActive polls native brightness while the controls are on screen: it also moves with the keyboard keys.
@@ -155,7 +145,7 @@ func (d *Controller) SetLevel(id uint32, level float64) {
 		d.applySoftware(level, id)
 		_ = d.prefs.Set(softwareKey(id), level)
 	}
-	d.changed()
+	d.changes.Notify()
 }
 
 func (d *Controller) indexOf(id uint32) int {
@@ -214,7 +204,7 @@ func (d *Controller) refresh() {
 	for _, id := range probe {
 		d.probeDDC(id)
 	}
-	d.changed()
+	d.changes.Notify()
 }
 
 func (d *Controller) probeDDC(id uint32) {
@@ -261,7 +251,7 @@ func (d *Controller) probeDDC(id uint32) {
 		if dimmed {
 			d.restoreGamma(id)
 		}
-		d.changed()
+		d.changes.Notify()
 	}()
 }
 
@@ -279,7 +269,7 @@ func (d *Controller) pollNative() {
 	}
 	d.mu.Unlock()
 	if changed {
-		d.changed()
+		d.changes.Notify()
 	}
 }
 

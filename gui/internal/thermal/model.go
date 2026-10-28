@@ -128,15 +128,6 @@ func (s Snapshot) AnyFanManual() bool {
 	return false
 }
 
-// HottestC is the highest group maximum, false without readings.
-func (s Snapshot) HottestC() (float64, bool) {
-	hi, ok := math.Inf(-1), false
-	for _, t := range s.Temperatures {
-		hi, ok = math.Max(hi, t.MaximumC), true
-	}
-	return hi, ok
-}
-
 // MaxActualRPM is the fastest fan's speed, 0 without fans.
 func (s Snapshot) MaxActualRPM() float64 {
 	hi := 0.0

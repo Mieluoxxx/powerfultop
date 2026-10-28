@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"powerfultop/internal/lang"
 )
 
 // DataSource tells whether power came from PowerTelemetryData or the Amperage × Voltage fallback.
@@ -244,15 +246,15 @@ func (d Data) EffectiveACOutputW() float64 {
 func (d Data) PowerSourceDescription() string {
 	switch d.PowerState().Kind {
 	case StateOnBattery:
-		return l("Battery Discharging", "电池放电")
+		return lang.L("Battery Discharging", "电池放电")
 	case StateConnectingAC:
-		return l("AC Connecting", "AC 连接中")
+		return lang.L("AC Connecting", "AC 连接中")
 	case StateACIdle:
-		return l("AC Powered", "AC 供电")
+		return lang.L("AC Powered", "AC 供电")
 	case StateCharging:
-		return l("AC Charging", "AC 充电中")
+		return lang.L("AC Charging", "AC 充电中")
 	default:
-		return l("AC + Battery Supplement", "AC + 电池补充供电")
+		return lang.L("AC + Battery Supplement", "AC + 电池补充供电")
 	}
 }
 
@@ -468,11 +470,11 @@ func (d Data) EstimatedTimeRemainingText() string {
 func (d Data) EstimatedTimeRemainingLabel() string {
 	if d.IsBatteryCharging() {
 		if d.ChargeLimitPercent < 100 {
-			return lf("Est. Time to %d%%", "预计充至 %d%%", d.ChargeLimitPercent)
+			return lang.Lf("Est. Time to %d%%", "预计充至 %d%%", d.ChargeLimitPercent)
 		}
-		return l("Est. Time to Full", "预计充满时间")
+		return lang.L("Est. Time to Full", "预计充满时间")
 	}
-	return l("Est. Time to Empty", "预计剩余时间")
+	return lang.L("Est. Time to Empty", "预计剩余时间")
 }
 
 func (d Data) EstimatedTimeFootnote() string {
@@ -480,9 +482,9 @@ func (d Data) EstimatedTimeFootnote() string {
 		return ""
 	}
 	if source := ChargeLimitSourceLabel(d.ChargeLimitSource); d.ChargeLimitPercent < 100 && source != "" {
-		return lf("Estimated to %d%% charge limit (%s).", "按 %d%% 充电上限估算（%s）。", d.ChargeLimitPercent, source)
+		return lang.Lf("Estimated to %d%% charge limit (%s).", "按 %d%% 充电上限估算（%s）。", d.ChargeLimitPercent, source)
 	}
-	return l("Estimated from remaining energy and smoothed power (macOS no longer provides this).",
+	return lang.L("Estimated from remaining energy and smoothed power (macOS no longer provides this).",
 		"根据剩余电量与平滑功耗估算（macOS 已不再提供此数据）。")
 }
 
@@ -490,9 +492,9 @@ func (d Data) EstimatedTimeFootnote() string {
 func FormatDuration(minutes int) string {
 	hours, mins := minutes/60, minutes%60
 	if hours > 0 {
-		return lf("%dh %dm", "%d 小时 %d 分钟", hours, mins)
+		return lang.Lf("%dh %dm", "%d 小时 %d 分钟", hours, mins)
 	}
-	return lf("%dm", "%d 分钟", mins)
+	return lang.Lf("%dm", "%d 分钟", mins)
 }
 
 func minutesFromEnergy(energyWh, powerW float64) *int {
@@ -514,17 +516,17 @@ func (d Data) NotChargingReasonDescription() string {
 	reason := *d.NotChargingReason
 	switch {
 	case reason&0x01000000 != 0:
-		return l("Optimized Battery Charging", "优化电池充电")
+		return lang.L("Optimized Battery Charging", "优化电池充电")
 	case reason&0x00000002 != 0:
-		return l("Temperature Too High", "温度过高")
+		return lang.L("Temperature Too High", "温度过高")
 	case reason&0x00000001 != 0:
-		return l("Battery Fully Charged", "电池已充满")
+		return lang.L("Battery Fully Charged", "电池已充满")
 	case reason&0x00000004 != 0:
-		return l("Battery Abnormal", "电池异常")
+		return lang.L("Battery Abnormal", "电池异常")
 	case reason&0x00000080 != 0:
-		return l("Charger Power Insufficient", "充电器功率不足")
+		return lang.L("Charger Power Insufficient", "充电器功率不足")
 	}
-	return lf("Reason Code %d (0x%X)", "原因代码 %d (0x%X)", reason, reason)
+	return lang.Lf("Reason Code %d (0x%X)", "原因代码 %d (0x%X)", reason, reason)
 }
 
 func (d Data) WithConnectionPhase(phase ConnectionPhase) Data {

@@ -3,6 +3,8 @@ package power
 import (
 	"sync"
 	"time"
+
+	"powerfultop/internal/notify"
 )
 
 const (
@@ -32,7 +34,7 @@ type Monitor struct {
 	available bool
 	started   bool
 	stop      chan struct{}
-	listeners []func()
+	changes   notify.Listeners
 
 	estimator    Estimator
 	machine      machinePhase
@@ -64,9 +66,7 @@ func (m *Monitor) Available() bool {
 
 // OnChange registers fn, called on any goroutine after each refresh.
 func (m *Monitor) OnChange(fn func()) {
-	m.mu.Lock()
-	m.listeners = append(m.listeners, fn)
-	m.mu.Unlock()
+	m.changes.Add(fn)
 }
 
 func (m *Monitor) Start() {
@@ -91,7 +91,7 @@ func (m *Monitor) Start() {
 	}
 	m.publishLocked(raw)
 	m.mu.Unlock()
-	m.notify()
+	m.changes.Notify()
 
 	go m.loop(stop)
 	watchPowerSources(m)
@@ -109,9 +109,6 @@ func (m *Monitor) Stop() {
 	m.estimator.Reset()
 	unwatchPowerSources(m)
 }
-
-// RefreshNow reads again without waiting for the next poll.
-func (m *Monitor) RefreshNow() { go m.update() }
 
 func (m *Monitor) loop(stop chan struct{}) {
 	ticker := time.NewTicker(pollInterval)
@@ -144,7 +141,7 @@ func (m *Monitor) update() {
 	m.available = ok
 	m.publishLocked(raw)
 	m.mu.Unlock()
-	m.notify()
+	m.changes.Notify()
 }
 
 // powerSourceChanged runs on a power-source notification: plug, unplug or adapter change.
@@ -172,7 +169,7 @@ func (m *Monitor) powerSourceChanged() {
 	m.refreshGen++
 	gen := m.refreshGen
 	m.mu.Unlock()
-	m.notify()
+	m.changes.Notify()
 
 	for _, delay := range coalescedRefreshDelays {
 		time.AfterFunc(delay, func() {
@@ -237,13 +234,4 @@ func resolvedWhileConnecting(raw Data) bool {
 		return false
 	}
 	return raw.BatteryPowerW < -0.3 || raw.ACInputW >= raw.SystemPowerW-0.5
-}
-
-func (m *Monitor) notify() {
-	m.mu.Lock()
-	listeners := append([]func(){}, m.listeners...)
-	m.mu.Unlock()
-	for _, fn := range listeners {
-		fn()
-	}
 }

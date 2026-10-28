@@ -11,6 +11,7 @@ import (
 
 	"github.com/egoist/mygo"
 
+	"powerfultop/internal/lang"
 	"powerfultop/internal/macos"
 )
 
@@ -54,7 +55,7 @@ func (d *darwinItems) setAllowList(list []any) bool {
 }
 
 func (d *darwinItems) requestAllowListAccess() bool {
-	granted := d.requestFileAccess(allowListPath, allowListBookmarkKey, tr(
+	granted := d.requestFileAccess(allowListPath, allowListBookmarkKey, lang.L(
 		"Choose group.com.apple.controlcenter.plist so PowerfulTop can switch menu bar icons on and off for the tray.",
 		"请选择 group.com.apple.controlcenter.plist，PowerfulTop 才能为托盘开关菜单栏图标。"))
 	return granted && d.allowList() != nil

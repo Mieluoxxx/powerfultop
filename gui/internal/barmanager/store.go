@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"powerfultop/internal/notify"
 )
 
 // StoreError is why the last move failed; the page words it.
@@ -79,12 +81,12 @@ type ItemStore struct {
 	// chosen is the display the user picked; it may be disconnected, and comes back with it.
 	chosen string
 
-	mu        sync.Mutex
-	snap      StoreSnapshot
-	visible   bool
-	stop      chan struct{}
-	listeners []func()
-	icons     map[string][]byte
+	mu      sync.Mutex
+	snap    StoreSnapshot
+	visible bool
+	stop    chan struct{}
+	changes notify.Listeners
+	icons   map[string][]byte
 
 	// work serializes scans and moves, which both read and drive the bar.
 	work sync.Mutex
@@ -139,19 +141,14 @@ func (s *ItemStore) Snapshot() StoreSnapshot {
 
 // OnChange registers fn, called from the store's goroutine after the snapshot changes.
 func (s *ItemStore) OnChange(fn func()) {
-	s.mu.Lock()
-	s.listeners = append(s.listeners, fn)
-	s.mu.Unlock()
+	s.changes.Add(fn)
 }
 
 func (s *ItemStore) update(change func(*StoreSnapshot)) {
 	s.mu.Lock()
 	change(&s.snap)
-	listeners := append([]func(){}, s.listeners...)
 	s.mu.Unlock()
-	for _, fn := range listeners {
-		fn()
-	}
+	s.changes.Notify()
 }
 
 // Icon is the PNG of the app owning item, once a scan has fetched it.

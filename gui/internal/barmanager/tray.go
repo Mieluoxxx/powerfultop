@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"powerfultop/internal/notify"
 )
 
 // TrayError is why the last tray action failed; the page words it.
@@ -143,12 +145,12 @@ type TrayStore struct {
 	// sit right of it, so what they open hangs near the flyout.
 	overflowName string
 
-	mu        sync.Mutex
-	snap      TraySnapshot
-	members   []string
-	listeners []func()
-	icons     map[string][]byte
-	stop      chan struct{}
+	mu      sync.Mutex
+	snap    TraySnapshot
+	members []string
+	changes notify.Listeners
+	icons   map[string][]byte
+	stop    chan struct{}
 	// menuRefs are the elements of the menu last read, released when the next one is.
 	menuRefs    []axRef
 	opened      *openedItem
@@ -207,19 +209,14 @@ func (s *TrayStore) Snapshot() TraySnapshot {
 
 // OnChange registers fn, called from the store's goroutines after the snapshot changes.
 func (s *TrayStore) OnChange(fn func()) {
-	s.mu.Lock()
-	s.listeners = append(s.listeners, fn)
-	s.mu.Unlock()
+	s.changes.Add(fn)
 }
 
 func (s *TrayStore) update(change func(*TraySnapshot)) {
 	s.mu.Lock()
 	change(&s.snap)
-	listeners := append([]func(){}, s.listeners...)
 	s.mu.Unlock()
-	for _, fn := range listeners {
-		fn()
-	}
+	s.changes.Notify()
 }
 
 // Icon is the PNG of the entry's app, once fetched.
@@ -406,11 +403,6 @@ func (s *TrayStore) RefreshMenuBar() {
 			s.add(snap.ErrorID)
 		}
 	}()
-}
-
-// ClearError dismisses the last error.
-func (s *TrayStore) ClearError() {
-	s.update(func(snap *TraySnapshot) { snap.Error, snap.ErrorID = TrayNoError, "" })
 }
 
 func (s *TrayStore) membersCopy() []string {

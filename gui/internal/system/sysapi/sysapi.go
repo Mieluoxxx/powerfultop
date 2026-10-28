@@ -80,9 +80,6 @@ func load() error {
 	return loadErr
 }
 
-// Load reports whether the libraries could be loaded.
-func Load() error { return load() }
-
 // IOKitHandle is the dlopen handle of IOKit, for packages resolving their own symbols in it.
 func IOKitHandle() uintptr {
 	if load() != nil {
