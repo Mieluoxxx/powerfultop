@@ -425,7 +425,7 @@ func demoBarManager(iconDir string) (*barmanager.ItemStore, *barmanager.TrayStor
 		item("ChatGPT", "", "absent", ""),
 	}
 	store := barmanager.NewPreview(barmanager.StoreSnapshot{
-		Supported: true, Trusted: true, HasLayoutAccess: true, Items: items,
+		Trusted: true, HasLayoutAccess: true, Items: items,
 		Displays: []barmanager.Display{{Name: "Built-in Retina Display", Frame: barmanager.Rect{X: 0, Y: 0, W: 1512, H: 32}}},
 	})
 	entries := []barmanager.TrayEntry{
@@ -435,7 +435,7 @@ func demoBarManager(iconDir string) (*barmanager.ItemStore, *barmanager.TrayStor
 		{ID: "com.apple.menuextra.sound", Name: "Sound", NameZh: "声音", Icon: "volume-2", Running: true},
 	}
 	tray := barmanager.NewTrayPreview(barmanager.TraySnapshot{
-		Supported: true, Enabled: true, HasAllowListAccess: true, Entries: entries,
+		Enabled: true, HasAllowListAccess: true, Entries: entries,
 	})
 	for _, it := range items {
 		if png, err := os.ReadFile(filepath.Join(iconDir, it.Name+".png")); err == nil {

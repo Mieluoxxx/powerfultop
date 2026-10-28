@@ -8,7 +8,7 @@
     "source": "en"
   },
   "macos": {
-    "minimumSystemVersion": "14.0",
+    "minimumSystemVersion": "27.0",
     "infoPlist": {
       "LSUIElement": true
     }

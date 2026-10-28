@@ -39,7 +39,6 @@ type TrayEntry struct {
 
 // TraySnapshot is what the tray's flyout and page show; safe to read from any goroutine.
 type TraySnapshot struct {
-	Supported          bool
 	Enabled            bool
 	Entries            []TrayEntry
 	HasAllowListAccess bool
@@ -180,13 +179,12 @@ type openedItem struct {
 	pid int32
 }
 
-func newTrayStore(p trayPlatform, prefs prefStore, supported bool, overflowName string) *TrayStore {
+func newTrayStore(p trayPlatform, prefs prefStore, overflowName string) *TrayStore {
 	s := &TrayStore{
 		p: p, prefs: prefs, overflowName: overflowName,
 		icons: map[string][]byte{}, lost: map[string]bool{}, conflicts: map[string]bool{},
 		sleep: time.Sleep, now: time.Now, logf: func(string, ...any) {},
 	}
-	s.snap.Supported = supported
 	s.snap.Enabled, _ = prefs.Bool(trayEnabledKey)
 	if v, ok := prefs.Value(trayItemsKey); ok {
 		list, _ := v.([]any)
@@ -235,7 +233,7 @@ func (s *TrayStore) Contains(id string) bool {
 
 func (s *TrayStore) active() bool {
 	snap := s.Snapshot()
-	return snap.Supported && snap.Enabled && !s.isClosed()
+	return snap.Enabled && !s.isClosed()
 }
 
 // Start puts the tray's items away again, as a crash or the last quit left them, and keeps

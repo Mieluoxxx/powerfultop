@@ -27,14 +27,14 @@ func TestManagerSnapshot(t *testing.T) {
 		app("7", "WeChat", "overflow", ""), app("8", "ego lite", "overflow", ""), app("9", "QQ", "absent", ""),
 		app("10", "wpsoffice", "absent", ""),
 	}
-	s := barmanager.NewPreview(barmanager.StoreSnapshot{Supported: true, Trusted: true, HasLayoutAccess: true, Items: items})
+	s := barmanager.NewPreview(barmanager.StoreSnapshot{Trusted: true, HasLayoutAccess: true, Items: items})
 	// Logos come as PNGs named after the app, since reading them from AppKit needs the app's run loop.
 	for _, it := range items {
 		if data, err := os.ReadFile(filepath.Join(os.Getenv("MANAGER_ICONS"), it.Name+".png")); err == nil {
 			s.SetPreviewIcon(it.AppPath, data)
 		}
 	}
-	tray := barmanager.NewTrayPreview(barmanager.TraySnapshot{Supported: true, Enabled: true, HasAllowListAccess: true,
+	tray := barmanager.NewTrayPreview(barmanager.TraySnapshot{Enabled: true, HasAllowListAccess: true,
 		Entries: []barmanager.TrayEntry{
 			{ID: "com.tencent.qq", Name: "QQ", AppPath: "/Applications/QQ.app", Running: true},
 			{ID: "com.apple.menuextra.wifi", Name: "Wi-Fi", NameZh: "Wi-Fi", Icon: "wifi", Running: true},

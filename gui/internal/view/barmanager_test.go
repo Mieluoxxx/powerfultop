@@ -9,7 +9,7 @@ import (
 )
 
 func managerTester(s *barmanager.ItemStore) *ui.Tester {
-	return trayManagerTester(s, barmanager.NewTrayPreview(barmanager.TraySnapshot{Supported: s.Snapshot().Supported}))
+	return trayManagerTester(s, barmanager.NewTrayPreview(barmanager.TraySnapshot{}))
 }
 
 func trayManagerTester(s *barmanager.ItemStore, tray *barmanager.TrayStore) *ui.Tester {
@@ -21,7 +21,7 @@ func trayManagerTester(s *barmanager.ItemStore, tray *barmanager.TrayStore) *ui.
 
 func TestManagerPageOrderEditor(t *testing.T) {
 	s := barmanager.NewPreview(barmanager.StoreSnapshot{
-		Supported: true, Trusted: true, HasLayoutAccess: true, Error: barmanager.ErrDidNotMove,
+		Trusted: true, HasLayoutAccess: true, Error: barmanager.ErrDidNotMove,
 		Items: []barmanager.Item{
 			{ID: "w#0", Name: "WeChat", Section: barmanager.Overflow, LayoutKey: "w"},
 			{ID: "a#0", Name: "FineTune", Section: barmanager.Shown, LayoutKey: "k", Reachable: true},
@@ -49,16 +49,11 @@ func TestManagerPageOrderEditor(t *testing.T) {
 
 func TestManagerPageStates(t *testing.T) {
 	tt := managerTester(barmanager.NewPreview(barmanager.StoreSnapshot{}))
-	if !tt.HasText("Requires macOS 27 or later.") || tt.HasText("Layout file allowed") {
-		t.Errorf("unsupported: %q", tt.Texts())
-	}
-
-	tt = managerTester(barmanager.NewPreview(barmanager.StoreSnapshot{Supported: true}))
-	if !tt.HasText("Grant Accessibility Access…") {
+	if !tt.HasText("Grant Accessibility Access…") || tt.HasText("Layout file allowed") {
 		t.Errorf("untrusted: %q", tt.Texts())
 	}
 
-	tt = managerTester(barmanager.NewPreview(barmanager.StoreSnapshot{Supported: true, Trusted: true}))
+	tt = managerTester(barmanager.NewPreview(barmanager.StoreSnapshot{Trusted: true}))
 	if !tt.HasText("Reading the menu bar…") || !tt.HasText("Allow Layout File…") {
 		t.Errorf("scanning without the layout file: %q", tt.Texts())
 	}
@@ -69,7 +64,7 @@ func TestManagerPageStates(t *testing.T) {
 
 func TestManagerPageTray(t *testing.T) {
 	store := barmanager.NewPreview(barmanager.StoreSnapshot{
-		Supported: true, Trusted: true, HasLayoutAccess: true,
+		Trusted: true, HasLayoutAccess: true,
 		Items: []barmanager.Item{
 			{ID: "s#0", Name: "Stats", BundleID: "eu.exelban.Stats", Section: barmanager.Shown, LayoutKey: "k", Reachable: true},
 			// Switched off by the tray, which the absent panel must not blame on System Settings.
@@ -77,7 +72,7 @@ func TestManagerPageTray(t *testing.T) {
 		},
 	})
 	tray := barmanager.NewTrayPreview(barmanager.TraySnapshot{
-		Supported: true, Enabled: true, Error: barmanager.ErrTrayUntracked, ErrorID: "x",
+		Enabled: true, Error: barmanager.ErrTrayUntracked, ErrorID: "x",
 		Entries: []barmanager.TrayEntry{
 			{ID: "com.tencent.xinWeChat", Name: "WeChat", Running: true},
 			{ID: "com.apple.menuextra.wifi", Name: "Wi-Fi", NameZh: "Wi-Fi", Icon: "wifi", Running: true},
@@ -98,18 +93,18 @@ func TestManagerPageTray(t *testing.T) {
 		t.Error("the empty hint shows only without entries")
 	}
 
-	tt = trayManagerTester(store, barmanager.NewTrayPreview(barmanager.TraySnapshot{Supported: true, HasAllowListAccess: true}))
+	tt = trayManagerTester(store, barmanager.NewTrayPreview(barmanager.TraySnapshot{HasAllowListAccess: true}))
 	if tt.HasText("Drag icons here from the menu bar below, or right-click one there.") || tt.HasText("Switch file allowed") {
 		t.Errorf("a disabled tray shows only its switch: %q", tt.Texts())
 	}
-	tt = trayManagerTester(store, barmanager.NewTrayPreview(barmanager.TraySnapshot{Supported: true, Enabled: true, HasAllowListAccess: true}))
+	tt = trayManagerTester(store, barmanager.NewTrayPreview(barmanager.TraySnapshot{Enabled: true, HasAllowListAccess: true}))
 	if !tt.HasText("Drag icons here from the menu bar below, or right-click one there.") || !tt.HasText("Switch file allowed") {
 		t.Errorf("empty tray: %q", tt.Texts())
 	}
 }
 
 func TestTrayFlyout(t *testing.T) {
-	tray := barmanager.NewTrayPreview(barmanager.TraySnapshot{Supported: true, Enabled: true,
+	tray := barmanager.NewTrayPreview(barmanager.TraySnapshot{Enabled: true,
 		Entries: []barmanager.TrayEntry{{ID: "a", Name: "Chat", Running: true}, {ID: "b", Name: "VPN"}},
 	})
 	var opened string
@@ -125,7 +120,7 @@ func TestTrayFlyout(t *testing.T) {
 	}
 
 	empty := ui.NewTester(func(c *ui.Context) {
-		TrayFlyout(c, barmanager.NewTrayPreview(barmanager.TraySnapshot{Supported: true, Enabled: true}), state, TrayFlyoutActions{})
+		TrayFlyout(c, barmanager.NewTrayPreview(barmanager.TraySnapshot{Enabled: true}), state, TrayFlyoutActions{})
 	}, TrayFlyoutWidth, 200)
 	if !empty.HasText("No icons in the tray") {
 		t.Errorf("empty: %q", empty.Texts())
@@ -134,7 +129,7 @@ func TestTrayFlyout(t *testing.T) {
 
 func TestManagerPagePicksADisplay(t *testing.T) {
 	s := barmanager.NewPreview(barmanager.StoreSnapshot{
-		Supported: true, Trusted: true, HasLayoutAccess: true, Display: "P275MV MAX",
+		Trusted: true, HasLayoutAccess: true, Display: "P275MV MAX",
 		Displays: []barmanager.Display{{Name: "Built-in Retina Display", Internal: true}, {Name: "P275MV MAX"}},
 		Items:    []barmanager.Item{{ID: "a#0", Name: "FineTune", Section: barmanager.Shown, Reachable: true}},
 	})
@@ -143,7 +138,7 @@ func TestManagerPagePicksADisplay(t *testing.T) {
 		t.Errorf("both displays offered: %q", tt.Texts())
 	}
 	one := managerTester(barmanager.NewPreview(barmanager.StoreSnapshot{
-		Supported: true, Trusted: true, Displays: []barmanager.Display{{Name: "Built-in Retina Display"}},
+		Trusted: true, Displays: []barmanager.Display{{Name: "Built-in Retina Display"}},
 		Items: []barmanager.Item{{ID: "a#0", Name: "FineTune", Section: barmanager.Shown}},
 	}))
 	if one.HasText("Built-in Retina Display") {
@@ -152,8 +147,8 @@ func TestManagerPagePicksADisplay(t *testing.T) {
 }
 
 func TestManagerPageFlagsIconsSwitchedOnOutsideTheTray(t *testing.T) {
-	store := barmanager.NewPreview(barmanager.StoreSnapshot{Supported: true, Trusted: true})
-	tray := barmanager.NewTrayPreview(barmanager.TraySnapshot{Supported: true, Enabled: true, HasAllowListAccess: true,
+	store := barmanager.NewPreview(barmanager.StoreSnapshot{Trusted: true})
+	tray := barmanager.NewTrayPreview(barmanager.TraySnapshot{Enabled: true, HasAllowListAccess: true,
 		Entries: []barmanager.TrayEntry{{ID: "com.tencent.qq", Name: "QQ", Running: true, SwitchedOn: true}}})
 	tt := trayManagerTester(store, tray)
 	if !tt.HasText("Some icons were switched back on in System Settings. Right-click one to hide it again or put it back.") {

@@ -7,8 +7,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -25,13 +23,13 @@ import (
 // NewItemStore lists items for the layout editor; ownStatusItems are the autosave names of the
 // app's own status items. It re-opens file grants saved on an earlier launch.
 func NewItemStore(ownStatusItems ...string) *ItemStore {
-	return newItemStore(platform(), macos.AppPreferences(), majorVersion() >= 27, ownStatusItems)
+	return newItemStore(platform(), macos.AppPreferences(), ownStatusItems)
 }
 
 // NewTrayStore keeps the tray's items out of the menu bar; overflowItem is the autosave name of
 // the tray's own status item.
 func NewTrayStore(overflowItem string) *TrayStore {
-	s := newTrayStore(platform(), macos.AppPreferences(), majorVersion() >= 27, overflowItem)
+	s := newTrayStore(platform(), macos.AppPreferences(), overflowItem)
 	s.logf = trayLogger()
 	watchLog = s.logf
 	return s
@@ -73,15 +71,6 @@ func platform() *darwinItems {
 }
 
 func (d *darwinItems) ownPID() int32 { return int32(os.Getpid()) }
-
-func majorVersion() int {
-	version, err := syscall.Sysctl("kern.osproductversion")
-	if err != nil {
-		return 0
-	}
-	major, _ := strconv.Atoi(strings.SplitN(version, ".", 2)[0])
-	return major
-}
 
 const (
 	positionsKey     = "TrailingItemPreferredPositions"

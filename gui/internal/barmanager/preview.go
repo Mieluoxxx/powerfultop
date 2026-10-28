@@ -3,14 +3,14 @@ package barmanager
 // NewPreview builds a store that touches no AppKit, showing snap: for page tests and previews of
 // the layout editor.
 func NewPreview(snap StoreSnapshot) *ItemStore {
-	s := newItemStore(nullItems{}, memoryPrefs{}, snap.Supported, nil)
+	s := newItemStore(nullItems{}, memoryPrefs{}, nil)
 	s.snap = snap
 	return s
 }
 
 // NewTrayPreview builds a tray store that touches no AppKit, showing snap.
 func NewTrayPreview(snap TraySnapshot) *TrayStore {
-	s := newTrayStore(nullItems{}, memoryPrefs{}, snap.Supported, "")
+	s := newTrayStore(nullItems{}, memoryPrefs{}, "")
 	s.snap = snap
 	for _, e := range snap.Entries {
 		s.members = append(s.members, e.ID)

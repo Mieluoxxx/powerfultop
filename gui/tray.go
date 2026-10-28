@@ -8,15 +8,11 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
-	"powerfultop/internal/macos"
 	"powerfultop/internal/view"
 )
 
 // trayID is the status item's autosave name.
 const trayID = "PowerfulTop.status"
-
-// A press that closed the popover may still reach the status item as a click; reopening on it would flicker.
-const reopenGuard = 400 * time.Millisecond
 
 func (a *app) setupTray() {
 	var err error
@@ -94,9 +90,6 @@ func (a *app) togglePopover() {
 		p.Close()
 		return
 	}
-	if time.Since(a.closedAt) < reopenGuard {
-		return
-	}
 	a.panelHeight = 0
 	a.chargeLimit.Refresh()
 	panel := mygo.NewFlyout(mygo.FlyoutOptions{
@@ -110,14 +103,9 @@ func (a *app) togglePopover() {
 	})
 	a.panel.Store(panel)
 	a.setDisplaysShown(true)
-	a.clicks = macos.StartClickMonitor(a.dismissIfOutside)
 	panel.OnClosed(func() {
 		a.panel.Store(nil)
 		a.setDisplaysShown(false)
-		// Closing often runs inside the monitor's own block, which must outlive this call.
-		monitor := a.clicks
-		a.clicks = nil
-		go mygo.RunOnMain(monitor.Stop)
 	})
 }
 
@@ -127,19 +115,6 @@ func (a *app) setDisplaysShown(shown bool) {
 		a.displaysShown = shown
 		a.displays.SetActive(shown)
 	}
-}
-
-func (a *app) dismissIfOutside() {
-	p := a.panel.Load()
-	if p == nil || contains(p.Bounds(), mygo.Screen.CursorScreenPoint()) {
-		return
-	}
-	a.closedAt = time.Now()
-	p.Close()
-}
-
-func contains(r mygo.Rectangle, p mygo.Point) bool {
-	return p.X >= r.X && p.X < r.X+r.Width && p.Y >= r.Y && p.Y < r.Y+r.Height
 }
 
 func (a *app) popoverView(c *ui.Context) {

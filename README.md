@@ -8,7 +8,7 @@ A lightweight menu bar app that shows exactly how much power your MacBook is usi
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.0.0-blue" />
-  <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue" />
+  <img src="https://img.shields.io/badge/platform-macOS%2027%2B-blue" />
   <img src="https://img.shields.io/badge/architecture-Apple%20Silicon-green" />
   <img src="https://img.shields.io/badge/license-MIT-orange" />
 </p>
@@ -23,7 +23,7 @@ A lightweight menu bar app that shows exactly how much power your MacBook is usi
 - **Battery** — health and capacity, cell topology (e.g. 3S2P) with series voltage and parallel currents, the charger's negotiation, lifetime statistics, and the charge limit itself.
 - **Cooling** — CPU, GPU and battery sensors, and fan control: Auto, Full Blast, or a fixed RPM or temperature ramp. One administrator prompt installs the helper, and the fans go back to macOS when PowerfulTop quits, the Mac sleeps, or the chip runs too hot.
 - **System** — CPU per core cluster, memory composition, load average, uptime, swap and the busiest processes.
-- **Menu bar manager and tray (macOS 27)** — every icon in its real order, drag to reorder, and a taskbar-style overflow for the icons macOS tucks behind «.
+- **Menu bar manager and tray** — every icon in its real order, drag to reorder, and a taskbar-style overflow for the icons macOS tucks behind «.
 
 Everything updates live, including the moment you plug in or unplug the charger.
 
@@ -66,7 +66,7 @@ open build/PowerfulTop.app
 ## Requirements
 
 - Apple Silicon MacBook with its built-in battery
-- macOS 14 (Sonoma) or later; the menu bar manager and the tray need macOS 27
+- macOS 27 or later
 
 ## Acknowledgements
 

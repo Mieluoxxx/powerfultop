@@ -2,13 +2,11 @@ package main
 
 import (
 	"log"
-	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
 	"powerfultop/internal/barmanager"
-	"powerfultop/internal/macos"
 	"powerfultop/internal/view"
 )
 
@@ -28,7 +26,7 @@ func (a *app) setupOverflow() {
 // syncOverflow shows the chevron while the tray is on, and redraws what shows the tray.
 func (a *app) syncOverflow() {
 	snap := a.trayStore.Snapshot()
-	want := snap.Supported && snap.Enabled
+	want := snap.Enabled
 	switch {
 	case want && a.overflow == nil:
 		a.trayStore.PlaceOverflow(trayID)
@@ -76,9 +74,6 @@ func (a *app) toggleOverflow() {
 		p.Close()
 		return
 	}
-	if time.Since(a.overflowClosedAt) < reopenGuard {
-		return
-	}
 	a.trayStore.Reconcile()
 	a.overflowHeight = 0
 	panel := mygo.NewFlyout(mygo.FlyoutOptions{
@@ -92,17 +87,11 @@ func (a *app) toggleOverflow() {
 	})
 	a.overflowPanel.Store(panel)
 	_ = a.overflow.SetIcon(barmanager.OverflowIcon(true), true)
-	a.overflowClicks = macos.StartClickMonitor(a.dismissOverflowIfOutside)
 	panel.OnClosed(func() {
 		a.overflowPanel.Store(nil)
-		a.overflowClosedAt = time.Now()
 		if a.overflow != nil {
 			_ = a.overflow.SetIcon(barmanager.OverflowIcon(false), true)
 		}
-		// Closing often runs inside the monitor's own block, which must outlive this call.
-		monitor := a.overflowClicks
-		a.overflowClicks = nil
-		go mygo.RunOnMain(monitor.Stop)
 	})
 }
 
@@ -110,15 +99,6 @@ func (a *app) closeOverflow() {
 	if p := a.overflowPanel.Load(); p != nil {
 		p.Close()
 	}
-}
-
-func (a *app) dismissOverflowIfOutside() {
-	p := a.overflowPanel.Load()
-	// A menu copied from a tray item hangs below the flyout; choosing from it closes the flyout itself.
-	if p == nil || a.overflowMenuOpen || contains(p.Bounds(), mygo.Screen.CursorScreenPoint()) {
-		return
-	}
-	p.Close()
 }
 
 func (a *app) overflowView(c *ui.Context) {
@@ -152,8 +132,6 @@ func (a *app) openTrayItem(id string, tile ui.Rect) {
 			if p == nil {
 				return
 			}
-			a.overflowMenuOpen = true
-			defer func() { a.overflowMenuOpen = false }()
 			mygo.NewMenu(a.trayMenuItems(entries)).PopupAt(p, int(tile.X), int(tile.Y+tile.H+4))
 		})
 	}()

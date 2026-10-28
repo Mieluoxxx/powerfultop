@@ -203,7 +203,7 @@ func newTestTray(t *testing.T, f *fakeTray, members ...string) (*TrayStore, *fak
 		list[i] = m
 	}
 	prefs := &fakePrefs{values: map[string]any{trayEnabledKey: true, trayItemsKey: list}}
-	s := newTrayStore(f, prefs, true, "PowerfulTop.overflow")
+	s := newTrayStore(f, prefs, "PowerfulTop.overflow")
 	s.sleep = func(time.Duration) {}
 	t.Cleanup(s.stopReconciling)
 	return s, prefs

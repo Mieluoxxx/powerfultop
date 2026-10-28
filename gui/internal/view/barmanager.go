@@ -35,9 +35,7 @@ func MenuBarManagerPage(c *ui.Context, store *barmanager.ItemStore, tray *barman
 		}
 	}
 	ui.Column(c).Gap(22).MaxWidth(880).Children(func() {
-		if snap.Supported {
-			managerTrayPanel(c, tray, snap, state)
-		}
+		managerTrayPanel(c, tray, snap, state)
 		managerLayoutPanel(c, store, tray, snap, state)
 		if len(absent) > 0 {
 			managerAbsentPanel(c, store, state, absent)
@@ -179,13 +177,11 @@ func find(items []barmanager.Item, id string) (barmanager.Item, bool) {
 func managerLayoutPanel(c *ui.Context, store *barmanager.ItemStore, tray *barmanager.TrayStore, snap barmanager.StoreSnapshot, state *ManagerPageState) {
 	Surface(c, ui.Column(c).Padding(18).Gap(14), 18).Children(func() {
 		PanelHeader(c, "layout-panel-top", L("Menu Bar Order", "菜单栏排序"), Purple, func() {
-			if snap.Supported && snap.Trusted {
+			if snap.Trusted {
 				managerLayoutAccess(c, store, snap)
 			}
 		})
 		switch {
-		case !snap.Supported:
-			managerEmptyState(c, "triangle-alert", L("Requires macOS 27 or later.", "需要 macOS 27 或更高版本。"), "")
 		case !snap.Trusted:
 			managerEmptyState(c, "lock", L("Arranging icons here needs Accessibility access.", "在这里整理图标需要辅助功能权限。"),
 				L("macOS has no API for other apps' menu bar icons, so PowerfulTop reads them through Accessibility and moves them with the same ⌘-drag you would do.",

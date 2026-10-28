@@ -37,19 +37,14 @@ type app struct {
 	trayStore    *barmanager.TrayStore
 	history      history.History
 
-	tray     *mygo.Tray
-	panel    atomic.Pointer[mygo.Window]
-	details  atomic.Pointer[mygo.Window]
-	clicks   *macos.ClickMonitor
-	closedAt time.Time
+	tray    *mygo.Tray
+	panel   atomic.Pointer[mygo.Window]
+	details atomic.Pointer[mygo.Window]
 
-	overflow         *mygo.Tray
-	overflowPanel    atomic.Pointer[mygo.Window]
-	overflowClicks   *macos.ClickMonitor
-	overflowClosedAt time.Time
-	overflowHeight   int
-	overflowMenuOpen bool
-	overflowState    view.TrayFlyoutState
+	overflow       *mygo.Tray
+	overflowPanel  atomic.Pointer[mygo.Window]
+	overflowHeight int
+	overflowState  view.TrayFlyoutState
 
 	trayIcon      []byte
 	trayTicker    *time.Ticker

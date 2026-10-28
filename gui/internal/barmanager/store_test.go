@@ -104,7 +104,7 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 
 func visibleStore(t *testing.T, p *fakeItems) *ItemStore {
 	t.Helper()
-	s := newItemStore(p, &fakePrefs{values: map[string]any{}}, true, []string{"PowerfulTop.status"})
+	s := newItemStore(p, &fakePrefs{values: map[string]any{}}, []string{"PowerfulTop.status"})
 	s.SetVisible(true)
 	t.Cleanup(func() { s.SetVisible(false) })
 	waitFor(t, "items", func() bool { return len(s.Snapshot().Items) > 0 })
@@ -112,7 +112,7 @@ func visibleStore(t *testing.T, p *fakeItems) *ItemStore {
 }
 
 func TestStoreListsOnlyWhileVisibleAndTrusted(t *testing.T) {
-	s := newItemStore(&fakeItems{bars: wideBars()}, &fakePrefs{values: map[string]any{}}, true, nil)
+	s := newItemStore(&fakeItems{bars: wideBars()}, &fakePrefs{values: map[string]any{}}, nil)
 	s.SetVisible(true)
 	time.Sleep(50 * time.Millisecond)
 	if snap := s.Snapshot(); snap.Trusted || len(snap.Items) != 0 {
@@ -120,7 +120,7 @@ func TestStoreListsOnlyWhileVisibleAndTrusted(t *testing.T) {
 	}
 	s.SetVisible(false)
 
-	trusted := newItemStore(&fakeItems{bars: wideBars(), isTrusted: true}, &fakePrefs{values: map[string]any{}}, true, nil)
+	trusted := newItemStore(&fakeItems{bars: wideBars(), isTrusted: true}, &fakePrefs{values: map[string]any{}}, nil)
 	trusted.SetVisible(true)
 	waitFor(t, "items", func() bool { return len(trusted.Snapshot().Items) == 6 })
 	trusted.SetVisible(false)
@@ -179,14 +179,5 @@ func TestStoreReportsMovesThatDidNotLand(t *testing.T) {
 	s.move("com.tencent.qq#0", "")
 	if s.Snapshot().Error != ErrNotInMenuBar {
 		t.Error("an absent item can't be moved")
-	}
-}
-
-func TestStoreUnsupportedNeverScans(t *testing.T) {
-	s := newItemStore(&fakeItems{bars: wideBars(), isTrusted: true}, &fakePrefs{values: map[string]any{}}, false, nil)
-	s.SetVisible(true)
-	time.Sleep(50 * time.Millisecond)
-	if len(s.Snapshot().Items) != 0 {
-		t.Error("before macOS 27 the editor stays empty")
 	}
 }

@@ -24,8 +24,6 @@ const (
 
 // StoreSnapshot is what the layout editor shows; safe to read from any goroutine.
 type StoreSnapshot struct {
-	// Supported is false before macOS 27, whose single menu bar and layout file the editor relies on.
-	Supported bool
 	// Items run left to right as in the bar.
 	Items           []Item
 	Trusted         bool
@@ -94,8 +92,8 @@ type ItemStore struct {
 
 const editorDisplayKey = "menuBarEditorDisplay"
 
-func newItemStore(p itemPlatform, prefs prefStore, supported bool, ownNames []string) *ItemStore {
-	s := &ItemStore{p: p, prefs: prefs, ownNames: ownNames, snap: StoreSnapshot{Supported: supported}, icons: map[string][]byte{}}
+func newItemStore(p itemPlatform, prefs prefStore, ownNames []string) *ItemStore {
+	s := &ItemStore{p: p, prefs: prefs, ownNames: ownNames, icons: map[string][]byte{}}
 	if v, ok := prefs.Value(editorDisplayKey); ok {
 		s.chosen, _ = v.(string)
 	}
@@ -162,7 +160,7 @@ func (s *ItemStore) Icon(item Item) []byte {
 // Safe from any goroutine.
 func (s *ItemStore) SetVisible(visible bool) {
 	s.mu.Lock()
-	if visible == s.visible || !s.snap.Supported {
+	if visible == s.visible {
 		s.mu.Unlock()
 		return
 	}

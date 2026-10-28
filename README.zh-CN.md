@@ -8,7 +8,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.0.0-blue" />
-  <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue" />
+  <img src="https://img.shields.io/badge/platform-macOS%2027%2B-blue" />
   <img src="https://img.shields.io/badge/architecture-Apple%20Silicon-green" />
   <img src="https://img.shields.io/badge/license-MIT-orange" />
 </p>
@@ -23,7 +23,7 @@
 - **电池** —— 健康度与容量、电芯拓扑（如 3S2P）与串联组电压、并联节电流、充电器协商参数、生命周期统计，以及充电上限本身。
 - **散热** —— CPU、GPU、电池三组传感器，风扇控制可选择自动、全速，或固定转速 / 按温度提速。安装小组件只需一次管理员授权；PowerfulTop 退出、Mac 睡眠或芯片过热时，风扇会自动交还系统。
 - **系统** —— 各核心簇的 CPU 占用、内存构成、平均负载、已运行时间、交换区与最忙的进程。
-- **菜单栏管理与托盘（macOS 27）** —— 按真实顺序列出所有图标、拖放排序，以及类似任务栏溢出区的托盘，收在 « 里的图标也能打开。
+- **菜单栏管理与托盘** —— 按真实顺序列出所有图标、拖放排序，以及类似任务栏溢出区的托盘，收在 « 里的图标也能打开。
 
 数据实时更新，插拔电源的瞬间同样准确。
 
@@ -66,7 +66,7 @@ open build/PowerfulTop.app
 ## 系统要求
 
 - 带内置电池的 Apple Silicon MacBook
-- macOS 14（Sonoma）或更高版本；菜单栏管理与托盘需要 macOS 27
+- macOS 27 或更高版本
 
 ## 致谢
 

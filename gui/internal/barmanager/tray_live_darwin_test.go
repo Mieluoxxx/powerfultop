@@ -73,7 +73,7 @@ func TestTrayLiveAdd(t *testing.T) {
 	d := &darwinItems{onMain: func(fn func()) { fn() }}
 	prefs := &livePrefs{values: map[string]any{trayEnabledKey: true}}
 	// MyGo draws file icons on its run loop, which a test doesn't run.
-	s := newTrayStore(noIcons{d}, prefs, true, "PowerfulTop.overflow")
+	s := newTrayStore(noIcons{d}, prefs, "PowerfulTop.overflow")
 	t.Cleanup(s.stopReconciling)
 	t.Cleanup(s.RestoreAll)
 	if !s.CanHold(id) {
@@ -122,7 +122,7 @@ func TestLiveScan(t *testing.T) {
 		t.Skip()
 	}
 	d := &darwinItems{onMain: func(fn func()) { fn() }}
-	s := newItemStore(noIcons{d}, &livePrefs{values: map[string]any{}}, true, []string{"PowerfulTop.status", "PowerfulTop.overflow"})
+	s := newItemStore(noIcons{d}, &livePrefs{values: map[string]any{}}, []string{"PowerfulTop.status", "PowerfulTop.overflow"})
 	s.scan()
 	for _, display := range s.Snapshot().Displays {
 		s.chosen = display.Name

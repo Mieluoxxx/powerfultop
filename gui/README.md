@@ -14,8 +14,8 @@ go test ./...        # views and parsers, without a window
   popover, the details window, and what connects them. The views are put together from
   [CrychicUI](https://github.com/ELY-Open-Source/CrychicUI) components on MyGo's native UI.
 - `internal/macos`: macOS APIs MyGo doesn't wrap, through purego (no cgo): the IOKit registry,
-  CF ↔ Go conversion over XML property lists, cfprefsd preferences, a global click monitor, and the
-  Objective-C helpers (strings, data, autorelease pools, typed `objc_msgSend`) every package shares.
+  CF ↔ Go conversion over XML property lists, cfprefsd preferences, and the Objective-C
+  helpers (strings, data, autorelease pools, typed `objc_msgSend`) every package shares.
 - `internal/power`, `internal/thermal`, `internal/system`, `internal/display`: the monitors, each
   with `Start`/`Stop`/`Snapshot`/`OnChange`; `internal/notify` runs every `OnChange`.
 - `internal/menubar`: the menu bar label, rendered to a template PNG since trays can't show
@@ -33,8 +33,6 @@ go test ./...        # views and parsers, without a window
   same bundle identifier has a different signature; run a development copy under a different
   `identifier` in `mygo.json` while an installed build exists.
 - MyGo quits when the last window closes, so the app registers `App.OnWindowAllClosed`.
-- The popover closes through `internal/macos.ClickMonitor`: since macOS 14 an accessory app isn't
-  activated when its popover opens, so AppKit's transient dismissal never fires.
 - MenuBarAgent doesn't always notice writes to its layout file; the layout editor checks the bar
   after each move and restarts the agent when the write didn't take.
 - The README's screenshots are rendered from these views, with one Mac's readings, so they can be
